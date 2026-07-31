@@ -118,6 +118,7 @@ npm test
 npm run test:phase4a
 npm run test:phase4b
 npm run test:phase5a
+npm run test:phase5b
 npm run test:phase3
 node src/run-demo.js
 ```
@@ -216,6 +217,8 @@ docs/phase4a-http-api-key.md         fake-only version-2 contract and limits
 docs/phase4b-http-basic.md           fake-only version-3 contract and limits
 docs/phase5a-portable-bootstrap-plan.md
                                       pure cross-platform machine/repo boundary
+docs/phase5b-read-only-host-preflight.md
+                                      value-free metadata and integrity audit
 test/*.test.js                      functional + exposure tests
 AGENTS.md                           experiment rules for agents
 ```

@@ -110,3 +110,18 @@ platform inputs. It must not read files or environment variables, inspect file
 permissions, resolve links, access a vault or network, install launchers, create
 directories, or mutate machine/repository state. Those operations require a
 later explicit apply gate with symlink/reparse-point and ownership/DACL checks.
+
+## Phase 5b scope
+
+Phase 5b may add a read-only host preflight over already-derived paths. It may
+inspect file metadata and hash the non-secret launcher, but must not read the
+user config contents. POSIX readiness requires current-UID ownership and rejects
+group/other-writable installation artifacts plus any group/other access to the
+config file. Windows readiness requires an injected, value-free security adapter
+that confirms no reparse point, current-user ownership, and no other-user write;
+absence or malformed output from that adapter fails closed.
+
+Reports contain fixed check ids/status/reasons only: never raw OS command output,
+ACL principals, SIDs, usernames, config values, vault references, or exception
+messages. Phase 5b remains non-mutating and must not create, repair, chmod, install,
+pair, authenticate, access Bitwarden, or start the broker.
