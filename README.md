@@ -129,6 +129,7 @@ npm run test:phase5h4
 npm run test:phase5h5
 npm run test:phase5h6
 npm run test:phase5h7
+npm run test:phase5h8
 node src/run-demo.js
 ```
 
@@ -252,6 +253,7 @@ docs/phase5h4-macos-helper-evidence.md   pure macOS XPC/audit-token evidence com
 docs/phase5h5-inherited-launcher-transfer.md real disposable inherited-handle check
 docs/phase5h6-windows-helper-pipe-session.md real local pipe/token denial check
 docs/phase5h7-windows-native-denial-session.md combined pipe/handle/AccessCheck denial
+docs/phase5h8-windows-passwordless-service-plan.md pure passwordless service contract
 test/*.test.js                      functional + exposure tests
 AGENTS.md                           experiment rules for agents
 ```
@@ -282,6 +284,9 @@ AGENTS.md                           experiment rules for agents
 - Phase 5h.7 additionally carries the canonical request over that pipe, verifies
   an inherited launcher handle inside the probe, and performs native AccessCheck
   calls for every first-install target. It still cannot authorize the same user.
+- Phase 5h.8 fixes the future Windows writer to a passwordless `LocalService`
+  service SID and a digest-pinned binary, but performs no service installation,
+  elevation, ACL mutation, or host inspection.
 - No browser/website automation, query, cookie, form, process-env,
   SSH, database, RDP, or desktop credential injection.
 - Not a substitute for vault, OS keychain, or production broker hardening.

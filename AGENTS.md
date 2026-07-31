@@ -334,3 +334,31 @@ This phase accepts no caller-selected handle, path, pipe, PID, command,
 executable, environment, or evidence. It does not support upgrade/backup
 manifests, execute any manifest action, create a second principal, change target
 ACLs, access normal user roots or Bitwarden, or claim production readiness.
+
+## Phase 5h.8 scope
+
+Phase 5h.8 may define only a pure, non-executable Windows service-boundary plan.
+The fixed future helper identity is the built-in `LocalService` account with an
+unrestricted service SID, demand start, no password, no required network access,
+and no vault access. The plan binds a reviewed helper binary by lowercase SHA-256
+and byte length and requires local-only first-instance pipe, PID/token, target
+ACL, disposable apply/rollback, and cleanup gates.
+
+The Bridge client must authenticate the connected pipe server PID and token as
+both `LocalService` TokenUser and the expected per-service SID token group; a
+predictable pipe name plus first-instance flag is not server authentication.
+The installed binary/parent chain must be reparse-free and caller-nonwritable,
+and the service-object DACL must deny caller configuration changes.
+Targets and every security-relevant ancestor must be owned by a trusted
+Administrator/SYSTEM/TrustedInstaller identity or exactly the expected
+per-service SID, never by the caller or shared `LocalService` TokenUser. Native
+checks must deny caller data/create, `WRITE_DAC`,
+`WRITE_OWNER`, `DELETE`, and parent `FILE_DELETE_CHILD` rights. Ordinary
+caller-owned LocalAppData/home roots cannot establish this boundary.
+
+The API accepts no account, service name, pipe name, path, command, password,
+credential, ACL, or approval evidence from the caller. It performs no I/O and
+must not emit installer commands. It does not install/start a service, elevate,
+change ACLs, create an account, inspect the host, execute a manifest, or access
+Bitwarden. Every mutable operation remains behind an explicit operator-approved
+live gate and must be reverified from native evidence afterward.
