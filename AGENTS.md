@@ -495,3 +495,37 @@ must continue to report `scm_lifecycle_live_verified=false`,
 manifest execution, filesystem access, network access, vault access, or
 Bitwarden connection is permitted. A positive SCM lifecycle test requires a
 later explicit operator-approved disposable install/start/remove gate.
+
+## Phase 5h.15 scope
+
+Phase 5h.15 may add only a pure, non-executable approval envelope for the first
+disposable elevated Windows service lifecycle test. It accepts only the canonical
+in-process Phase 5h.8 boundary plan and binds its reviewed binary digest and byte
+length to a fixed ordered stage, install, configure, start, identity-check,
+denial-handshake, stop, delete, remove, and absence-verification sequence.
+
+Before mutation the plan must prove the fixed service/pipe absent and select and
+verify a fresh absent disposable root/binary target. The scope remains the fixed demand-start LocalService service, unrestricted fixed
+service SID, disposable administrator-controlled root, and denial-only pipe.
+Every mutation requires immediate native re-verification; cleanup is a separate
+finally path after the first run-owned object is created, continues after individual cleanup
+failures, and ends with absence proof. Any drift, unexpected
+pre-existing service, ACL/configuration/identity mismatch, non-denial response,
+or incomplete cleanup stops the test. Cleanup must be attempted after any
+activation and final evidence must prove service, binary, root, and pipe absent.
+Every service/file/root mutation and destructive cleanup must use retained handles
+for objects created by this run, with immediate native re-verification after each
+mutation. A create collision must never cause reacquisition or deletion by the
+fixed name/path of an object owned by another process.
+
+Approval is not representable as API input. The plan must always report
+`mutation_authorized=false`, `live_test_executed=false`, and
+`install_gate_eligible=false`. This phase must not emit commands, paths, SIDs,
+ACLs, or raw output and must not elevate, install/start/stop/delete a service,
+mutate files/registry/ACLs, execute a manifest, access a network/vault, or connect
+to Bitwarden. Execution requires a later explicit operator approval naming this
+disposable install/start/remove test and elevation scope.
+Serialized, cloned, spread, accessor-backed, or forged gate objects are not
+security capabilities and must be rejected; a future executor must rebuild the
+branded gate in-process from the canonical boundary plan plus fresh out-of-band
+operator approval.

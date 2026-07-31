@@ -319,6 +319,11 @@ AGENTS.md                           experiment rules for agents
   different client `TokenUser`, and always denies with incomplete target-ACL
   evidence and no manifest executor. Neither SCM lifecycle nor service-mode pipe
   activation has been live-verified, so installation remains ineligible.
+- Phase 5h.15 freezes the exact disposable Windows stage/install/start/verify/
+  deny/stop/delete/cleanup lifecycle as a pure approval envelope. It accepts no
+  approval value, emits no commands or host identifiers, performs no mutation,
+  and keeps installation ineligible until the named elevated test is explicitly
+  approved in the active task.
 - No browser/website automation, query, cookie, form, process-env,
   SSH, database, RDP, or desktop credential injection.
 - Not a substitute for vault, OS keychain, or production broker hardening.
