@@ -54,7 +54,7 @@ export function evaluateWindowsHelperPeerEvidence(raw) {
   return Object.freeze({
     local_transport: localTransport,
     identity_verified: identityVerified,
-    different_principal: !sameTokenUser,
+    different_principal: identityVerified && !sameTokenUser,
     caller_write_denied: facts.acl_checks_verified && facts.all_targets_checked &&
       facts.caller_effective_write_denied,
     helper_write_allowed: facts.acl_checks_verified && facts.all_targets_checked &&

@@ -235,3 +235,20 @@ PIDs, paths, ACLs, token details, and exception text must never be returned.
 This phase still must not inspect live tokens/ACLs, open a pipe, launch a helper,
 create an account/service/AppContainer, pass handles, mutate permissions, execute
 a manifest, access real user roots, or connect to Bitwarden.
+
+## Phase 5h.3 scope
+
+Phase 5h.3 may add only a pure Linux peer-evidence evaluator over trusted,
+injected collector facts. It must require AF_UNIX peer credentials with verified
+peer/helper process binding, caller/helper UIDs translated to the initial user
+namespace, the helper itself in the initial user namespace, peercred agreement
+with the translated caller host UID, unequal host-UID digests, and complete
+effective-access checks in the helper mount namespace over every bound target.
+
+Namespace-local UID 0, UID maps, no-new-privs, empty capabilities, seccomp, and
+Landlock are defense-in-depth signals only. They must never establish a distinct
+principal when host-UID digests are equal. Returned evidence contains only the
+five shared booleans; raw UIDs, PIDs, uid maps, namespace identifiers, paths,
+capabilities, filters, ACLs, and errors must not escape. This phase performs no
+socket or `/proc` I/O, namespace creation, helper launch, mount, permission
+mutation, manifest execution, real-root access, or Bitwarden connection.

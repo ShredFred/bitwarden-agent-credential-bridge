@@ -243,6 +243,7 @@ docs/phase5f-disposable-permissions.md OS-specific hardening inside marked roots
 docs/phase5g-disposable-executor.md    real install/upgrade/rollback in temp only
 docs/phase5h-helper-protocol.md         pure separate-writer helper wire contract
 docs/phase5h2-windows-helper-evidence.md pure Windows token/ACL evidence compiler
+docs/phase5h3-linux-helper-evidence.md   pure Linux host-UID/peercred evidence compiler
 test/*.test.js                      functional + exposure tests
 AGENTS.md                           experiment rules for agents
 ```
@@ -259,6 +260,8 @@ AGENTS.md                           experiment rules for agents
   OS-specific identity boundary is not implemented yet.
 - Phase 5h.2 refuses to treat Windows Restricted Tokens or AppContainers as a
   distinct writer when their `TokenUser` SID remains the caller's SID.
+- Phase 5h.3 similarly refuses to treat namespace-local UID 0, seccomp, Landlock,
+  capabilities, or no-new-privs as a distinct Linux host principal.
 - No browser/website automation, query, cookie, form, process-env,
   SSH, database, RDP, or desktop credential injection.
 - Not a substitute for vault, OS keychain, or production broker hardening.

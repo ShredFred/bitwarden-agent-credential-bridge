@@ -79,6 +79,9 @@ describe('Windows helper peer-evidence evaluator', () => {
       assert.equal(result.caller_write_denied, false);
       assert.equal(result.helper_write_allowed, false);
     }
+    for (const field of ['caller_token_verified', 'helper_token_verified']) {
+      assert.equal(evaluateWindowsHelperPeerEvidence(evidence({ [field]: false })).different_principal, false);
+    }
   });
 
   it('rejects missing, extra, accessor, non-boolean, and raw-SID-shaped evidence', () => {
