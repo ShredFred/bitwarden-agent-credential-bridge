@@ -1,0 +1,15 @@
+{
+  "name": "bitwarden-agent-credential-bridge",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Sample-only Phase 1 harness for an agent credential bridge contract (fake API + policy + broker).",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "test": "node --test \"./test/*.test.js\"",
+    "start:api": "node src/run-fake-api.js",
+    "start:demo": "node src/run-demo.js"
+  }
+}
