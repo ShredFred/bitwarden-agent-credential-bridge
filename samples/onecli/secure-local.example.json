@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "binds": {
+    "dashboard": {
+      "host": "127.0.0.1",
+      "port": 10254
+    },
+    "gateway": {
+      "host": "127.0.0.1",
+      "port": 10255
+    },
+    "postgres": {
+      "host": "127.0.0.1",
+      "port": 5432
+    }
+  },
+  "images": {
+    "onecli": "<pin-reviewed-onecli-image-tag-or-digest>",
+    "postgres": "<pin-reviewed-postgres-image-tag-or-digest>"
+  },
+  "postgres": {
+    "username": "<set-non-default-postgres-username>",
+    "password": "<generate-postgres-password-outside-this-repository>"
+  },
+  "encryptionKey": "<generate-encryption-key-outside-this-repository>",
+  "bitwardenRelayUrl": "https://<approved-bitwarden-relay-host>",
+  "credentialCacheTtlSeconds": 60,
+  "separateRuntimeBoundaryAcknowledged": true
+}

@@ -14,6 +14,7 @@ const samplePolicyPath = path.join(root, 'policies', 'sample-fake-service.json')
 
 const SKIP_DIR_NAMES = new Set([
   '.git',
+  '.agent-broker',
   'node_modules',
   '.cursor',
   'agent-transcripts',

@@ -3,12 +3,14 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Sample-only Phase 1 harness for an agent credential bridge contract (fake API + policy + broker).",
+  "description": "Sample-only credential bridge contract harness and non-mutating OneCLI readiness audit.",
   "engines": {
     "node": ">=20"
   },
   "scripts": {
     "test": "node --test \"./test/*.test.js\"",
+    "test:phase2": "node --test test/onecli-audit.test.js test/onecli-artifacts.test.js test/onecli-preflight.test.js",
+    "preflight:onecli": "node scripts/preflight-onecli.mjs",
     "start:api": "node src/run-fake-api.js",
     "start:demo": "node src/run-demo.js"
   }

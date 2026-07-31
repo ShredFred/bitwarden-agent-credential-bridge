@@ -24,3 +24,17 @@ Implement only:
 - documentation explaining that this harness tests the contract, not Bitwarden or OneCLI production security.
 
 Do not implement Bitwarden pairing, OneCLI deployment, TLS interception, certificate installation, firewall mutation, background services, browser login, MFA, SSH, databases, RDP, or desktop credential handling in this slice.
+
+## Phase 2 scope
+
+Phase 2 may add only a non-mutating OneCLI/Bitwarden readiness layer:
+
+- pin and document audited upstream commits/releases;
+- inspect local Docker/Compose, ports, platform, and `aac` availability;
+- validate a proposed deployment configuration without starting containers;
+- model the same-user, Docker-control, dashboard, relay, cache, log, and egress boundaries;
+- use generated fake values in tests and redact command output.
+
+Phase 2 must not start/stop Docker, pull images, pair a vault, call the Bitwarden
+relay, create real agent tokens, install certificates, modify firewall/proxy
+settings, or read/write a real secret. Those require a later explicit live-test gate.

@@ -1,6 +1,8 @@
-# Agent Credential Bridge — Phase 1 Harness
+# Agent Credential Bridge Experiment
 
-Sample-only security experiment. This repository tests a **credential-bridge contract**, not Bitwarden product security and not OneCLI production security.
+Sample-only security experiment. Phase 1 tests a **credential-bridge contract**.
+Phase 2 adds an offline, non-mutating OneCLI readiness audit. Neither phase
+tests Bitwarden product security or OneCLI production security.
 
 ## What Phase 1 covers
 
@@ -18,6 +20,28 @@ Bitwarden pairing, OneCLI deployment, TLS interception, certificate installation
 
 Do not connect this harness to a personal or company Bitwarden vault.
 
+## What Phase 2 covers
+
+- An upstream lock for OneCLI release `1.45.0`, its reviewed source commit, and
+  the audited Bitwarden Agent Access commit.
+- Pure proposed-configuration validators for audited local binds, pinned images,
+  deployment values, relay transport, the source-fixed cache TTL, and runtime
+  separation.
+- An injected-runner preflight that checks platform, Docker CLI, Compose,
+  `aac`, and the audited local ports (dashboard `10254`, gateway `10255`,
+  Postgres `5432`) using read-only commands.
+- A placeholder-only, deliberately non-deployable sample configuration.
+- Readiness limits and threat boundaries in
+  [`docs/phase2-onecli-readiness.md`](docs/phase2-onecli-readiness.md).
+
+Phase 2 does not start or stop Docker, pull images, access a network or relay,
+pair a vault, read environment values, create tokens, or read/write real
+secrets. Those operations require a separate live-test gate.
+
+For the pinned baseline, the audited Bitwarden provider hard-codes
+`credentialCacheTtlSeconds` to `60`; this is source behavior, not a Compose
+setting.
+
 ## Requirements
 
 - Node.js 20+ (ESM, standard library only — no npm dependencies)
@@ -30,6 +54,17 @@ node src/run-demo.js
 ```
 
 `run-demo.js` generates a cryptographically random fake sentinel, starts the fake API and foreground broker, calls through the broker bind URL, and prints only caller-visible status/body. It exits non-zero if the sentinel leaks into those surfaces or broker logs.
+
+To perform only the optional local Phase 2 readiness inspection:
+
+```bash
+npm run preflight:onecli
+```
+
+The preflight prints JSON and exits non-zero when a prerequisite is missing, a
+required port is occupied, or a probe cannot establish readiness. It does not
+print command output or environment values. A pass is not permission to deploy
+or pair OneCLI.
 
 ## Contract under test
 
@@ -64,12 +99,18 @@ Demo/tests rewrite `upstream` to the fake API’s concrete loopback origin after
 
 ```
 policies/sample-fake-service.json   declarative sample policy
+upstream/onecli.lock.json            reviewed Phase 2 upstream revisions
+samples/onecli/secure-local.example.json
+                                      rejected deployment placeholders
 src/constants.js                    constant API body + sentinel generator
 src/policy.js                       load + validate (loopback + placeholder rules)
 src/fake-api.js                     local fake HTTP API
 src/broker.js                       foreground loopback HTTP broker
 src/run-fake-api.js                 foreground API process
 src/run-demo.js                     end-to-end foreground demo
+src/onecli-audit.mjs                pure proposed-config validators
+scripts/preflight-onecli.mjs        read-only, value-free readiness report
+docs/phase2-onecli-readiness.md     evidence, platform path, threat boundaries
 test/*.test.js                      functional + exposure tests
 AGENTS.md                           experiment rules for agents
 ```
@@ -80,6 +121,9 @@ AGENTS.md                           experiment rules for agents
 - Sample policy uses port `0` for bind/upstream placeholders; runtime code supplies the concrete upstream origin after the fake API listens.
 - No TLS, no persistence, no multi-writer coordination beyond “one writer at a time” for this repo.
 - Not a substitute for vault, OS keychain, or production broker hardening.
+- Phase 2 validates a proposal and local prerequisites only. It does not verify
+  remote tags, images, relay reachability, Docker permissions, or runtime
+  isolation.
 
 ## Publication
 

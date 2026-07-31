@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "repository": "https://github.com/onecli/onecli.git",
+  "release": "1.45.0",
+  "commit": "84ccaf74ce6350f8925675457b48272c29f32c1a",
+  "bitwardenAgentAccessCommit": "9cd303f65dc501c19d1d513fb4cf88fe5f44936a",
+  "auditedDefaultPorts": {
+    "dashboard": 10254,
+    "gateway": 10255,
+    "postgres": 5432
+  },
+  "credentialCacheTtlSeconds": 60
+}
