@@ -188,15 +188,17 @@ function exactObject(value, fields) {
   if (keys.length !== fields.size || keys.some((key) => typeof key !== 'string' || !fields.has(key))) {
     throw new WindowsServiceLifecycleEvidenceError();
   }
-  const snapshot = {};
+  const snapshot = Object.create(null);
   for (const key of keys) {
     const descriptor = Object.getOwnPropertyDescriptor(value, key);
     if (descriptor === undefined || !('value' in descriptor)) {
       throw new WindowsServiceLifecycleEvidenceError();
     }
-    snapshot[key] = descriptor.value;
+    Object.defineProperty(snapshot, key, {
+      value: descriptor.value, enumerable: true, writable: false, configurable: false,
+    });
   }
-  return snapshot;
+  return Object.freeze(snapshot);
 }
 
 function exactArray(value, maximumLength) {
@@ -216,7 +218,9 @@ function exactArray(value, maximumLength) {
     if (descriptor === undefined || !('value' in descriptor)) {
       throw new WindowsServiceLifecycleEvidenceError();
     }
-    snapshot.push(descriptor.value);
+    Object.defineProperty(snapshot, String(index), {
+      value: descriptor.value, enumerable: true, writable: false, configurable: false,
+    });
   }
-  return snapshot;
+  return Object.freeze(snapshot);
 }

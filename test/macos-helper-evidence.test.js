@@ -146,13 +146,13 @@ describe('macOS helper peer-evidence evaluator', () => {
     assert.equal(evaluateMacosHelperPeerEvidence(evidence({ helper_required_write_allowed: false })).helper_write_allowed, false);
   });
 
-  it('rejects missing, extra, accessor, non-boolean, raw-EUID, and wrong-transport evidence', () => {
+  it('rejects missing, extra, accessor, proxy, non-boolean, raw-EUID, and wrong-transport evidence', () => {
     const missing = evidence();
     delete missing.mach_service_bound;
     const accessor = evidence();
     Object.defineProperty(accessor, 'helper_euid_verified', { get: () => true });
     for (const invalid of [
-      null, missing, { ...evidence(), raw_euid: 501 }, accessor,
+      null, missing, { ...evidence(), raw_euid: 501 }, accessor, new Proxy(evidence(), {}),
       evidence({ caller_hardened_runtime: 1 }), evidence({ caller_euid_sha256: '0' }),
       evidence({ transport_kind: 'tcp' }),
     ]) {
@@ -160,6 +160,27 @@ describe('macOS helper peer-evidence evaluator', () => {
         () => evaluateMacosHelperPeerEvidence(invalid),
         (error) => error instanceof MacosHelperEvidenceError && error.code === 'peer_identity_unverified',
       );
+    }
+  });
+
+  it('snapshots validated facts without consulting a poisoned Object.prototype', () => {
+    let getterCalls = 0;
+    let setterCalls = 0;
+    const priorDescriptor = Object.getOwnPropertyDescriptor(Object.prototype, 'helper_euid_verified');
+    Object.defineProperty(Object.prototype, 'helper_euid_verified', {
+      configurable: true,
+      get() { getterCalls += 1; return true; },
+      set() { setterCalls += 1; },
+    });
+    try {
+      const result = evaluateMacosHelperPeerEvidence(evidence({ helper_euid_verified: false }));
+      assert.equal(result.identity_verified, false);
+      assert.equal(result.different_principal, false);
+      assert.equal(getterCalls, 0);
+      assert.equal(setterCalls, 0);
+    } finally {
+      if (priorDescriptor === undefined) delete Object.prototype.helper_euid_verified;
+      else Object.defineProperty(Object.prototype, 'helper_euid_verified', priorDescriptor);
     }
   });
 

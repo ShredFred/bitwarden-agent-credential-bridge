@@ -557,3 +557,29 @@ must be explicitly named as structural claims, never live verification. It must 
 approval, or authorization. This phase performs no collection, command execution,
 elevation, SCM/filesystem/registry/ACL mutation, manifest execution, network/vault
 access, or Bitwarden connection.
+
+## Phase 5h.17 scope
+
+Phase 5h.17 may add only a pure Linux boundary plan for the system instance of
+systemd. It must fail closed for systemd user managers, other init systems,
+non-Linux platforms, and ambiguous runtime profiles. The future helper identity
+is a fixed static, passwordless, non-login system user; `DynamicUser=` must not be
+treated as stable ownership or distinct-principal evidence.
+
+The plan must bind a reviewed binary digest/length, fixed service and socket unit
+names, root-owned caller-nonwritable unit/binary objects and their complete
+parent/mount chains, retained-descriptor identity at use, post-`daemon-reload`
+loaded fragment/drop-in verification, and a root-owned filesystem
+AF_UNIX endpoint with caller connect-only access, kernel peer/process binding,
+initial-user-namespace identity, complete target access checks, and explicit
+system-service sandbox requirements. No-network must require later-verifiable
+enforcement through a private network namespace, exact AF_UNIX-only address
+families, `IPAddressDeny=any`, and fail-closed runtime verification. It must accept no command, path, UID, unit
+content, account override, approval value, or credential reference.
+
+The plan is non-executable and must always report mutation unauthorized, live
+test not executed, and install gate ineligible. No host inspection, account/unit
+creation, elevation, file/ACL mutation, socket I/O, helper launch, manifest
+execution, network/vault access, or Bitwarden connection is permitted. Those
+require later Linux-specific preflight, lifecycle, trusted-collector, and explicit
+operator-approval phases.

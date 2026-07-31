@@ -16,7 +16,8 @@ protocol:
 - `caller_write_denied`
 - `helper_write_allowed`
 
-It accepts an exact, accessor-free schema. Effective UIDs enter only as
+It accepts an exact, accessor-free, non-proxy schema and snapshots data-property
+values before evaluation. Effective UIDs enter only as
 lowercase SHA-256 digests and never appear in the result. The collector must
 hash the canonical UTF-8 preimage `euid:<decimal>`, where `<decimal>` is the
 unsigned base-10 EUID with no leading zeroes (except `0` itself). A different writer is

@@ -1,4 +1,5 @@
 import { timingSafeEqual } from 'node:crypto';
+import { types as utilTypes } from 'node:util';
 
 const EVIDENCE_FIELDS = new Set([
   'schema_version',
@@ -84,6 +85,7 @@ export function evaluateMacosHelperPeerEvidence(raw) {
 
 function exactPlainObject(value, fields) {
   if (value === null || typeof value !== 'object' || Array.isArray(value) ||
+      utilTypes.isProxy(value) ||
       Object.getPrototypeOf(value) !== Object.prototype) {
     throw new MacosHelperEvidenceError();
   }
@@ -91,11 +93,15 @@ function exactPlainObject(value, fields) {
   if (keys.length !== fields.size || keys.some((key) => typeof key !== 'string' || !fields.has(key))) {
     throw new MacosHelperEvidenceError();
   }
+  const snapshot = Object.create(null);
   for (const key of keys) {
     const descriptor = Object.getOwnPropertyDescriptor(value, key);
     if (descriptor === undefined || !('value' in descriptor)) throw new MacosHelperEvidenceError();
+    Object.defineProperty(snapshot, key, {
+      value: descriptor.value, enumerable: true, writable: false, configurable: false,
+    });
   }
-  return value;
+  return Object.freeze(snapshot);
 }
 
 function isDigest(value) {

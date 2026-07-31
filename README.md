@@ -261,6 +261,7 @@ docs/phase5h10-native-windows-service-host.md deterministic native lifecycle sca
 docs/phase5h11-native-pipe-denial.md native local pipe/token denial probe
 docs/phase5h12-explicit-pipe-dacl.md fixed protected native pipe DACL proof
 docs/phase5h13-server-identity-verifier.md pre-request SCM/PID/token verifier
+docs/phase5h17-linux-systemd-boundary-plan.md pure fixed systemd system-service contract
 test/*.test.js                      functional + exposure tests
 AGENTS.md                           experiment rules for agents
 ```
@@ -329,6 +330,11 @@ AGENTS.md                           experiment rules for agents
   ownership-consistent skip semantics, and final absence proof. Even a complete
   synthetic transcript remains explicitly untrusted, not live-verified, and not
   authorization evidence.
+- Phase 5h.17 starts Linux parity with a pure plan limited to the systemd system
+  manager, a fixed static non-login service account, fixed service/socket units,
+  root-owned nonwritable artifacts, a filesystem AF_UNIX endpoint, and explicit
+  sandbox requirements. It performs no host inspection, elevation, account/unit
+  creation, socket I/O, or mutation and remains ineligible for installation.
 - No browser/website automation, query, cookie, form, process-env,
   SSH, database, RDP, or desktop credential injection.
 - Not a substitute for vault, OS keychain, or production broker hardening.

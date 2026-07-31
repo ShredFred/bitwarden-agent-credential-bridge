@@ -17,8 +17,9 @@ not separate writer principals when `TokenUser` is unchanged. The evaluator
 therefore forces `different_principal` to false for any equal `TokenUser` digest,
 regardless of restricted-token or AppContainer flags.
 
-The evaluator never returns SID digests or any other identity, path, process, or
-ACL detail. Missing, extra, accessor-backed, wrongly typed, raw-SID-shaped, or
+The evaluator rejects proxies and snapshots exact data-property values before
+evaluation. It never returns SID digests or any other identity, path, process,
+or ACL detail. Missing, extra, accessor-backed, wrongly typed, raw-SID-shaped, or
 otherwise malformed evidence fails with the fixed `peer_identity_unverified`
 code.
 

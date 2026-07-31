@@ -6,8 +6,9 @@ booleans required by the helper protocol. It performs no I/O.
 The future collector must run from a helper in the initial user namespace and
 prove AF_UNIX `SO_PEERCRED` plus peer/helper process binding. Caller and helper
 UIDs must be translated to the initial user namespace and represented only as
-SHA-256 digests of one canonical host-UID encoding. The peercred UID must agree
-with the translated caller host UID.
+SHA-256 digests of the canonical UTF-8 preimage `uid:<decimal>`, where
+`<decimal>` is the unsigned base-10 host UID without leading zeroes (except `0`
+itself). The peercred UID must agree with the translated caller host UID.
 
 This prevents namespace-root cosplay: a caller can map its host UID to UID 0 in
 its own user namespace, but that does not change its host principal. Equal host
@@ -18,7 +19,9 @@ Write claims require verified checks for every manifest-bound target from the
 helper mount namespace. Skipping that namespace, any target, or the effective
 access procedure makes both write claims false.
 
-The evaluator returns no UID digest, PID, uid map, namespace identifier, path,
+The evaluator rejects proxies and snapshots exact data-property values before
+evaluation so collector input cannot change after schema validation. It returns
+no UID digest, PID, uid map, namespace identifier, path,
 capability set, filter, ACL, or exception detail. Missing, extra, accessor-backed,
 wrongly typed, raw-UID-shaped, and non-AF_UNIX evidence fails with the fixed
 `peer_identity_unverified` code.

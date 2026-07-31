@@ -84,7 +84,7 @@ describe('Windows helper peer-evidence evaluator', () => {
     }
   });
 
-  it('rejects missing, extra, accessor, non-boolean, and raw-SID-shaped evidence', () => {
+  it('rejects missing, extra, accessor, proxy, non-boolean, and raw-SID-shaped evidence', () => {
     const missing = evidence();
     delete missing.client_pid_verified;
     const extra = { ...evidence(), caller_sid: 'S-1-5-21-synthetic' };
@@ -95,6 +95,7 @@ describe('Windows helper peer-evidence evaluator', () => {
       missing,
       extra,
       accessor,
+      new Proxy(evidence(), {}),
       evidence({ caller_token_verified: 1 }),
       evidence({ caller_token_user_sha256: 'S-1-5-21-synthetic' }),
       evidence({ transport_kind: 'tcp' }),
@@ -103,6 +104,27 @@ describe('Windows helper peer-evidence evaluator', () => {
         () => evaluateWindowsHelperPeerEvidence(invalid),
         (error) => error instanceof WindowsHelperEvidenceError && error.code === 'peer_identity_unverified',
       );
+    }
+  });
+
+  it('snapshots validated facts without consulting a poisoned Object.prototype', () => {
+    let getterCalls = 0;
+    let setterCalls = 0;
+    const priorDescriptor = Object.getOwnPropertyDescriptor(Object.prototype, 'helper_token_verified');
+    Object.defineProperty(Object.prototype, 'helper_token_verified', {
+      configurable: true,
+      get() { getterCalls += 1; return true; },
+      set() { setterCalls += 1; },
+    });
+    try {
+      const result = evaluateWindowsHelperPeerEvidence(evidence({ helper_token_verified: false }));
+      assert.equal(result.identity_verified, false);
+      assert.equal(result.different_principal, false);
+      assert.equal(getterCalls, 0);
+      assert.equal(setterCalls, 0);
+    } finally {
+      if (priorDescriptor === undefined) delete Object.prototype.helper_token_verified;
+      else Object.defineProperty(Object.prototype, 'helper_token_verified', priorDescriptor);
     }
   });
 

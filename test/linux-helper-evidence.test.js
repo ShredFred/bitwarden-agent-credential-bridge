@@ -8,8 +8,8 @@ import {
   LinuxHelperEvidenceError,
 } from '../src/linux-helper-evidence.mjs';
 
-const callerDigest = createHash('sha256').update('uid:00001000').digest('hex');
-const helperDigest = createHash('sha256').update('uid:00001001').digest('hex');
+const callerDigest = createHash('sha256').update('uid:1000').digest('hex');
+const helperDigest = createHash('sha256').update('uid:1001').digest('hex');
 
 function evidence(overrides = {}) {
   return {
@@ -124,7 +124,7 @@ describe('Linux helper peer-evidence evaluator', () => {
     assert.equal(evaluateLinuxHelperPeerEvidence(evidence({ helper_required_write_allowed: false })).helper_write_allowed, false);
   });
 
-  it('rejects missing, extra, accessor, non-boolean, raw-UID, and wrong-transport evidence', () => {
+  it('rejects missing, extra, accessor, proxy, non-boolean, raw-UID, and wrong-transport evidence', () => {
     const missing = evidence();
     delete missing.peercred_verified;
     const accessor = evidence();
@@ -134,6 +134,7 @@ describe('Linux helper peer-evidence evaluator', () => {
       missing,
       { ...evidence(), raw_uid: 0 },
       accessor,
+      new Proxy(evidence(), {}),
       evidence({ helper_no_new_privs: 1 }),
       evidence({ caller_host_uid_sha256: '0' }),
       evidence({ transport_kind: 'tcp' }),
@@ -142,6 +143,27 @@ describe('Linux helper peer-evidence evaluator', () => {
         () => evaluateLinuxHelperPeerEvidence(invalid),
         (error) => error instanceof LinuxHelperEvidenceError && error.code === 'peer_identity_unverified',
       );
+    }
+  });
+
+  it('snapshots validated facts without consulting a poisoned Object.prototype', () => {
+    let getterCalls = 0;
+    let setterCalls = 0;
+    const priorDescriptor = Object.getOwnPropertyDescriptor(Object.prototype, 'helper_creds_verified');
+    Object.defineProperty(Object.prototype, 'helper_creds_verified', {
+      configurable: true,
+      get() { getterCalls += 1; return true; },
+      set() { setterCalls += 1; },
+    });
+    try {
+      const result = evaluateLinuxHelperPeerEvidence(evidence({ helper_creds_verified: false }));
+      assert.equal(result.identity_verified, false);
+      assert.equal(result.different_principal, false);
+      assert.equal(getterCalls, 0);
+      assert.equal(setterCalls, 0);
+    } finally {
+      if (priorDescriptor === undefined) delete Object.prototype.helper_creds_verified;
+      else Object.defineProperty(Object.prototype, 'helper_creds_verified', priorDescriptor);
     }
   });
 

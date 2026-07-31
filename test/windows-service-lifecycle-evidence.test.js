@@ -207,6 +207,27 @@ describe('Windows service lifecycle value-free transcript', () => {
     }
   });
 
+  it('parses transcript snapshots without consulting a poisoned Object.prototype', () => {
+    const value = gate();
+    let getterCalls = 0;
+    let setterCalls = 0;
+    const priorDescriptor = Object.getOwnPropertyDescriptor(Object.prototype, 'terminal_outcome');
+    Object.defineProperty(Object.prototype, 'terminal_outcome', {
+      configurable: true,
+      get() { getterCalls += 1; return 'denial_verified'; },
+      set() { setterCalls += 1; },
+    });
+    try {
+      const report = evaluateWindowsServiceLifecycleTranscript(value, successTranscript(value));
+      assert.equal(report.transcript_structure_complete, true);
+      assert.equal(getterCalls, 0);
+      assert.equal(setterCalls, 0);
+    } finally {
+      if (priorDescriptor === undefined) delete Object.prototype.terminal_outcome;
+      else Object.defineProperty(Object.prototype, 'terminal_outcome', priorDescriptor);
+    }
+  });
+
   it('rejects reordering, omissions, false success, illegal skips, extras, and forged gates', () => {
     const value = gate();
     const cases = [];
