@@ -4,8 +4,9 @@ Sample-only security experiment. Phase 1 tests a **credential-bridge contract**.
 Phase 2 adds an offline, non-mutating OneCLI readiness audit. Phase 3 adds
 offline supply-chain evidence and a not-run disposable live-test design. Phase
 4a adds a fake-only, policy-pinned HTTP API-key header contract. Phase 4b adds
-a fake-only HTTP Basic contract. None of these
-phases tests Bitwarden product security or OneCLI production security.
+a fake-only HTTP Basic contract. Phase 5a adds a pure cross-platform bootstrap
+plan. None of these phases access a real vault or test Bitwarden product
+security or OneCLI production security.
 
 ## What Phase 1 covers
 
@@ -116,6 +117,7 @@ approved disposable test passes and its evidence is reviewed. See
 npm test
 npm run test:phase4a
 npm run test:phase4b
+npm run test:phase5a
 npm run test:phase3
 node src/run-demo.js
 ```
@@ -212,6 +214,8 @@ docs/phase2-onecli-readiness.md     evidence, platform path, threat boundaries
 docs/phase3-disposable-live-test.md approval-gated, not-run live-test plan
 docs/phase4a-http-api-key.md         fake-only version-2 contract and limits
 docs/phase4b-http-basic.md           fake-only version-3 contract and limits
+docs/phase5a-portable-bootstrap-plan.md
+                                      pure cross-platform machine/repo boundary
 test/*.test.js                      functional + exposure tests
 AGENTS.md                           experiment rules for agents
 ```

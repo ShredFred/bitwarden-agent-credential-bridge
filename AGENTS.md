@@ -90,3 +90,23 @@ Phase 4b remains loopback, foreground, dependency-free, and fake-only. It must n
 add live Bitwarden/OneCLI access, Unicode Basic interoperability, browser or form
 login, cookies, query credentials, process environment, SSH, databases, or desktop
 credential handling.
+
+## Phase 5a scope
+
+Phase 5a may add only a pure, offline bootstrap planner for Windows, macOS, and
+Linux. It must separate one per-user machine installation from tracked,
+secret-free per-repository service selections. Project configuration may select
+strict ASCII service aliases only; it must not choose commands, executable paths,
+URLs, headers, policies, vault identifiers, or credential fields.
+
+User-local configuration may map pre-approved aliases to structurally validated
+Bitwarden item and field references, but the planner output must never include
+those references. Local configuration is authoritative: a repository can select
+only aliases already enabled by the user. Schemas are exact and unsupported
+platforms, fields, credential classes, and ambiguous runtime inputs fail closed.
+
+This slice must remain a pure function over supplied objects and synthetic
+platform inputs. It must not read files or environment variables, inspect file
+permissions, resolve links, access a vault or network, install launchers, create
+directories, or mutate machine/repository state. Those operations require a
+later explicit apply gate with symlink/reparse-point and ownership/DACL checks.

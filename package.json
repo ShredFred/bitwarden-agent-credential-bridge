@@ -11,6 +11,7 @@
     "test": "node --test \"./test/*.test.js\"",
     "test:phase4a": "node --test test/policy.test.js test/fake-api.test.js test/broker.test.js test/exposure.test.js",
     "test:phase4b": "node --test test/basic-credentials.test.js test/policy.test.js test/fake-api.test.js test/broker.test.js",
+    "test:phase5a": "node --test test/bootstrap-plan.test.js",
     "test:phase2": "node --test test/onecli-audit.test.js test/onecli-artifacts.test.js test/onecli-preflight.test.js",
     "test:phase3": "node --test test/supply-chain-audit.test.js test/phase3-artifacts.test.js",
     "preflight:onecli": "node scripts/preflight-onecli.mjs",
