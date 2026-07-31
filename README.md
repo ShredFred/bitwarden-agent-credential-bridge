@@ -121,6 +121,7 @@ npm run test:phase5a
 npm run test:phase5b
 npm run test:phase5c
 npm run test:phase5d
+npm run test:phase5e
 npm run test:phase3
 node src/run-demo.js
 ```
@@ -235,6 +236,7 @@ docs/phase5b-read-only-host-preflight.md
 docs/phase5c-windows-security-adapter.md
                                       bounded read-only Windows ACL probe
 docs/phase5d-apply-live-test-gate.md   explicit mutation and disposable-test gate
+docs/phase5e-disposable-workspace.md   marked OS-temp-only execution boundary
 test/*.test.js                      functional + exposure tests
 AGENTS.md                           experiment rules for agents
 ```

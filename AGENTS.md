@@ -155,3 +155,16 @@ Canonical sorted-key UTF-8 JSON is hashed without self-referential digest fields
 confirmation requires the complete SHA-256 digest. This phase must not create,
 move, replace, chmod, delete, inspect, or read any host path and must not implement
 the apply executor itself.
+
+## Phase 5e scope
+
+Phase 5e may create and verify a disposable workspace only beneath the canonical
+OS temporary directory. The workspace root must come from `mkdtemp`, be a real
+directory rather than a link/reparse point, and contain a newly exclusive marker
+with a cryptographic nonce. Marker verification is byte-exact and bounded; roots,
+markers, and synthetic home/config/data paths must remain strict descendants of
+the canonical temp root.
+
+The workspace API must not expose recursive cleanup, accept default user roots,
+create Bitwarden configuration, access a vault/network, or execute an apply
+manifest. Tests may remove only the exact root they created after verification.
