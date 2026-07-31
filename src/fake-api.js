@@ -1,4 +1,8 @@
 import http from 'node:http';
+import {
+  basicAuthorizationValue,
+  validateBasicCredentials,
+} from './basic-credentials.js';
 import { FAKE_API_CONSTANT_BODY } from './constants.js';
 
 /**
@@ -7,11 +11,12 @@ import { FAKE_API_CONSTANT_BODY } from './constants.js';
  * logging its value, then returns a constant JSON body.
  *
  * @param {{
- *   sentinel: string,
+ *   sentinel?: string,
+ *   credentials?: import('./basic-credentials.js').BasicCredentials,
  *   host?: string,
  *   path?: string,
  *   method?: string,
- *   credentialClass?: 'http_bearer' | 'http_api_key_header',
+ *   credentialClass?: 'http_bearer' | 'http_api_key_header' | 'http_basic',
  *   headerName?: string,
  * }} options
  * @returns {Promise<{
@@ -23,24 +28,22 @@ import { FAKE_API_CONSTANT_BODY } from './constants.js';
  * }>}
  */
 export async function startFakeApi(options) {
-  const sentinel = options?.sentinel;
-  if (typeof sentinel !== 'string' || sentinel.length === 0) {
-    throw new Error('startFakeApi requires an explicit runtime sentinel');
-  }
-
   const host = options.host ?? '127.0.0.1';
   const allowedPath = options.path ?? '/v1/resource';
   const allowedMethod = options.method ?? 'GET';
   const credentialClass = options.credentialClass ?? 'http_bearer';
   if (
     credentialClass !== 'http_bearer' &&
-    credentialClass !== 'http_api_key_header'
+    credentialClass !== 'http_api_key_header' &&
+    credentialClass !== 'http_basic'
   ) {
     throw new Error('startFakeApi received an unsupported credential class');
   }
 
   const headerName =
-    credentialClass === 'http_bearer' ? 'authorization' : options.headerName;
+    credentialClass === 'http_api_key_header'
+      ? options.headerName
+      : 'authorization';
   if (
     typeof headerName !== 'string' ||
     headerName.length === 0 ||
@@ -50,8 +53,33 @@ export async function startFakeApi(options) {
       'startFakeApi requires a canonical lowercase API-key header name',
     );
   }
-  const expectedValue =
-    credentialClass === 'http_bearer' ? `Bearer ${sentinel}` : sentinel;
+  let expectedValue;
+  if (credentialClass === 'http_basic') {
+    if (options.sentinel !== undefined) {
+      throw new Error('startFakeApi rejects sentinel material for HTTP Basic');
+    }
+    let credentials;
+    try {
+      credentials = validateBasicCredentials(options.credentials);
+    } catch {
+      throw new Error(
+        'startFakeApi requires an exact valid HTTP Basic credentials object',
+      );
+    }
+    expectedValue = basicAuthorizationValue(credentials);
+  } else {
+    if (options.credentials !== undefined) {
+      throw new Error(
+        'startFakeApi rejects credentials material for bearer and API-key modes',
+      );
+    }
+    const sentinel = options.sentinel;
+    if (typeof sentinel !== 'string' || sentinel.length === 0) {
+      throw new Error('startFakeApi requires an explicit runtime sentinel');
+    }
+    expectedValue =
+      credentialClass === 'http_bearer' ? `Bearer ${sentinel}` : sentinel;
+  }
 
   const server = http.createServer((req, res) => {
     const url = new URL(req.url ?? '/', `http://${host}`);

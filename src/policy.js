@@ -1,7 +1,9 @@
 import { readFile } from 'node:fs/promises';
 import {
   CREDENTIAL_PLACEHOLDER,
+  PASSWORD_PLACEHOLDER,
   SUPPORTED_CREDENTIAL_CLASSES,
+  USERNAME_PLACEHOLDER,
 } from './constants.js';
 
 const LOOPBACK_HOSTS = new Set(['127.0.0.1', 'localhost']);
@@ -31,6 +33,11 @@ const VERSION_2_POLICY_FIELDS = new Set([
   ...COMMON_POLICY_FIELDS,
   'header_name',
   'header_value',
+]);
+const VERSION_3_POLICY_FIELDS = new Set([
+  ...COMMON_POLICY_FIELDS,
+  'username_value',
+  'password_value',
 ]);
 const FORBIDDEN_API_KEY_HEADER_NAMES = new Set([
   'authorization',
@@ -79,7 +86,9 @@ const MAX_API_KEY_HEADER_NAME_LENGTH = 128;
 
 /** @typedef {PolicyBase & {version: 2, credential_class: 'http_api_key_header', header_name: string, header_value: string}} ApiKeyHeaderPolicy */
 
-/** @typedef {BearerPolicy | ApiKeyHeaderPolicy} Policy */
+/** @typedef {PolicyBase & {version: 3, credential_class: 'http_basic', username_value: string, password_value: string}} BasicPolicy */
+
+/** @typedef {BearerPolicy | ApiKeyHeaderPolicy | BasicPolicy} Policy */
 
 /**
  * Validate a declarative policy object. Unsupported credential classes fail closed.
@@ -94,13 +103,19 @@ export function validatePolicy(raw) {
   /** @type {Record<string, unknown>} */
   const obj = /** @type {Record<string, unknown>} */ (raw);
 
-  if (obj.version !== 1 && obj.version !== 2) {
-    throw new PolicyValidationError('policy.version must be 1 or 2');
+  if (obj.version !== 1 && obj.version !== 2 && obj.version !== 3) {
+    throw new PolicyValidationError('policy.version must be 1, 2, or 3');
   }
 
+  const allowedFields =
+    obj.version === 1
+      ? VERSION_1_POLICY_FIELDS
+      : obj.version === 2
+        ? VERSION_2_POLICY_FIELDS
+        : VERSION_3_POLICY_FIELDS;
   validateExactFields(
     obj,
-    obj.version === 1 ? VERSION_1_POLICY_FIELDS : VERSION_2_POLICY_FIELDS,
+    allowedFields,
   );
 
   if (typeof obj.service !== 'string' || obj.service.trim() === '') {
@@ -124,7 +139,11 @@ export function validatePolicy(raw) {
   }
 
   const expectedClass =
-    obj.version === 1 ? 'http_bearer' : 'http_api_key_header';
+    obj.version === 1
+      ? 'http_bearer'
+      : obj.version === 2
+        ? 'http_api_key_header'
+        : 'http_basic';
   if (obj.credential_class !== expectedClass) {
     throw new PolicyValidationError(
       `policy.version ${obj.version} requires credential_class "${expectedClass}"`,
@@ -177,17 +196,37 @@ export function validatePolicy(raw) {
     };
   }
 
-  validateApiKeyHeaderName(obj.header_name);
-  if (typeof obj.header_value !== 'string') {
-    throw new PolicyValidationError('policy.header_value must be a string');
+  if (obj.version === 2) {
+    validateApiKeyHeaderName(obj.header_name);
+    if (typeof obj.header_value !== 'string') {
+      throw new PolicyValidationError('policy.header_value must be a string');
+    }
+    validateCredentialPlaceholder(obj.header_value, 'policy.header_value');
+    return {
+      version: 2,
+      ...common,
+      credential_class: 'http_api_key_header',
+      header_name: /** @type {string} */ (obj.header_name),
+      header_value: CREDENTIAL_PLACEHOLDER,
+    };
   }
-  validateCredentialPlaceholder(obj.header_value, 'policy.header_value');
+
+  validateExactPlaceholder(
+    obj.username_value,
+    USERNAME_PLACEHOLDER,
+    'policy.username_value',
+  );
+  validateExactPlaceholder(
+    obj.password_value,
+    PASSWORD_PLACEHOLDER,
+    'policy.password_value',
+  );
   return {
-    version: 2,
+    version: 3,
     ...common,
-    credential_class: 'http_api_key_header',
-    header_name: /** @type {string} */ (obj.header_name),
-    header_value: CREDENTIAL_PLACEHOLDER,
+    credential_class: 'http_basic',
+    username_value: USERNAME_PLACEHOLDER,
+    password_value: PASSWORD_PLACEHOLDER,
   };
 }
 
@@ -370,6 +409,22 @@ function validateCredentialPlaceholder(value, fieldName) {
 
   throw new PolicyValidationError(
     `${fieldName} must be exactly ${CREDENTIAL_PLACEHOLDER}; literal credential values are rejected`,
+  );
+}
+
+/**
+ * @param {unknown} value
+ * @param {string} placeholder
+ * @param {string} fieldName
+ */
+function validateExactPlaceholder(value, placeholder, fieldName) {
+  if (value === placeholder) return;
+  const kind =
+    typeof value === 'string' && /\{\{[^}]*\}\}/.test(value)
+      ? 'unsupported placeholder rejected'
+      : 'literal credential values are rejected';
+  throw new PolicyValidationError(
+    `${fieldName} must be exactly ${placeholder}; ${kind}`,
   );
 }
 

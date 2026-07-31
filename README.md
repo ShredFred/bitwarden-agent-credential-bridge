@@ -3,7 +3,8 @@
 Sample-only security experiment. Phase 1 tests a **credential-bridge contract**.
 Phase 2 adds an offline, non-mutating OneCLI readiness audit. Phase 3 adds
 offline supply-chain evidence and a not-run disposable live-test design. Phase
-4a adds a fake-only, policy-pinned HTTP API-key header contract. None of these
+4a adds a fake-only, policy-pinned HTTP API-key header contract. Phase 4b adds
+a fake-only HTTP Basic contract. None of these
 phases tests Bitwarden product security or OneCLI production security.
 
 ## What Phase 1 covers
@@ -43,6 +44,23 @@ passwords, Basic Auth, query/cookie/form injection, process-environment
 injection, SSH, databases, and desktop credentials remain unsupported.
 
 See [`docs/phase4a-http-api-key.md`](docs/phase4a-http-api-key.md).
+
+## What Phase 4b covers
+
+- A strict version-3 `http_basic` policy with separate exact `{{username}}`
+  and `{{password}}` placeholders and an exact in-memory runtime object
+  containing only `username` and `password`.
+- Printable ASCII credentials with explicit length bounds. Usernames cannot
+  contain `:`, while passwords may contain it.
+- Case-insensitive stripping of caller authentication headers followed by one
+  standard, padded `Authorization: Basic ...` value on the upstream request.
+- Response-body, response-header-name/value, log, and error scanning for raw,
+  percent-encoded, Base64, and Base64url credential forms.
+
+Phase 4b remains loopback-only, foreground-only, dependency-free, and fake-only.
+It does not retrieve credentials from Bitwarden, operate a browser, or provide
+a production authentication proxy. See
+[`docs/phase4b-http-basic.md`](docs/phase4b-http-basic.md).
 
 ## What Phase 2 covers
 
@@ -97,6 +115,7 @@ approved disposable test passes and its evidence is reviewed. See
 ```bash
 npm test
 npm run test:phase4a
+npm run test:phase4b
 npm run test:phase3
 node src/run-demo.js
 ```
@@ -120,9 +139,10 @@ or pair OneCLI.
 2. For version 1, the **broker** strips caller credential/protocol headers and injects `Authorization: Bearer <runtime-sentinel>` only on the outbound upstream request.
 3. For version 2, the broker strips the pinned API-key header and caller credential/protocol headers case-insensitively, then injects exactly one pinned header whose value is the runtime sentinel.
 4. Version-1 `authorization` and version-2 `header_value` must be exactly `{{credential}}`. Literal credential values, unsupported placeholders, extra fields, unsafe API-key header names, and API-key header names longer than 128 ASCII characters are rejected.
-5. Requests with query or fragment-like syntax are rejected. Upstream redirects fail closed, and upstream bodies larger than 1 MiB produce a generic `502` before any partial body is forwarded.
-6. **Bind** and **upstream** must be `http` loopback only (`127.0.0.1` or `localhost`) with an explicit port (`0` allowed for ephemeral bind).
-7. **Unsupported credential classes** fail closed at validation and again at broker start. There is no fallback to printing secrets or injecting them into the general process environment.
+5. Version 3 requires separate exact `{{username}}` and `{{password}}` policy placeholders and an exact runtime `{ username, password }` object. The broker injects exactly one HTTP Basic authorization value.
+6. Requests with query or fragment-like syntax are rejected. Upstream redirects fail closed, and upstream bodies larger than 1 MiB produce a generic `502` before any partial body is forwarded.
+7. **Bind** and **upstream** must be `http` loopback only (`127.0.0.1` or `localhost`) with an explicit port (`0` allowed for ephemeral bind).
+8. **Unsupported credential classes** fail closed at validation and again at broker start. There is no fallback to printing secrets or injecting them into the general process environment.
 
 ## Runtime sentinel
 
@@ -171,6 +191,8 @@ The version-2 sample is equally strict:
 policies/sample-fake-service.json   declarative sample policy
 policies/sample-fake-api-key-service.json
                                       strict version-2 API-key sample
+policies/sample-fake-basic-service.json
+                                      strict version-3 HTTP Basic sample
 upstream/onecli.lock.json            corrected Phase 2 upstream revisions
 upstream/supply-chain.lock.json      Phase 3 offline digest/revision evidence
 samples/onecli/secure-local.example.json
@@ -189,17 +211,18 @@ scripts/preflight-onecli.mjs        read-only, value-free readiness report
 docs/phase2-onecli-readiness.md     evidence, platform path, threat boundaries
 docs/phase3-disposable-live-test.md approval-gated, not-run live-test plan
 docs/phase4a-http-api-key.md         fake-only version-2 contract and limits
+docs/phase4b-http-basic.md           fake-only version-3 contract and limits
 test/*.test.js                      functional + exposure tests
 AGENTS.md                           experiment rules for agents
 ```
 
 ## Limitations
 
-- Two fake HTTP credential classes (`http_bearer` and
-  `http_api_key_header`) for a single sample service.
+- Three fake HTTP credential classes (`http_bearer`,
+  `http_api_key_header`, and `http_basic`) for a single sample service.
 - Sample policy uses port `0` for bind/upstream placeholders; runtime code supplies the concrete upstream origin after the fake API listens.
 - No TLS, no persistence, no multi-writer coordination beyond “one writer at a time” for this repo.
-- No browser/website password, Basic Auth, query, cookie, form, process-env,
+- No browser/website automation, query, cookie, form, process-env,
   SSH, database, RDP, or desktop credential injection.
 - Not a substitute for vault, OS keychain, or production broker hardening.
 - Phase 2 validates a proposal and local prerequisites only. It does not verify

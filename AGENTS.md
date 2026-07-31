@@ -69,3 +69,24 @@ bodies before buffering them. Keep redirects fail-closed and test split response
 chunks, duplicate/case-varied caller headers, forbidden header names, oversized
 responses, and all agent-readable surfaces. Do not add Basic Auth, query, cookie,
 form, browser, process-env, SSH, database, or arbitrary-template injection yet.
+
+## Phase 4b scope
+
+Phase 4b may add one fake-only version-3 `http_basic` policy and an explicit
+in-memory `{ username, password }` runtime bundle. Policy files contain only exact
+`{{username}}` and `{{password}}` placeholders, never values. Preserve valid
+version-1 bearer and version-2 API-key behavior.
+
+For this slice, accept bounded printable ASCII runtime fields only; reject control
+characters, empty values, and `:` in the username. Inject exactly one outbound
+`Authorization: Basic <base64(username:password)>` value after stripping every
+caller credential/protocol header. Treat username, password, their joined form,
+the complete Basic value, and their deterministic percent/Base64/Base64url forms
+as sensitive for response blocking and recursive log/error redaction. Tests must
+cover username byte alignment, duplicate Authorization inputs, derived echoes,
+invalid bundles, v1/v2 regressions, and every existing exposure surface.
+
+Phase 4b remains loopback, foreground, dependency-free, and fake-only. It must not
+add live Bitwarden/OneCLI access, Unicode Basic interoperability, browser or form
+login, cookies, query credentials, process environment, SSH, databases, or desktop
+credential handling.

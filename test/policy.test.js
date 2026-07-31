@@ -21,6 +21,12 @@ const sampleV2PolicyPath = path.join(
   'policies',
   'sample-fake-api-key-service.json',
 );
+const sampleV3PolicyPath = path.join(
+  path.dirname(fileURLToPath(import.meta.url)),
+  '..',
+  'policies',
+  'sample-fake-basic-service.json',
+);
 
 function validPolicy(overrides = {}) {
   return {
@@ -47,6 +53,21 @@ function validV2Policy(overrides = {}) {
     path: '/v1/resource',
     header_name: 'x-fake-api-key',
     header_value: '{{credential}}',
+    ...overrides,
+  };
+}
+
+function validV3Policy(overrides = {}) {
+  return {
+    version: 3,
+    service: 'fake-sample-api',
+    credential_class: 'http_basic',
+    bind: 'http://127.0.0.1:0',
+    upstream: 'http://127.0.0.1:0',
+    method: 'GET',
+    path: '/v1/resource',
+    username_value: '{{username}}',
+    password_value: '{{password}}',
     ...overrides,
   };
 }
@@ -91,6 +112,11 @@ describe('policy validation', () => {
     assert.equal(policy.credential_class, 'http_api_key_header');
     assert.equal(policy.header_name, 'x-fake-api-key');
     assert.equal(policy.header_value, '{{credential}}');
+  });
+
+  it('accepts the strict version-3 HTTP Basic sample', async () => {
+    const policy = await loadPolicy(sampleV3PolicyPath);
+    assert.deepEqual(policy, validV3Policy());
   });
 
   it('rejects uppercase and syntactically invalid API-key header names', () => {
@@ -164,6 +190,41 @@ describe('policy validation', () => {
     }
   });
 
+  it('requires separate exact version-3 username and password placeholders', () => {
+    const invalidPolicies = [
+      validV3Policy({ username_value: '{{credential}}' }),
+      validV3Policy({ password_value: '{{credential}}' }),
+      validV3Policy({ username_value: '{{password}}' }),
+      validV3Policy({ password_value: '{{username}}' }),
+      validV3Policy({ username_value: 'prefix {{username}}' }),
+      validV3Policy({ password_value: '{{password}} suffix' }),
+      validV3Policy({ username_value: 'literal-fake-username' }),
+      validV3Policy({ password_value: 'literal-fake-password' }),
+    ];
+    for (const policy of invalidPolicies) {
+      assert.throws(
+        () => validatePolicy(policy),
+        /must be exactly \{\{(?:username|password)\}\}/,
+      );
+    }
+  });
+
+  it('rejects missing, extra, and cross-version fields in version 3', () => {
+    const missingUsername = validV3Policy();
+    delete missingUsername.username_value;
+    const missingPassword = validV3Policy();
+    delete missingPassword.password_value;
+    for (const policy of [
+      missingUsername,
+      missingPassword,
+      validV3Policy({ extra: true }),
+      validV3Policy({ authorization: '{{credential}}' }),
+      validV3Policy({ header_value: '{{credential}}' }),
+    ]) {
+      assert.throws(() => validatePolicy(policy), PolicyValidationError);
+    }
+  });
+
   it('rejects unknown fields in either policy version', () => {
     assert.throws(
       () => validatePolicy(validPolicy({ extra: true })),
@@ -186,6 +247,10 @@ describe('policy validation', () => {
     assert.throws(
       () => validatePolicy(validV2Policy({ credential_class: 'http_bearer' })),
       /version 2 requires credential_class "http_api_key_header"/,
+    );
+    assert.throws(
+      () => validatePolicy(validV3Policy({ credential_class: 'http_bearer' })),
+      /version 3 requires credential_class "http_basic"/,
     );
   });
 

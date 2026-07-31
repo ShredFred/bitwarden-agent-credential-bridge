@@ -16,10 +16,13 @@ export const FAKE_API_CONSTANT_BODY = Object.freeze({
 export const SUPPORTED_CREDENTIAL_CLASSES = Object.freeze([
   'http_bearer',
   'http_api_key_header',
+  'http_basic',
 ]);
 
 /** Exact credential value placeholder required by policies. */
 export const CREDENTIAL_PLACEHOLDER = '{{credential}}';
+export const USERNAME_PLACEHOLDER = '{{username}}';
+export const PASSWORD_PLACEHOLDER = '{{password}}';
 
 /**
  * Generate a cryptographically random fake credential sentinel for this process.

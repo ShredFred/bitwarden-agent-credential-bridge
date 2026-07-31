@@ -99,7 +99,80 @@ describe('fake HTTP API', () => {
       await apiKeyApi.close();
     }
   });
+
+  it('validates exactly one raw HTTP Basic authorization header', async () => {
+    const credentials = generatedBasicCredentials();
+    const basicApi = await startFakeApi({
+      credentialClass: 'http_basic',
+      credentials,
+    });
+    const expected = `Basic ${Buffer.from(
+      `${credentials.username}:${credentials.password}`,
+      'ascii',
+    ).toString('base64')}`;
+
+    try {
+      const accepted = await rawGet(basicApi.baseUrl, [
+        ['Authorization', expected],
+      ]);
+      assert.equal(accepted.status, 200);
+      assert.deepEqual(JSON.parse(accepted.body), FAKE_API_CONSTANT_BODY);
+      assert.ok(!accepted.body.includes(credentials.username));
+      assert.ok(!accepted.body.includes(credentials.password));
+
+      for (const headers of [
+        [],
+        [['Authorization', 'Basic wrong-fake-value']],
+        [
+          ['Authorization', expected],
+          ['authorization', expected],
+        ],
+      ]) {
+        const rejected = await rawGet(
+          basicApi.baseUrl,
+          /** @type {[string, string][]} */ (headers),
+        );
+        assert.equal(rejected.status, 401);
+        assert.ok(!rejected.body.includes(credentials.username));
+        assert.ok(!rejected.body.includes(credentials.password));
+      }
+    } finally {
+      await basicApi.close();
+    }
+  });
+
+  it('rejects invalid or ambiguous HTTP Basic runtime bundles', async () => {
+    const credentials = generatedBasicCredentials();
+    for (const options of [
+      { credentialClass: 'http_basic' },
+      { credentialClass: 'http_basic', sentinel },
+      { credentialClass: 'http_basic', sentinel, credentials },
+      {
+        credentialClass: 'http_basic',
+        credentials: { ...credentials, extra: true },
+      },
+      {
+        credentialClass: 'http_basic',
+        credentials: { ...credentials, username: `${credentials.username}:x` },
+      },
+    ]) {
+      await assert.rejects(
+        () =>
+          startFakeApi(
+            /** @type {Parameters<typeof startFakeApi>[0]} */ (options),
+          ),
+      );
+    }
+  });
 });
+
+function generatedBasicCredentials() {
+  const material = generateFakeSentinel().replace(/[^A-Za-z0-9]/g, 'x');
+  return {
+    username: `user-${material}`,
+    password: `pass-${material}:${material}`,
+  };
+}
 
 /**
  * @param {string} baseUrl

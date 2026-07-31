@@ -29,6 +29,12 @@ const sampleV2PolicyPath = path.join(
   'policies',
   'sample-fake-api-key-service.json',
 );
+const sampleV3PolicyPath = path.join(
+  path.dirname(fileURLToPath(import.meta.url)),
+  '..',
+  'policies',
+  'sample-fake-basic-service.json',
+);
 
 describe('foreground HTTP broker', () => {
   const sentinel = generateFakeSentinel();
@@ -173,6 +179,55 @@ describe('foreground HTTP broker', () => {
     }
   });
 
+  it('injects exactly one HTTP Basic authorization value for version 3', async () => {
+    const credentials = generatedBasicCredentials();
+    const sample = await loadPolicy(sampleV3PolicyPath);
+    const localApi = await startFakeApi({
+      credentials,
+      path: sample.path,
+      method: sample.method,
+      credentialClass: sample.credential_class,
+    });
+    /** @type {Record<string, string> | null} */
+    let seenHeaders = null;
+    const localBroker = await startBroker({
+      policy: withUpstream(sample, localApi.baseUrl),
+      credentials,
+      fetchImpl: async (url, init) => {
+        seenHeaders = Object.fromEntries(new Headers(init?.headers).entries());
+        return fetch(url, init);
+      },
+    });
+
+    try {
+      const response = await rawRequest(localBroker.baseUrl, sample.path, [
+        ['Authorization', 'Basic caller-one'],
+        ['authorization', 'Basic caller-two'],
+        ['Proxy-Authorization', 'Basic caller-proxy'],
+        ['Cookie', 'caller-cookie=value'],
+      ]);
+      const payload = Buffer.from(
+        `${credentials.username}:${credentials.password}`,
+        'ascii',
+      ).toString('base64');
+      assert.equal(response.status, 200);
+      assert.deepEqual(JSON.parse(response.body), FAKE_API_CONSTANT_BODY);
+      assert.ok(seenHeaders);
+      assert.equal(seenHeaders.authorization, `Basic ${payload}`);
+      assert.equal(
+        Object.keys(seenHeaders).filter(
+          (name) => name.toLowerCase() === 'authorization',
+        ).length,
+        1,
+      );
+      assert.equal(seenHeaders['proxy-authorization'], undefined);
+      assert.equal(seenHeaders.cookie, undefined);
+    } finally {
+      await localBroker.close();
+      await localApi.close();
+    }
+  });
+
   it('revalidates v2 class, header, placeholder, and exact schema at broker start', async () => {
     const sample = await loadPolicy(sampleV2PolicyPath);
     const invalidPolicies = [
@@ -196,6 +251,59 @@ describe('foreground HTTP broker', () => {
           (err.code === 'invalid_policy' ||
             err.code === 'invalid_authorization_placeholder') &&
           !err.message.includes(sentinel),
+      );
+    }
+  });
+
+  it('requires unambiguous runtime material for every policy version', async () => {
+    const v1 = await loadPolicy(samplePolicyPath);
+    const v2 = await loadPolicy(sampleV2PolicyPath);
+    const v3 = await loadPolicy(sampleV3PolicyPath);
+    const credentials = generatedBasicCredentials();
+
+    for (const options of [
+      { policy: v3 },
+      { policy: v3, sentinel },
+      { policy: v3, sentinel, credentials },
+      { policy: v3, credentials: { username: credentials.username } },
+      { policy: v3, credentials: { ...credentials, extra: true } },
+      { policy: v1, sentinel, credentials },
+      { policy: v2, sentinel, credentials },
+    ]) {
+      await assert.rejects(
+        () =>
+          startBroker(
+            /** @type {Parameters<typeof startBroker>[0]} */ (options),
+          ),
+        (err) =>
+          err instanceof BrokerError &&
+          ['invalid_credentials', 'ambiguous_runtime_material'].includes(
+            err.code,
+          ) &&
+          !err.message.includes(credentials.username) &&
+          !err.message.includes(credentials.password),
+      );
+    }
+  });
+
+  it('revalidates strict version-3 policy fields at broker start', async () => {
+    const sample = await loadPolicy(sampleV3PolicyPath);
+    const credentials = generatedBasicCredentials();
+    for (const invalidPolicy of [
+      { ...sample, username_value: '{{credential}}' },
+      { ...sample, password_value: '{{username}}' },
+      { ...sample, credential_class: 'http_bearer' },
+      { ...sample, extra: true },
+    ]) {
+      await assert.rejects(
+        () =>
+          startBroker({
+            policy: /** @type {import('../src/policy.js').Policy} */ (
+              invalidPolicy
+            ),
+            credentials,
+          }),
+        (err) => err instanceof BrokerError && err.code === 'invalid_policy',
       );
     }
   });
@@ -428,6 +536,34 @@ describe('foreground HTTP broker', () => {
       assertNoSensitiveVariants('response body', bodyText, variants);
       assertNoSensitiveVariants('response headers', headerObj, variants);
       assertNoSensitiveVariants('broker logs', localLogs, variants);
+    } finally {
+      await localBroker.close();
+    }
+  });
+
+  it('blocks a version-3 credential echoed in an upstream header name', async () => {
+    const credentials = {
+      username: `fake-user-${generateFakeSentinel()
+        .replace(/[^a-z0-9]/gi, 'x')
+        .toLowerCase()}`,
+      password: `fake-pass-${generateFakeSentinel()}`,
+    };
+    const sample = await loadPolicy(sampleV3PolicyPath);
+    const localBroker = await startBroker({
+      policy: sample,
+      credentials,
+      fetchImpl: async () =>
+        new Response('safe-body', {
+          status: 200,
+          headers: { [credentials.username]: 'safe-value' },
+        }),
+    });
+
+    try {
+      const response = await fetch(localBroker.url);
+      assert.equal(response.status, 502);
+      assert.deepEqual(await response.json(), { error: 'upstream_failed' });
+      assert.equal(response.headers.get(credentials.username), null);
     } finally {
       await localBroker.close();
     }
@@ -796,6 +932,14 @@ function sensitiveVariantsForTest(sentinel) {
       Buffer.from(sentinel, 'utf8').toString('base64url'),
     ]),
   ].filter((value) => value.length > 0);
+}
+
+function generatedBasicCredentials() {
+  const material = generateFakeSentinel().replace(/[^A-Za-z0-9]/g, 'x');
+  return {
+    username: `user-${material}`,
+    password: `pass-${material}-${material}`,
+  };
 }
 
 /**

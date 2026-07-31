@@ -1,5 +1,9 @@
 import http from 'node:http';
 import {
+  basicAuthorizationValue,
+  validateBasicCredentials,
+} from './basic-credentials.js';
+import {
   CREDENTIAL_PLACEHOLDER,
   SUPPORTED_CREDENTIAL_CLASSES,
 } from './constants.js';
@@ -74,14 +78,14 @@ export class BrokerError extends Error {
  * @returns {unknown}
  */
 export function redactSentinel(value, sentinel) {
-  return redactSensitiveVariants(value, buildSensitiveVariants(sentinel));
+  return redactSensitiveVariants(value, buildSentinelSensitiveVariants(sentinel));
 }
 
 /**
  * @param {string} sentinel
  * @returns {Set<string>}
  */
-function buildSensitiveVariants(sentinel) {
+function buildSentinelSensitiveVariants(sentinel) {
   return new Set(
     [
       sentinel,
@@ -93,6 +97,44 @@ function buildSensitiveVariants(sentinel) {
 }
 
 /**
+ * Build all deterministic sensitive forms required for an HTTP Basic bundle.
+ * Values remain in memory and are never persisted.
+ * @param {import('./basic-credentials.js').BasicCredentials} credentials
+ * @returns {Set<string>}
+ */
+function buildBasicSensitiveVariants(credentials) {
+  const joined = `${credentials.username}:${credentials.password}`;
+  const payload = Buffer.from(joined, 'ascii').toString('base64');
+  const fullAuthorization = `Basic ${payload}`;
+  const variants = new Set();
+
+  for (const value of [
+    credentials.username,
+    credentials.password,
+    joined,
+    payload,
+    fullAuthorization,
+  ]) {
+    const upperPercent = encodeURIComponent(value);
+    const lowerPercentDigits = upperPercent.replace(
+      /%[0-9A-F]{2}/g,
+      (triplet) => triplet.toLowerCase(),
+    );
+    for (const variant of [
+      value,
+      upperPercent,
+      lowerPercentDigits,
+      Buffer.from(value, 'utf8').toString('base64'),
+      Buffer.from(value, 'utf8').toString('base64url'),
+    ]) {
+      if (variant.length > 0) variants.add(variant);
+    }
+  }
+
+  return variants;
+}
+
+/**
  * @param {unknown} value
  * @param {Set<string>} sensitiveVariants
  * @returns {unknown}
@@ -100,7 +142,9 @@ function buildSensitiveVariants(sentinel) {
 function redactSensitiveVariants(value, sensitiveVariants) {
   if (typeof value === 'string') {
     let safe = value;
-    for (const variant of sensitiveVariants) {
+    for (const variant of [...sensitiveVariants].sort(
+      (left, right) => right.length - left.length,
+    )) {
       safe = safe.split(variant).join(REDACTED);
     }
     return safe;
@@ -129,7 +173,8 @@ function redactSensitiveVariants(value, sensitiveVariants) {
  *
  * @param {{
  *   policy: import('./policy.js').Policy,
- *   sentinel: string,
+ *   sentinel?: string,
+ *   credentials?: import('./basic-credentials.js').BasicCredentials,
  *   log?: (entry: BrokerLogEntry) => void,
  *   fetchImpl?: typeof fetch,
  * }} options
@@ -147,6 +192,7 @@ export async function startBroker(options) {
   const {
     policy: suppliedPolicy,
     sentinel,
+    credentials: suppliedCredentials,
     fetchImpl = globalThis.fetch,
   } = options;
   /** @type {BrokerLogEntry[]} */
@@ -157,32 +203,6 @@ export async function startBroker(options) {
     ((entry) => {
       logs.push(entry);
     });
-
-  if (typeof sentinel !== 'string' || sentinel.length === 0) {
-    throw new BrokerError('broker requires an explicit runtime sentinel', {
-      code: 'missing_sentinel',
-    });
-  }
-  const sensitiveVariants = buildSensitiveVariants(sentinel);
-
-  /**
-   * @param {BrokerLogEntry} entry
-   */
-  const log = (entry) => {
-    /** @type {BrokerLogEntry} */
-    const safe = {
-      level: entry.level,
-      message: /** @type {string} */ (
-        redactSensitiveVariants(entry.message, sensitiveVariants)
-      ),
-    };
-    if (entry.meta !== undefined) {
-      safe.meta = /** @type {Record<string, unknown>} */ (
-        redactSensitiveVariants(entry.meta, sensitiveVariants)
-      );
-    }
-    rawLog(safe);
-  };
 
   const suppliedClass =
     suppliedPolicy !== null &&
@@ -206,6 +226,8 @@ export async function startBroker(options) {
   } catch {
     const code =
       suppliedClass === 'http_bearer' &&
+      'authorization' in
+        /** @type {Record<string, unknown>} */ (suppliedPolicy) &&
       /** @type {{ authorization?: unknown }} */ (suppliedPolicy)
         .authorization !== CREDENTIAL_PLACEHOLDER
         ? 'invalid_authorization_placeholder'
@@ -216,6 +238,65 @@ export async function startBroker(options) {
     );
   }
 
+  /** @type {Set<string>} */
+  let sensitiveVariants;
+  let outboundCredentialValue;
+  if (policy.credential_class === 'http_basic') {
+    if (sentinel !== undefined) {
+      throw new BrokerError(
+        'version 3 requires credentials only; sentinel material is rejected',
+        { code: 'ambiguous_runtime_material' },
+      );
+    }
+    let credentials;
+    try {
+      credentials = validateBasicCredentials(suppliedCredentials);
+    } catch {
+      throw new BrokerError(
+        'version 3 requires an exact valid username/password credentials object',
+        { code: 'invalid_credentials' },
+      );
+    }
+    sensitiveVariants = buildBasicSensitiveVariants(credentials);
+    outboundCredentialValue = basicAuthorizationValue(credentials);
+  } else {
+    if (suppliedCredentials !== undefined) {
+      throw new BrokerError(
+        'version 1 and 2 accept sentinel material only; credentials are rejected',
+        { code: 'ambiguous_runtime_material' },
+      );
+    }
+    if (typeof sentinel !== 'string' || sentinel.length === 0) {
+      throw new BrokerError('broker requires an explicit runtime sentinel', {
+        code: 'missing_sentinel',
+      });
+    }
+    sensitiveVariants = buildSentinelSensitiveVariants(sentinel);
+    outboundCredentialValue =
+      policy.credential_class === 'http_bearer'
+        ? `Bearer ${sentinel}`
+        : sentinel;
+  }
+
+  /**
+   * @param {BrokerLogEntry} entry
+   */
+  const log = (entry) => {
+    /** @type {BrokerLogEntry} */
+    const safe = {
+      level: entry.level,
+      message: /** @type {string} */ (
+        redactSensitiveVariants(entry.message, sensitiveVariants)
+      ),
+    };
+    if (entry.meta !== undefined) {
+      safe.meta = /** @type {Record<string, unknown>} */ (
+        redactSensitiveVariants(entry.meta, sensitiveVariants)
+      );
+    }
+    rawLog(safe);
+  };
+
   const bindUrl = parseLoopbackHttpUrl(policy.bind, 'policy.bind');
   const upstreamUrl = parseLoopbackHttpUrl(policy.upstream, 'policy.upstream');
   const bindHost = bindUrl.hostname;
@@ -224,7 +305,7 @@ export async function startBroker(options) {
   const server = http.createServer((req, res) => {
     void handleBrokerRequest(req, res, {
       policy,
-      sentinel,
+      outboundCredentialValue,
       sensitiveVariants,
       upstreamOrigin: upstreamUrl.href.replace(/\/$/, ''),
       fetchImpl,
@@ -274,7 +355,7 @@ export async function startBroker(options) {
  * @param {http.ServerResponse} res
  * @param {{
  *   policy: import('./policy.js').Policy,
- *   sentinel: string,
+ *   outboundCredentialValue: string,
  *   sensitiveVariants: Set<string>,
  *   upstreamOrigin: string,
  *   fetchImpl: typeof fetch,
@@ -284,7 +365,7 @@ export async function startBroker(options) {
 async function handleBrokerRequest(req, res, ctx) {
   const {
     policy,
-    sentinel,
+    outboundCredentialValue,
     sensitiveVariants,
     upstreamOrigin,
     fetchImpl,
@@ -344,9 +425,11 @@ async function handleBrokerRequest(req, res, ctx) {
     outboundHeaders[lower] = Array.isArray(value) ? value.join(', ') : value;
   }
   if (policy.credential_class === 'http_bearer') {
-    outboundHeaders.authorization = `Bearer ${sentinel}`;
+    outboundHeaders.authorization = outboundCredentialValue;
+  } else if (policy.credential_class === 'http_api_key_header') {
+    outboundHeaders[policy.header_name] = outboundCredentialValue;
   } else {
-    outboundHeaders[policy.header_name] = sentinel;
+    outboundHeaders.authorization = outboundCredentialValue;
   }
 
   const outboundUrl = `${upstreamOrigin}${policy.path}`;
@@ -504,9 +587,9 @@ function bufferContainsSensitiveVariant(body, sensitiveVariants) {
  * @returns {boolean}
  */
 function headersContainSensitiveVariant(headers, sensitiveVariants) {
-  for (const value of headers.values()) {
+  for (const [name, value] of headers.entries()) {
     for (const variant of sensitiveVariants) {
-      if (value.includes(variant)) return true;
+      if (name.includes(variant) || value.includes(variant)) return true;
     }
   }
   return false;
