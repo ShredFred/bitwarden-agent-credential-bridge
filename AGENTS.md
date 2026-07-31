@@ -450,3 +450,22 @@ framing, token, and same-principal denial property. ServiceMain still must not
 activate the listener in this phase, and install eligibility remains false.
 No service install/start, elevation, filesystem/registry/ACL mutation, manifest
 execution, normal-root access, network access, or Bitwarden access is permitted.
+
+## Phase 5h.13 scope
+
+Phase 5h.13 may add a native, value-free pre-request verifier for the single fixed
+Windows service. It opens only the fixed pipe with the Phase 5h.12 narrow client
+rights, obtains the live pipe server PID, pins that process with a handle, and
+requires the fixed SCM service to be running as an own-process service with the
+same stable PID before and after token inspection. The process `TokenUser` must
+equal LocalService and its `TokenGroups` must contain the enabled, non-deny-only
+fixed service SID.
+
+Reports contain exact booleans only and must always expose
+`request_sent=false` and `authorization_denied=true` in this phase. The current
+uninstalled console server must prove PID/token binding but fail SCM, LocalService,
+service-SID, and aggregate identity verification. No nonce, request, manifest,
+launcher, credential, SID, PID, account, service output, or native error may be
+sent or returned. ServiceMain IPC, installation, elevation, mutation, manifest
+execution, network, and Bitwarden access remain absent; install eligibility stays
+false.

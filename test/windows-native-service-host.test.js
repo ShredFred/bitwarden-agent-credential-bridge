@@ -126,19 +126,25 @@ describe('native Windows helper service host scaffold', () => {
   it('contains no network, vault, process-launch, or manifest-executor surface', async () => {
     assert.deepEqual(
       (await fs.readdir(SOURCE)).sort(),
-      [PROJECT, 'DenialPipeProbe.cs', 'NativeDenialPipeClient.cs', 'PipeSecurity.cs', 'Program.cs', 'global.json', 'NuGet.Config'].sort(),
+      [PROJECT, 'DenialPipeProbe.cs', 'NativeDenialPipeClient.cs', 'NativeServerIdentityVerifier.cs', 'PipeSecurity.cs', 'Program.cs', 'global.json', 'NuGet.Config'].sort(),
     );
     const project = await fs.readFile(path.join(SOURCE, PROJECT), 'utf8');
     assert.equal(project.includes('PackageReference'), false);
     const pipeSecurity = await fs.readFile(path.join(SOURCE, 'PipeSecurity.cs'), 'utf8');
+    const serverVerifier = await fs.readFile(path.join(SOURCE, 'NativeServerIdentityVerifier.cs'), 'utf8');
     assert.ok(pipeSecurity.includes(
       '"D:P(A;;GA;;;SY)(A;;GA;;;" + ServiceSid + ")(A;;0x12018b;;;AU)"',
     ));
     assert.ok(pipeSecurity.includes(`ServiceSid = "${SERVICE_SID}"`));
+    assert.ok(serverVerifier.includes(`ServiceSid = "${SERVICE_SID}"`));
+    assert.ok(serverVerifier.includes('LocalServiceSid = "S-1-5-19"'));
+    assert.ok(serverVerifier.includes('ServiceName = "BitwardenAgentCredentialBridgeHelper"'));
+    assert.equal(serverVerifier.includes('WriteFile'), false);
+    assert.equal(serverVerifier.includes('nonce'), false);
     for (const forbiddenTrustee of [';;;WD)', ';;;AN)', ';;;NU)', ';;;BA)', ';;;OW)']) {
       assert.equal(pipeSecurity.includes(forbiddenTrustee), false, forbiddenTrustee);
     }
-    const source = `${await fs.readFile(path.join(SOURCE, 'Program.cs'), 'utf8')}\n${await fs.readFile(path.join(SOURCE, 'DenialPipeProbe.cs'), 'utf8')}\n${await fs.readFile(path.join(SOURCE, 'NativeDenialPipeClient.cs'), 'utf8')}\n${await fs.readFile(path.join(SOURCE, 'PipeSecurity.cs'), 'utf8')}`;
+    const source = `${await fs.readFile(path.join(SOURCE, 'Program.cs'), 'utf8')}\n${await fs.readFile(path.join(SOURCE, 'DenialPipeProbe.cs'), 'utf8')}\n${await fs.readFile(path.join(SOURCE, 'NativeDenialPipeClient.cs'), 'utf8')}\n${await fs.readFile(path.join(SOURCE, 'NativeServerIdentityVerifier.cs'), 'utf8')}\n${await fs.readFile(path.join(SOURCE, 'PipeSecurity.cs'), 'utf8')}`;
     assert.equal(source.match(/CreateFile\(/g)?.length, 2);
     assert.ok(source.includes('GenericRead | FileWriteData | FileWriteAttributes'));
     for (const forbidden of [
@@ -182,6 +188,7 @@ describe('native Windows helper service host scaffold', () => {
         scm_lifecycle_live_verified: false,
         console_denial_pipe_compiled: true,
         explicit_pipe_dacl_compiled: true,
+        server_identity_verifier_compiled: true,
         service_pipe_activation_absent: true,
         manifest_executor_absent: true,
         network_stack_absent: true,
@@ -190,6 +197,42 @@ describe('native Windows helper service host scaffold', () => {
       });
 
       const nonce = 'a'.repeat(64);
+      const identityClient = spawn(first.executable, ['--verify-fixed-server-identity'], {
+        windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'],
+      });
+      const identityServer = spawn(first.executable, ['--console-pipe-denial', nonce], {
+        windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'],
+      });
+      const identityClientStdout = [];
+      const identityClientStderr = [];
+      const identityServerStdout = [];
+      const identityServerStderr = [];
+      identityClient.stdout.on('data', (chunk) => identityClientStdout.push(chunk));
+      identityClient.stderr.on('data', (chunk) => identityClientStderr.push(chunk));
+      identityServer.stdout.on('data', (chunk) => identityServerStdout.push(chunk));
+      identityServer.stderr.on('data', (chunk) => identityServerStderr.push(chunk));
+      const [identityClientResult, identityServerResult] = await Promise.all([
+        waitForExit(identityClient), waitForExit(identityServer),
+      ]);
+      assert.deepEqual(identityClientResult, { code: 31, signal: null });
+      assert.deepEqual(identityServerResult, { code: 12, signal: null });
+      assert.equal(Buffer.concat(identityClientStderr).length, 0);
+      assert.equal(Buffer.concat(identityServerStdout).length, 0);
+      assert.equal(Buffer.concat(identityServerStderr).length, 0);
+      assert.deepEqual(JSON.parse(Buffer.concat(identityClientStdout).toString('utf8')), {
+        schema_version: 1,
+        local_pipe_connected: true,
+        server_pid_bound: true,
+        scm_service_running: false,
+        scm_server_pid_match: false,
+        server_token_bound: true,
+        server_token_user_local_service: false,
+        service_sid_group_enabled: false,
+        server_identity_verified: false,
+        request_sent: false,
+        authorization_denied: true,
+      });
+
       const valid = await runPipePair(first.executable, nonce, 'valid');
       assert.deepEqual(valid.clientResult, { code: 0, signal: null });
       assert.deepEqual(valid.serverResult, { code: 0, signal: null });

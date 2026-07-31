@@ -87,7 +87,7 @@ internal static class NativeDenialPipeClient
         }
         finally
         {
-            _ = CloseHandle(pipe);
+            ClosePipe(pipe);
         }
     }
 
@@ -124,7 +124,7 @@ internal static class NativeDenialPipeClient
         }
     }
 
-    private static bool TryOpenPipe(out IntPtr pipe)
+    internal static bool TryOpenPipe(out IntPtr pipe)
     {
         pipe = InvalidHandleValue;
         long deadline = Environment.TickCount64 + 10000;
@@ -161,6 +161,11 @@ internal static class NativeDenialPipeClient
             Thread.Sleep(20);
         }
         return false;
+    }
+
+    internal static void ClosePipe(IntPtr pipe)
+    {
+        if (pipe != InvalidHandleValue && pipe != IntPtr.Zero) _ = CloseHandle(pipe);
     }
 
     private static bool RunOverlapped(IntPtr pipe, IntPtr buffer, uint length, bool read, out uint transferred)

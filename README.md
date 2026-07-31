@@ -260,6 +260,7 @@ docs/phase5h9-windows-service-boundary-preflight.md native read-only service che
 docs/phase5h10-native-windows-service-host.md deterministic native lifecycle scaffold
 docs/phase5h11-native-pipe-denial.md native local pipe/token denial probe
 docs/phase5h12-explicit-pipe-dacl.md fixed protected native pipe DACL proof
+docs/phase5h13-server-identity-verifier.md pre-request SCM/PID/token verifier
 test/*.test.js                      functional + exposure tests
 AGENTS.md                           experiment rules for agents
 ```
@@ -309,6 +310,9 @@ AGENTS.md                           experiment rules for agents
 - Phase 5h.12 replaces the ambient pipe DACL with an exact protected three-ACE
   descriptor and verifies the created kernel object's DACL before accepting a
   client. Service-mode IPC and installation remain disabled.
+- Phase 5h.13 binds the connected server PID to the fixed running SCM service,
+  LocalService `TokenUser`, and enabled service-SID group before any request.
+  The current console server is correctly rejected and sends no request.
 - No browser/website automation, query, cookie, form, process-env,
   SSH, database, RDP, or desktop credential injection.
 - Not a substitute for vault, OS keychain, or production broker hardening.
