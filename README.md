@@ -126,6 +126,7 @@ npm run test:phase5f
 npm run test:phase5g
 npm run test:phase3
 npm run test:phase5h4
+npm run test:phase5h5
 node src/run-demo.js
 ```
 
@@ -246,6 +247,7 @@ docs/phase5h-helper-protocol.md         pure separate-writer helper wire contrac
 docs/phase5h2-windows-helper-evidence.md pure Windows token/ACL evidence compiler
 docs/phase5h3-linux-helper-evidence.md   pure Linux host-UID/peercred evidence compiler
 docs/phase5h4-macos-helper-evidence.md   pure macOS XPC/audit-token evidence compiler
+docs/phase5h5-inherited-launcher-transfer.md real disposable inherited-handle check
 test/*.test.js                      functional + exposure tests
 AGENTS.md                           experiment rules for agents
 ```
@@ -267,6 +269,9 @@ AGENTS.md                           experiment rules for agents
 - Phase 5h.4 refuses to treat App Sandbox, Hardened Runtime, signing identity,
   or a different audit session as a distinct macOS writer when the effective
   UID remains equal.
+- Phase 5h.5 proves only that a short-lived child can independently verify
+  launcher bytes received through an inherited read-only handle. It does not
+  establish a distinct writer or authenticated local IPC.
 - No browser/website automation, query, cookie, form, process-env,
   SSH, database, RDP, or desktop credential injection.
 - Not a substitute for vault, OS keychain, or production broker hardening.

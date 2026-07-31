@@ -270,3 +270,22 @@ raw UIDs, audit tokens, PIDs, pidversions, code identities, paths, entitlements,
 ACLs, and errors must not escape. This phase performs no XPC/Mach or Security
 framework I/O, helper launch, authorization-service changes, permission
 mutation, manifest execution, real-root access, or Bitwarden connection.
+
+## Phase 5h.5 scope
+
+Phase 5h.5 may exercise the first real helper-process boundary only for launcher
+delivery. It creates an exclusive random temporary file inside an already
+verified disposable workspace, writes generated non-secret launcher bytes,
+opens a separate read-only handle, unlinks the path, and passes only that handle
+to a short-lived child. The canonical Phase 5h.1 request travels separately
+over stdin. The child must independently parse the request, read the bounded
+inherited handle to EOF, and match both launcher length and SHA-256.
+
+The live API accepts no caller-selected path, file descriptor, peer evidence,
+command, executable, or environment. Child output is exact, bounded, and
+value-free; stderr, timeout, excess output, non-zero exit, malformed UTF-8, and
+any mismatch fail closed. This phase does not prove a different principal or
+local authenticated IPC, inspect tokens/UIDs/audit tokens, execute a manifest,
+touch normal user roots, access Bitwarden, or claim protection from a malicious
+same-user process. Named-pipe/XPC/AF_UNIX identity collection and any successful
+authorization remain later live-gated work.
