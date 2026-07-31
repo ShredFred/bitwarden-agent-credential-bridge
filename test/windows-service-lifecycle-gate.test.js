@@ -24,8 +24,12 @@ describe('Windows disposable service lifecycle approval gate', () => {
       'prove_disposable_root_and_binary_absent',
     ]);
     assert.deepEqual(gate.mutation_steps, [
-      'stage_reviewed_binary_and_retain_root_binary_handles',
-      'reverify_staged_root_and_binary_handle_identity_digest_and_acl',
+      'create_disposable_admin_root_and_retain_handle',
+      'reverify_disposable_root_identity_and_acl_via_retained_handle',
+      'create_exclusive_binary_and_retain_handle',
+      'reverify_exclusive_binary_identity_via_retained_handle',
+      'write_reviewed_binary_via_retained_handle',
+      'reverify_binary_identity_digest_and_acl_via_retained_handle',
       'create_fixed_demand_start_local_service_and_retain_handle',
       'reverify_created_service_identity_and_config_via_retained_handle',
       'set_unrestricted_fixed_service_sid_via_retained_handle',
@@ -83,7 +87,7 @@ describe('Windows disposable service lifecycle approval gate', () => {
   it('encodes cleanup as a finally path after every partial activation outcome', () => {
     const gate = buildWindowsServiceLifecycleGate(boundaryPlan());
     for (const failurePoint of [
-      'stage_reviewed_binary_and_retain_root_binary_handles',
+      'create_disposable_admin_root_and_retain_handle',
       'create_fixed_demand_start_local_service_and_retain_handle',
       'start_fixed_service_via_retained_handle',
       'reverify_running_service_and_server_identity',
@@ -107,8 +111,12 @@ describe('Windows disposable service lifecycle approval gate', () => {
   it('places native re-verification after each service and ACL mutation', () => {
     const gate = buildWindowsServiceLifecycleGate(boundaryPlan());
     const pairs = [
-      ['stage_reviewed_binary_and_retain_root_binary_handles',
-        'reverify_staged_root_and_binary_handle_identity_digest_and_acl'],
+      ['create_disposable_admin_root_and_retain_handle',
+        'reverify_disposable_root_identity_and_acl_via_retained_handle'],
+      ['create_exclusive_binary_and_retain_handle',
+        'reverify_exclusive_binary_identity_via_retained_handle'],
+      ['write_reviewed_binary_via_retained_handle',
+        'reverify_binary_identity_digest_and_acl_via_retained_handle'],
       ['create_fixed_demand_start_local_service_and_retain_handle',
         'reverify_created_service_identity_and_config_via_retained_handle'],
       ['set_unrestricted_fixed_service_sid_via_retained_handle',

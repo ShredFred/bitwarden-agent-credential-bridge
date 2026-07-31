@@ -324,6 +324,11 @@ AGENTS.md                           experiment rules for agents
   approval value, emits no commands or host identifiers, performs no mutation,
   and keeps installation ineligible until the named elevated test is explicitly
   approved in the active task.
+- Phase 5h.16 validates the future collector's value-free lifecycle transcript as
+  a strict state machine: canonical preflight/mutation/denial/cleanup order,
+  ownership-consistent skip semantics, and final absence proof. Even a complete
+  synthetic transcript remains explicitly untrusted, not live-verified, and not
+  authorization evidence.
 - No browser/website automation, query, cookie, form, process-env,
   SSH, database, RDP, or desktop credential injection.
 - Not a substitute for vault, OS keychain, or production broker hardening.

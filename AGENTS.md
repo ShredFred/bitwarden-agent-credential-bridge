@@ -517,6 +517,9 @@ Every service/file/root mutation and destructive cleanup must use retained handl
 for objects created by this run, with immediate native re-verification after each
 mutation. A create collision must never cause reacquisition or deletion by the
 fixed name/path of an object owned by another process.
+Root creation and exclusive binary creation must be separate ownership-emitting
+steps; binary write occurs only through its retained handle. A partial staging
+failure must preserve exact per-object ownership for cleanup.
 
 Approval is not representable as API input. The plan must always report
 `mutation_authorized=false`, `live_test_executed=false`, and
@@ -529,3 +532,28 @@ Serialized, cloned, spread, accessor-backed, or forged gate objects are not
 security capabilities and must be rejected; a future executor must rebuild the
 branded gate in-process from the canonical boundary plan plus fresh out-of-band
 operator approval.
+
+## Phase 5h.16 scope
+
+Phase 5h.16 may add only a pure value-free transcript state machine for facts
+eventually produced by a trusted elevated lifecycle collector. It accepts only a
+branded in-process Phase 5h.15 gate and an exact bounded sequence of fixed step
+ids plus `verified`, `failed`, `skipped_not_owned`, or `skipped_not_started`
+statuses. Preflight, mutation, denial, cleanup, and final absence evidence must
+occur in the canonical order; reordering, omission, extra fields/events, illegal
+skips, proxies, accessor values, and false success claims fail closed.
+
+Cleanup skip semantics must match run ownership derived from earlier verified
+create steps. A created service/root/binary cannot later be marked not owned, and
+an attempted start (including a failed/ambiguous call) cannot skip stop. Final
+aggregate absence must be structurally present.
+Mutation failures may be structurally complete only after the full finally cleanup
+sequence. Cleanup failures remain incomplete.
+
+The evaluator validates transcript structure only. Positive completion fields
+must be explicitly named as structural claims, never live verification. It must always expose
+`collector_trust_verified=false`, `live_test_verified=false`, and
+`authorization_ready=false`; no caller-supplied transcript may become live proof,
+approval, or authorization. This phase performs no collection, command execution,
+elevation, SCM/filesystem/registry/ACL mutation, manifest execution, network/vault
+access, or Bitwarden connection.

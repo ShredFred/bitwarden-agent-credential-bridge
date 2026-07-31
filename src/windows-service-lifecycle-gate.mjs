@@ -8,8 +8,12 @@ const PRE_MUTATION_STEPS = Object.freeze([
 ]);
 
 const MUTATION_STEPS = Object.freeze([
-  'stage_reviewed_binary_and_retain_root_binary_handles',
-  'reverify_staged_root_and_binary_handle_identity_digest_and_acl',
+  'create_disposable_admin_root_and_retain_handle',
+  'reverify_disposable_root_identity_and_acl_via_retained_handle',
+  'create_exclusive_binary_and_retain_handle',
+  'reverify_exclusive_binary_identity_via_retained_handle',
+  'write_reviewed_binary_via_retained_handle',
+  'reverify_binary_identity_digest_and_acl_via_retained_handle',
   'create_fixed_demand_start_local_service_and_retain_handle',
   'reverify_created_service_identity_and_config_via_retained_handle',
   'set_unrestricted_fixed_service_sid_via_retained_handle',

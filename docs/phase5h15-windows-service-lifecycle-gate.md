@@ -22,6 +22,9 @@ service, scope mismatch, service/ACL/identity mismatch, non-denial response, or
 incomplete cleanup fails closed. Cleanup must be attempted after any activation,
 even when an intermediate verification fails.
 
+Root creation and exclusive binary-handle creation are separate atomic ownership
+steps. The binary is written only after its handle is retained, so partial failure
+cannot collapse root ownership, binary ownership, and no ownership into one status.
 Every created service/file/root remains bound to a handle retained by this run.
 Each staging, configuration, ACL, and cleanup mutation is followed immediately by native verification
 through retained object or parent-directory handles. Cleanup may stop/delete/remove only run-owned
