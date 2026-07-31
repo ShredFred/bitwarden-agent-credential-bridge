@@ -289,3 +289,24 @@ local authenticated IPC, inspect tokens/UIDs/audit tokens, execute a manifest,
 touch normal user roots, access Bitwarden, or claim protection from a malicious
 same-user process. Named-pipe/XPC/AF_UNIX identity collection and any successful
 authorization remain later live-gated work.
+
+## Phase 5h.6 scope
+
+Phase 5h.6 may exercise a real Windows named-pipe and process-token boundary
+inside a verified disposable workspace. A repo-owned PowerShell probe may use
+fixed P/Invoke declarations to create exactly one first-instance byte pipe with
+`PIPE_REJECT_REMOTE_CLIENTS`, bind the actual pipe client/server PIDs, inspect
+the caller, client, and helper process tokens, and emit only lowercase SHA-256
+digests of `TokenUser` SIDs plus exact booleans. The calling Bridge process
+connects directly and completes a nonce handshake derived from the marked
+workspace.
+
+The live session API accepts no pipe name, PID, executable, command,
+environment, SID, token, ACL, or peer evidence. It must prove the pipe client
+token matches the caller token and then feed the existing Phase 5h.2 evaluator
+and Phase 5h.1 authorization contract. On the current same-user host the only
+valid terminal result is `same_principal_rejected`. ACL/write evidence remains
+false, no manifest executor is called, and success under a distinct principal
+is not representable in this phase. It must not create accounts/services,
+change ACLs, access normal user roots or Bitwarden, or claim that the separate
+writer boundary is complete.
