@@ -132,6 +132,8 @@ describe('native Windows helper service host scaffold', () => {
     assert.equal(project.includes('PackageReference'), false);
     const pipeSecurity = await fs.readFile(path.join(SOURCE, 'PipeSecurity.cs'), 'utf8');
     const serverVerifier = await fs.readFile(path.join(SOURCE, 'NativeServerIdentityVerifier.cs'), 'utf8');
+    const program = await fs.readFile(path.join(SOURCE, 'Program.cs'), 'utf8');
+    const denialProbe = await fs.readFile(path.join(SOURCE, 'DenialPipeProbe.cs'), 'utf8');
     assert.ok(pipeSecurity.includes(
       '"D:P(A;;GA;;;SY)(A;;GA;;;" + ServiceSid + ")(A;;0x12018b;;;AU)"',
     ));
@@ -141,10 +143,25 @@ describe('native Windows helper service host scaffold', () => {
     assert.ok(serverVerifier.includes('ServiceName = "BitwardenAgentCredentialBridgeHelper"'));
     assert.equal(serverVerifier.includes('WriteFile'), false);
     assert.equal(serverVerifier.includes('nonce'), false);
+    assert.ok(serverVerifier.includes('CurrentProcessHasExpectedServiceIdentity()'));
+    const identityGate = program.indexOf('CurrentProcessHasExpectedServiceIdentity()');
+    const runningStatus = program.indexOf('ReportStatus(ServiceRunning');
+    const serviceLoop = program.indexOf('RunServiceLoop(StopEvent)');
+    assert.ok(identityGate > 0 && runningStatus > identityGate && serviceLoop > runningStatus);
+    assert.ok(denialProbe.includes('if (!NativeServerIdentityVerifier.CurrentProcessHasExpectedServiceIdentity())'));
+    assert.ok(denialProbe.includes('int createResult = TryCreateProtectedPipe(out IntPtr pipe);'));
+    assert.equal(denialProbe.includes('RunCore(null, "service"'), false);
+    assert.ok(denialProbe.includes('OpenProcess(ProcessQueryLimitedInformation | Synchronize'));
+    assert.ok(denialProbe.includes('WaitForSingleObject(clientProcess, 0) == WaitTimeout'));
+    assert.ok(denialProbe.includes('ImpersonateNamedPipeClient(pipe)'));
+    assert.ok(denialProbe.includes('TryEqualTokenUsers(callerToken, clientProcessToken'));
+    assert.ok(denialProbe.includes('if (!RevertToSelf()) ExitProcess(16)'));
+    assert.ok(denialProbe.includes('\\"authorization_denied\\":true'));
+    assert.ok(denialProbe.includes('\\"manifest_executor_absent\\":true'));
     for (const forbiddenTrustee of [';;;WD)', ';;;AN)', ';;;NU)', ';;;BA)', ';;;OW)']) {
       assert.equal(pipeSecurity.includes(forbiddenTrustee), false, forbiddenTrustee);
     }
-    const source = `${await fs.readFile(path.join(SOURCE, 'Program.cs'), 'utf8')}\n${await fs.readFile(path.join(SOURCE, 'DenialPipeProbe.cs'), 'utf8')}\n${await fs.readFile(path.join(SOURCE, 'NativeDenialPipeClient.cs'), 'utf8')}\n${await fs.readFile(path.join(SOURCE, 'NativeServerIdentityVerifier.cs'), 'utf8')}\n${await fs.readFile(path.join(SOURCE, 'PipeSecurity.cs'), 'utf8')}`;
+    const source = `${program}\n${denialProbe}\n${await fs.readFile(path.join(SOURCE, 'NativeDenialPipeClient.cs'), 'utf8')}\n${serverVerifier}\n${await fs.readFile(path.join(SOURCE, 'PipeSecurity.cs'), 'utf8')}`;
     assert.equal(source.match(/CreateFile\(/g)?.length, 2);
     assert.ok(source.includes('GenericRead | FileWriteData | FileWriteAttributes'));
     for (const forbidden of [
@@ -189,7 +206,9 @@ describe('native Windows helper service host scaffold', () => {
         console_denial_pipe_compiled: true,
         explicit_pipe_dacl_compiled: true,
         server_identity_verifier_compiled: true,
-        service_pipe_activation_absent: true,
+        service_identity_self_check_compiled: true,
+        service_pipe_activation_compiled: true,
+        service_pipe_activation_live_verified: false,
         manifest_executor_absent: true,
         network_stack_absent: true,
         vault_client_absent: true,

@@ -17,10 +17,13 @@ internal static class DenialPipeProbe
     private const uint PipeRejectRemoteClients = 0x00000008;
     private const uint PipeUnlimitedInstances = 255;
     private const uint TokenQuery = 0x0008;
+    private const uint ProcessQueryLimitedInformation = 0x00001000;
+    private const uint Synchronize = 0x00100000;
     private const int TokenUser = 1;
     private const int ErrorPipeConnected = 535;
     private const int ErrorIoPending = 997;
     private const uint WaitObject0 = 0;
+    private const uint WaitTimeout = 258;
     private const uint SessionTimeoutMilliseconds = 1500;
     private static readonly IntPtr InvalidHandleValue = new(-1);
     private static readonly byte[] DenialResponse = Encoding.ASCII.GetBytes(
@@ -29,6 +32,15 @@ internal static class DenialPipeProbe
         "\"service_sid_ace_verified\":true,\"authenticated_client_narrow_access_ace_verified\":true," +
         "\"client_pid_bound\":true,\"caller_token_bound\":true," +
         "\"helper_token_bound\":true,\"same_token_user\":true,\"different_principal\":false," +
+        "\"authorization_denied\":true}\n"
+    );
+    private static readonly byte[] ServiceDenialResponse = Encoding.ASCII.GetBytes(
+        "{\"schema_version\":1,\"local_transport\":true,\"remote_clients_rejected\":true," +
+        "\"first_instance\":true,\"explicit_pipe_dacl_verified\":true," +
+        "\"service_identity_self_verified\":true,\"client_pid_bound\":true," +
+        "\"caller_token_bound\":true,\"helper_token_bound\":true," +
+        "\"same_token_user\":false,\"different_principal\":true," +
+        "\"target_acl_evidence_complete\":false,\"manifest_executor_absent\":true," +
         "\"authorization_denied\":true}\n"
     );
     private static readonly byte[] TrailingJunkResponse = Encoding.ASCII.GetBytes(
@@ -61,13 +73,74 @@ internal static class DenialPipeProbe
         return RunCore(expectedNonce, mode);
     }
 
-    private static int RunCore(string expectedNonce, string mode)
+    internal static int RunServiceLoop(ManualResetEventSlim stopEvent)
     {
+        int createResult = TryCreateProtectedPipe(out IntPtr pipe);
+        if (createResult != 0) return createResult;
+        try
+        {
+            while (!stopEvent.IsSet)
+            {
+                if (!NativeServerIdentityVerifier.CurrentProcessHasExpectedServiceIdentity()) return 19;
+                if (!ConnectWithDeadline(pipe))
+                {
+                    _ = DisconnectNamedPipe(pipe);
+                    continue;
+                }
+                try
+                {
+                    if (stopEvent.IsSet || !ReadAndMatchNonce(pipe, null)) continue;
+                    if (!TryBindSameTokenUser(pipe, out bool sameTokenUser) || sameTokenUser) continue;
+                    if (stopEvent.IsSet || !WriteAll(pipe, ServiceDenialResponse)) continue;
+                    if (!stopEvent.IsSet) _ = ReadFixedMessage(pipe, "ack\n");
+                }
+                finally
+                {
+                    _ = DisconnectNamedPipe(pipe);
+                }
+            }
+            return 0;
+        }
+        finally
+        {
+            _ = CloseHandle(pipe);
+        }
+    }
+
+    private static int RunCore(string? expectedNonce, string mode, ManualResetEventSlim? stopEvent = null)
+    {
+        int createResult = TryCreateProtectedPipe(out IntPtr pipe);
+        if (createResult != 0) return createResult;
+        try
+        {
+            if (!ConnectWithDeadline(pipe)) return 11;
+            if (stopEvent?.IsSet == true) return 0;
+            if (!ReadAndMatchNonce(pipe, expectedNonce)) return 12;
+            if (!TryBindSameTokenUser(pipe, out bool sameTokenUser) || !sameTokenUser) return 13;
+            if (mode == "stall")
+            {
+                Thread.Sleep(2500);
+                return 0;
+            }
+            if (mode == "trailing") return WriteAll(pipe, TrailingJunkResponse) ? 0 : 14;
+            if (!WriteAll(pipe, DenialResponse)) return 14;
+            if (!ReadFixedMessage(pipe, "ack\n")) return 15;
+            _ = DisconnectNamedPipe(pipe);
+            return 0;
+        }
+        finally
+        {
+            _ = CloseHandle(pipe);
+        }
+    }
+
+    private static int TryCreateProtectedPipe(out IntPtr pipe)
+    {
+        pipe = InvalidHandleValue;
         if (!PipeSecurity.TryCreateAttributes(out IntPtr attributes, out IntPtr descriptor))
         {
             return 17;
         }
-        IntPtr pipe;
         try
         {
             pipe = CreateNamedPipe(
@@ -90,51 +163,16 @@ internal static class DenialPipeProbe
             return 10;
         }
 
-        try
-        {
-            if (!PipeSecurity.HasExpectedKernelDacl(pipe))
-            {
-                return 18;
-            }
-            if (!ConnectWithDeadline(pipe))
-            {
-                return 11;
-            }
-            if (!ReadAndMatchNonce(pipe, expectedNonce))
-            {
-                return 12;
-            }
-            if (!TryBindSameTokenUser(pipe, out bool sameTokenUser) || !sameTokenUser)
-            {
-                return 13;
-            }
-            if (mode == "stall")
-            {
-                Thread.Sleep(2500);
-                return 0;
-            }
-            if (mode == "trailing")
-            {
-                return WriteAll(pipe, TrailingJunkResponse) ? 0 : 14;
-            }
-            if (!WriteAll(pipe, DenialResponse))
-            {
-                return 14;
-            }
-            if (!ReadFixedMessage(pipe, "ack\n"))
-            {
-                return 15;
-            }
-            _ = DisconnectNamedPipe(pipe);
-            return 0;
-        }
-        finally
+        if (!PipeSecurity.HasExpectedKernelDacl(pipe))
         {
             _ = CloseHandle(pipe);
+            pipe = InvalidHandleValue;
+            return 18;
         }
+        return 0;
     }
 
-    private static bool ReadAndMatchNonce(IntPtr pipe, string expectedNonce)
+    private static bool ReadAndMatchNonce(IntPtr pipe, string? expectedNonce)
     {
         byte[] received = new byte[65];
         IntPtr buffer = Marshal.AllocHGlobal(received.Length);
@@ -153,6 +191,16 @@ internal static class DenialPipeProbe
         if (received[64] != (byte)'\n')
         {
             return false;
+        }
+        if (expectedNonce is null)
+        {
+            for (int index = 0; index < 64; index += 1)
+            {
+                byte value = received[index];
+                if (!((value >= (byte)'0' && value <= (byte)'9') ||
+                    (value >= (byte)'a' && value <= (byte)'f'))) return false;
+            }
+            return true;
         }
         byte[] expected = Encoding.ASCII.GetBytes(expectedNonce);
         int difference = 0;
@@ -282,37 +330,56 @@ internal static class DenialPipeProbe
         {
             return false;
         }
-        if (!ImpersonateNamedPipeClient(pipe))
+        IntPtr clientProcess = OpenProcess(ProcessQueryLimitedInformation | Synchronize, false, clientProcessId);
+        if (clientProcess == IntPtr.Zero)
         {
             return false;
         }
-        IntPtr clientToken = IntPtr.Zero;
-        bool compared = false;
         try
         {
-            if (!OpenThreadToken(GetCurrentThread(), TokenQuery, true, out clientToken))
-            {
-                return false;
-            }
-            if (!OpenProcessToken(GetCurrentProcess(), TokenQuery, out IntPtr helperToken))
+            if (GetProcessId(clientProcess) != clientProcessId ||
+                WaitForSingleObject(clientProcess, 0) != WaitTimeout ||
+                !OpenProcessToken(clientProcess, TokenQuery, out IntPtr clientProcessToken))
             {
                 return false;
             }
             try
             {
-                compared = TryEqualTokenUsers(clientToken, helperToken, out sameTokenUser);
+                if (!OpenProcessToken(GetCurrentProcess(), TokenQuery, out IntPtr helperToken)) return false;
+                try
+                {
+                    if (!ImpersonateNamedPipeClient(pipe)) return false;
+                    IntPtr callerToken = IntPtr.Zero;
+                    bool compared = false;
+                    try
+                    {
+                        if (!OpenThreadToken(GetCurrentThread(), TokenQuery, true, out callerToken)) return false;
+                        if (!TryEqualTokenUsers(callerToken, clientProcessToken, out bool callerMatchesProcess) ||
+                            !callerMatchesProcess) return false;
+                        compared = TryEqualTokenUsers(callerToken, helperToken, out sameTokenUser);
+                    }
+                    finally
+                    {
+                        if (callerToken != IntPtr.Zero) _ = CloseHandle(callerToken);
+                        if (!RevertToSelf()) ExitProcess(16);
+                    }
+                    return compared && GetProcessId(clientProcess) == clientProcessId &&
+                        WaitForSingleObject(clientProcess, 0) == WaitTimeout;
+                }
+                finally
+                {
+                    _ = CloseHandle(helperToken);
+                }
             }
             finally
             {
-                _ = CloseHandle(helperToken);
+                _ = CloseHandle(clientProcessToken);
             }
         }
         finally
         {
-            if (clientToken != IntPtr.Zero) _ = CloseHandle(clientToken);
-            if (!RevertToSelf()) compared = false;
+            _ = CloseHandle(clientProcess);
         }
-        return compared;
     }
 
     private static bool TryEqualTokenUsers(IntPtr firstToken, IntPtr secondToken, out bool equal)
@@ -470,6 +537,13 @@ internal static class DenialPipeProbe
 
     [DllImport("kernel32.dll")]
     private static extern IntPtr GetCurrentThread();
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern IntPtr OpenProcess(uint desiredAccess, [MarshalAs(UnmanagedType.Bool)] bool inheritHandle,
+        uint processId);
+
+    [DllImport("kernel32.dll")]
+    private static extern uint GetProcessId(IntPtr process);
 
     [DllImport("advapi32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]

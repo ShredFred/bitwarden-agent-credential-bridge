@@ -19,6 +19,9 @@ internal static class Program
     private const uint ServiceControlShutdown = 0x00000005;
     private const uint ServiceControlInterrogate = 0x00000004;
     private const uint ErrorCallNotImplemented = 120;
+    private const uint ErrorServiceSpecificError = 1066;
+    private const uint ServiceIdentityFailure = 1;
+    private const uint ServicePipeFailure = 2;
 
     private static readonly ManualResetEventSlim StopEvent = new(false);
     private static readonly ServiceMainDelegate ServiceMainRoot = ServiceMain;
@@ -32,7 +35,7 @@ internal static class Program
     {
         if (args.Length == 1 && string.Equals(args[0], "--self-test", StringComparison.Ordinal))
         {
-            Console.Out.Write("{\"schema_version\":1,\"platform_win32\":true,\"service_name_bound\":true,\"scm_entrypoint_compiled\":true,\"scm_lifecycle_live_verified\":false,\"console_denial_pipe_compiled\":true,\"explicit_pipe_dacl_compiled\":true,\"server_identity_verifier_compiled\":true,\"service_pipe_activation_absent\":true,\"manifest_executor_absent\":true,\"network_stack_absent\":true,\"vault_client_absent\":true,\"install_gate_eligible\":false}\n");
+            Console.Out.Write("{\"schema_version\":1,\"platform_win32\":true,\"service_name_bound\":true,\"scm_entrypoint_compiled\":true,\"scm_lifecycle_live_verified\":false,\"console_denial_pipe_compiled\":true,\"explicit_pipe_dacl_compiled\":true,\"server_identity_verifier_compiled\":true,\"service_identity_self_check_compiled\":true,\"service_pipe_activation_compiled\":true,\"service_pipe_activation_live_verified\":false,\"manifest_executor_absent\":true,\"network_stack_absent\":true,\"vault_client_absent\":true,\"install_gate_eligible\":false}\n");
             return 0;
         }
         if (args.Length == 2 &&
@@ -91,12 +94,24 @@ internal static class Program
             _serviceFailure = Marshal.GetLastWin32Error();
             return;
         }
-        if (!ReportStatus(ServiceStartPending, 0, 3000) ||
-            !ReportStatus(ServiceRunning, ServiceAcceptStop | ServiceAcceptShutdown, 0))
+        if (!ReportStatus(ServiceStartPending, 0, 5000))
         {
             return;
         }
-        StopEvent.Wait();
+        if (!NativeServerIdentityVerifier.CurrentProcessHasExpectedServiceIdentity())
+        {
+            _serviceFailure = (int)ServiceIdentityFailure;
+            _ = ReportStatus(ServiceStopped, 0, 0, ErrorServiceSpecificError, ServiceIdentityFailure);
+            return;
+        }
+        if (!ReportStatus(ServiceRunning, ServiceAcceptStop | ServiceAcceptShutdown, 0)) return;
+        int pipeResult = DenialPipeProbe.RunServiceLoop(StopEvent);
+        if (pipeResult != 0)
+        {
+            _serviceFailure = pipeResult;
+            _ = ReportStatus(ServiceStopped, 0, 0, ErrorServiceSpecificError, ServicePipeFailure);
+            return;
+        }
         _ = ReportStatus(ServiceStopped, 0, 0);
     }
 
@@ -107,7 +122,7 @@ internal static class Program
         _ = context;
         if (control == ServiceControlStop || control == ServiceControlShutdown)
         {
-            _ = ReportStatus(ServiceStopPending, 0, 3000);
+            _ = ReportStatus(ServiceStopPending, 0, 5000);
             StopEvent.Set();
             return 0;
         }
@@ -118,7 +133,8 @@ internal static class Program
         return ErrorCallNotImplemented;
     }
 
-    private static bool ReportStatus(uint state, uint acceptedControls, uint waitHint)
+    private static bool ReportStatus(uint state, uint acceptedControls, uint waitHint,
+        uint win32ExitCode = 0, uint serviceSpecificExitCode = 0)
     {
         lock (StatusLock)
         {
@@ -130,8 +146,8 @@ internal static class Program
                 ServiceType = ServiceWin32OwnProcess,
                 CurrentState = state,
                 ControlsAccepted = acceptedControls,
-                Win32ExitCode = 0,
-                ServiceSpecificExitCode = 0,
+                Win32ExitCode = win32ExitCode,
+                ServiceSpecificExitCode = serviceSpecificExitCode,
                 CheckPoint = checkpoint,
                 WaitHint = waitHint,
             };

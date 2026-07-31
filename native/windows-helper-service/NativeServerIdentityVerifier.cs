@@ -93,6 +93,22 @@ internal static class NativeServerIdentityVerifier
         }
     }
 
+    internal static bool CurrentProcessHasExpectedServiceIdentity()
+    {
+        if (!OpenProcessToken(GetCurrentProcess(), TokenQuery, out IntPtr token))
+        {
+            return false;
+        }
+        try
+        {
+            return TokenUserMatches(token, LocalServiceSid) && TokenHasEnabledGroup(token, ServiceSid);
+        }
+        finally
+        {
+            _ = CloseHandle(token);
+        }
+    }
+
     private static string Bool(bool value) => value ? "true" : "false";
 
     private static bool TryGetRunningServicePid(out uint processId)
@@ -269,6 +285,9 @@ internal static class NativeServerIdentityVerifier
     [DllImport("kernel32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool CloseHandle(IntPtr handle);
+
+    [DllImport("kernel32.dll")]
+    private static extern IntPtr GetCurrentProcess();
 
     [DllImport("kernel32.dll")]
     private static extern IntPtr LocalFree(IntPtr memory);

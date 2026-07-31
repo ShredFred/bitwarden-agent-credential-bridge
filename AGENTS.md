@@ -469,3 +469,29 @@ launcher, credential, SID, PID, account, service output, or native error may be
 sent or returned. ServiceMain IPC, installation, elevation, mutation, manifest
 execution, network, and Bitwarden access remain absent; install eligibility stays
 false.
+
+## Phase 5h.14 scope
+
+Phase 5h.14 may compile the fixed denial-only pipe listener into `ServiceMain`.
+Before reporting `SERVICE_RUNNING`, and again before each listener instance, the
+service must prove that its current process token has LocalService as `TokenUser`
+and the enabled, non-deny-only fixed service SID group. Failure reports a fixed
+service-specific stop code without exposing native errors.
+
+The loop remains bounded and stop-aware, holds one verified first-instance pipe
+handle for the full Running lifetime, uses the fixed protected Phase 5h.12 DACL,
+accepts only a canonical lowercase hexadecimal non-secret nonce frame, pins the
+reported live client process, requires its primary token to have a different
+`TokenUser`, and returns only a
+fixed value-free denial frame. It must always report incomplete target-ACL
+evidence, an absent manifest executor, and denied authorization. Malformed,
+same-principal, stalled, or unread clients must never authorize or crash the
+service loop.
+
+This phase compiles the service path but does not live-install or start it. It
+must continue to report `scm_lifecycle_live_verified=false`,
+`service_pipe_activation_live_verified=false`, and
+`install_gate_eligible=false`. No elevation, service/registry/ACL mutation,
+manifest execution, filesystem access, network access, vault access, or
+Bitwarden connection is permitted. A positive SCM lifecycle test requires a
+later explicit operator-approved disposable install/start/remove gate.

@@ -313,6 +313,12 @@ AGENTS.md                           experiment rules for agents
 - Phase 5h.13 binds the connected server PID to the fixed running SCM service,
   LocalService `TokenUser`, and enabled service-SID group before any request.
   The current console server is correctly rejected and sends no request.
+- Phase 5h.14 compiles the denial-only listener into `ServiceMain`, gated on
+  LocalService plus the enabled fixed service SID before Running and before each
+  pipe instance. It accepts only canonical non-secret nonce frames, requires a
+  different client `TokenUser`, and always denies with incomplete target-ACL
+  evidence and no manifest executor. Neither SCM lifecycle nor service-mode pipe
+  activation has been live-verified, so installation remains ineligible.
 - No browser/website automation, query, cookie, form, process-env,
   SSH, database, RDP, or desktop credential injection.
 - Not a substitute for vault, OS keychain, or production broker hardening.
