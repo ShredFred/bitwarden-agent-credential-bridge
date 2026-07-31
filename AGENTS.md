@@ -140,3 +140,18 @@ short timeout and small output bound. It accepts exactly one JSON object with
 three booleans and rejects stderr, extra output/fields, non-zero exit, timeout,
 or malformed data with stable value-free errors. It must never return raw command
 output, paths, principals, SIDs, usernames, or exception messages.
+
+## Phase 5d scope
+
+Phase 5d may implement only a pure, non-mutating apply/rollback manifest builder.
+It derives destinations internally, accepts launcher bytes only to hash them, and
+returns no content or vault references. Exact observed states must distinguish
+absent paths from previously verified secure/managed paths and reject incoherent
+parent/child states. Unknown existing files are never representable as writable.
+
+The manifest must bind exact forward and reverse actions, prior/post digests,
+permission policy, exclusive backup absence, and strict reverse rollback order.
+Canonical sorted-key UTF-8 JSON is hashed without self-referential digest fields;
+confirmation requires the complete SHA-256 digest. This phase must not create,
+move, replace, chmod, delete, inspect, or read any host path and must not implement
+the apply executor itself.

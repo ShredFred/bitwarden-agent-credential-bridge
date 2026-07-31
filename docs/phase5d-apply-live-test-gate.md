@@ -1,6 +1,7 @@
 # Phase 5d gate: apply and disposable live test
 
-No apply implementation is authorized yet. A later installer may proceed only
+Phase 5d may build and verify a pure, deterministic action manifest; it still
+performs no host I/O. No apply executor is authorized yet. A later installer may proceed only
 after all of the following are implemented and independently reviewed:
 
 1. Generate a complete value-free action manifest before mutation, including
@@ -22,6 +23,11 @@ after all of the following are implemented and independently reviewed:
 7. Before a Bitwarden live test, require a separate approval for a disposable
    account/item, bounded relay/network access, cache/revocation tests, process and
    log non-disclosure checks, cleanup, and a reviewed redacted evidence bundle.
+
+The manifest builder hashes launcher bytes without returning them, derives every
+destination internally, binds coherent observed states plus forward/rollback
+actions, and requires `APPLY <full 64-character SHA-256>`. Existing user config
+is preserved; an absent config receives only the public empty-services skeleton.
 
 Browser automation, website form filling, SSH, databases, RDP, desktop logins,
 TLS interception, and environment-variable secret injection remain separate

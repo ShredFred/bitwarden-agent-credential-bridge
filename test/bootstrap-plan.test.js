@@ -19,6 +19,12 @@ const user = {
 };
 
 describe('portable bootstrap planner', () => {
+  it('allows an empty local service registry before the first alias is configured', () => {
+    const result = validateUserConfig({ version: 1, services: {} });
+    assert.equal(result.version, 1);
+    assert.deepEqual(Object.keys(result.services), []);
+  });
+
   it('derives deterministic Windows, macOS, and Linux per-user paths', () => {
     assert.deepEqual(deriveUserRoots('win32', 'C:\\Users\\fake', { LOCALAPPDATA: 'C:\\Users\\fake\\AppData\\Local' }), {
       configPath: 'C:\\Users\\fake\\AppData\\Local\\BitwardenAgentCredentialBridge\\config.json',

@@ -120,6 +120,7 @@ npm run test:phase4b
 npm run test:phase5a
 npm run test:phase5b
 npm run test:phase5c
+npm run test:phase5d
 npm run test:phase3
 node src/run-demo.js
 ```

@@ -95,9 +95,6 @@ export function validateUserConfig(raw) {
     }
     services[alias] = Object.freeze({ ...service });
   }
-  if (Object.keys(services).length === 0) {
-    throw new BootstrapPlanError('invalid_user', 'user services must be non-empty');
-  }
   return Object.freeze({ version: 1, services: Object.freeze(services) });
 }
 
