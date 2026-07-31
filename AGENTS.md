@@ -168,3 +168,16 @@ the canonical temp root.
 The workspace API must not expose recursive cleanup, accept default user roots,
 create Bitwarden configuration, access a vault/network, or execute an apply
 manifest. Tests may remove only the exact root they created after verification.
+
+## Phase 5f scope
+
+Phase 5f may restrict permissions only for existing paths inside a currently
+valid disposable workspace. POSIX uses owner-only modes. Windows uses a
+repo-owned PowerShell setter with argument-array invocation; the script must
+independently verify the canonical root, exact marker bytes/nonce, containment,
+item type, and every existing path segment before replacing inheritance with
+FullControl for only current user, LocalSystem, and Builtin Administrators.
+
+The setter must be silent on success and expose stable value-free failures only.
+It must not accept paths outside the marked root, create/delete/move files,
+operate on normal user roots, access Bitwarden, or execute manifests.
