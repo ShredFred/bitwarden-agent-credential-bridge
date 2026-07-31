@@ -362,3 +362,29 @@ must not emit installer commands. It does not install/start a service, elevate,
 change ACLs, create an account, inspect the host, execute a manifest, or access
 Bitwarden. Every mutable operation remains behind an explicit operator-approved
 live gate and must be reverified from native evidence afterward.
+
+## Phase 5h.9 scope
+
+Phase 5h.9 may perform a bounded, read-only Windows preflight for the single
+fixed Phase 5h.8 service. It accepts only a plan object created by the in-process
+canonical builder, passes only the reviewed binary SHA-256 and byte length to a
+repo-owned PowerShell probe, and returns an exact value-free boolean schema.
+
+The probe may read the fixed service registry configuration, fixed SCM security
+descriptor, installed image metadata/content for hashing, and image ancestor
+security descriptors. It must verify exact Win32 own-process type, `LocalService`, demand start, unrestricted
+service SID type, caller denial of service change/delete/DACL/owner rights,
+binary digest/length, reparse-free trusted ownership, and caller denial of file,
+create, delete, DACL, and ownership rights. A missing service is a successful
+read-only probe with every readiness boolean false. The phase must not return
+paths, SIDs, SDDL, ACEs, account names, hashes, process output, or exception text.
+The public API uses fixed system PowerShell and the fixed repo script; it accepts
+no runner, executable, script path, command, or timeout override. Because the
+collector is path-based, even a fully matching snapshot must keep
+`authorization_ready=false`; it is advisory evidence only until a handle-bound
+installed-service matrix exists.
+The child receives a fixed minimal environment and resolves `sc.exe` through the
+OS system-directory API. A mutable in-process `SystemRoot` still selects the
+initial PowerShell binary, so no Phase 5h.9 result may be authorization evidence.
+It does not start/install/delete a service, mutate registry/SCM/files/ACLs,
+execute the helper, access a vault, or authorize a live apply.

@@ -3,6 +3,7 @@ const SERVICE_ACCOUNT = 'NT AUTHORITY\\LocalService';
 const PIPE_NAME = 'bitwarden-agent-credential-bridge-helper-v1';
 const SHA256 = /^[0-9a-f]{64}$/;
 const MAX_BINARY_BYTES = 64 * 1024 * 1024;
+const VALID_PLANS = new WeakSet();
 
 export class WindowsServiceBoundaryPlanError extends Error {
   constructor(code) {
@@ -27,7 +28,7 @@ export function buildWindowsServiceBoundaryPlan(input) {
     throw new WindowsServiceBoundaryPlanError('invalid_binary_binding');
   }
 
-  return deepFreeze({
+  const plan = deepFreeze({
     schema_version: 1,
     platform: 'win32',
     service: {
@@ -88,6 +89,12 @@ export function buildWindowsServiceBoundaryPlan(input) {
       'cleanup_verified',
     ],
   });
+  VALID_PLANS.add(plan);
+  return plan;
+}
+
+export function isWindowsServiceBoundaryPlan(value) {
+  return value !== null && typeof value === 'object' && VALID_PLANS.has(value);
 }
 
 function exactInput(value) {

@@ -130,6 +130,7 @@ npm run test:phase5h5
 npm run test:phase5h6
 npm run test:phase5h7
 npm run test:phase5h8
+npm run test:phase5h9
 node src/run-demo.js
 ```
 
@@ -254,6 +255,7 @@ docs/phase5h5-inherited-launcher-transfer.md real disposable inherited-handle ch
 docs/phase5h6-windows-helper-pipe-session.md real local pipe/token denial check
 docs/phase5h7-windows-native-denial-session.md combined pipe/handle/AccessCheck denial
 docs/phase5h8-windows-passwordless-service-plan.md pure passwordless service contract
+docs/phase5h9-windows-service-boundary-preflight.md native read-only service check
 test/*.test.js                      functional + exposure tests
 AGENTS.md                           experiment rules for agents
 ```
@@ -287,6 +289,10 @@ AGENTS.md                           experiment rules for agents
 - Phase 5h.8 fixes the future Windows writer to a passwordless `LocalService`
   service SID and a digest-pinned binary, but performs no service installation,
   elevation, ACL mutation, or host inspection.
+- Phase 5h.9 performs a real, value-free read-only inspection of that fixed
+  service and its binary/security boundary. The expected current result is not
+  present because the service has not been installed. Even a matching path-based
+  snapshot remains advisory and cannot authorize an apply.
 - No browser/website automation, query, cookie, form, process-env,
   SSH, database, RDP, or desktop credential injection.
 - Not a substitute for vault, OS keychain, or production broker hardening.
