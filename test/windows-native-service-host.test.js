@@ -18,6 +18,7 @@ const EXE = 'BitwardenAgentCredentialBridgeHelper.exe';
 const ILLINK_VERSION = '8.0.29';
 const ILLINK_NUPKG_SHA256 = '5e75b0b31660410b04fbb17614de9ba40bf44976cae45227094b544df085dce2';
 const PIPE_PATH = String.raw`\\.\pipe\BitwardenAgentCredentialBridgeHelper.v1.denial`;
+const SERVICE_SID = 'S-1-5-80-4161497498-1516966145-968308051-418532793-1299382607';
 
 function waitForExit(child) {
   return new Promise((resolve, reject) => {
@@ -26,68 +27,40 @@ function waitForExit(child) {
   });
 }
 
-function connectToDenialPipe(sentNonce, acknowledge = true) {
-  return new Promise((resolve, reject) => {
-    const deadline = Date.now() + 10000;
-    const attempt = () => {
-      const socket = net.createConnection(PIPE_PATH);
-      const chunks = [];
-      let connected = false;
-      let acknowledged = false;
-      socket.once('connect', () => {
-        connected = true;
-        if (sentNonce !== null) socket.write(`${sentNonce}\n`);
-      });
-      socket.on('data', (chunk) => {
-        chunks.push(chunk);
-        if (acknowledge && !acknowledged) {
-          acknowledged = true;
-          socket.write('ack\n');
-        }
-      });
-      socket.once('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
-      socket.once('error', (error) => {
-        socket.destroy();
-        if (connected && error.code === 'EPIPE') {
-          resolve(Buffer.concat(chunks).toString('utf8'));
-        } else if ((error.code === 'ENOENT' || error.code === 'EBUSY') && Date.now() < deadline) {
-          setTimeout(attempt, 20);
-        } else {
-          reject(error);
-        }
-      });
-    };
-    attempt();
+async function runPipePair(executable, nonce, mode, serverMode = 'normal') {
+  const client = spawn(executable, ['--self-test-pipe-client', mode, nonce], {
+    windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'],
   });
+  const serverArgs = serverMode === 'normal'
+    ? ['--console-pipe-denial', nonce]
+    : ['--self-test-pipe-server', serverMode, nonce];
+  const server = spawn(executable, serverArgs, {
+    windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  const serverStdout = [];
+  const serverStderr = [];
+  const clientStdout = [];
+  const clientStderr = [];
+  server.stdout.on('data', (chunk) => serverStdout.push(chunk));
+  server.stderr.on('data', (chunk) => serverStderr.push(chunk));
+  client.stdout.on('data', (chunk) => clientStdout.push(chunk));
+  client.stderr.on('data', (chunk) => clientStderr.push(chunk));
+  const [serverResult, clientResult] = await Promise.all([waitForExit(server), waitForExit(client)]);
+  return {
+    serverResult,
+    clientResult,
+    serverStdout: Buffer.concat(serverStdout).toString('utf8'),
+    serverStderr: Buffer.concat(serverStderr).toString('utf8'),
+    clientStdout: Buffer.concat(clientStdout).toString('utf8'),
+    clientStderr: Buffer.concat(clientStderr).toString('utf8'),
+  };
 }
 
-function connectAndPause(sentNonce) {
-  return new Promise((resolve, reject) => {
-    const deadline = Date.now() + 10000;
-    const attempt = () => {
-      const socket = net.createConnection(PIPE_PATH);
-      socket.once('connect', () => {
-        socket.write(`${sentNonce}\n`);
-        socket.pause();
-        resolve(socket);
-      });
-      socket.once('error', (error) => {
-        socket.destroy();
-        if ((error.code === 'ENOENT' || error.code === 'EBUSY') && Date.now() < deadline) {
-          setTimeout(attempt, 20);
-        } else {
-          reject(error);
-        }
-      });
-    };
-    attempt();
-  });
-}
-
-async function publishOnce(root) {
+async function publishOnce(root, mutateSource = null) {
   const projectDir = path.join(root, 'project');
   const outputDir = path.join(root, 'publish');
   await fs.cp(SOURCE, projectDir, { recursive: true, force: false, errorOnExist: true });
+  if (mutateSource !== null) await mutateSource(projectDir);
   const cliHome = path.join(root, 'dotnet-home');
   const packages = path.join(root, 'packages');
   const localFeed = path.join(root, 'local-feed');
@@ -153,15 +126,25 @@ describe('native Windows helper service host scaffold', () => {
   it('contains no network, vault, process-launch, or manifest-executor surface', async () => {
     assert.deepEqual(
       (await fs.readdir(SOURCE)).sort(),
-      [PROJECT, 'DenialPipeProbe.cs', 'Program.cs', 'global.json', 'NuGet.Config'].sort(),
+      [PROJECT, 'DenialPipeProbe.cs', 'NativeDenialPipeClient.cs', 'PipeSecurity.cs', 'Program.cs', 'global.json', 'NuGet.Config'].sort(),
     );
     const project = await fs.readFile(path.join(SOURCE, PROJECT), 'utf8');
     assert.equal(project.includes('PackageReference'), false);
-    const source = `${await fs.readFile(path.join(SOURCE, 'Program.cs'), 'utf8')}\n${await fs.readFile(path.join(SOURCE, 'DenialPipeProbe.cs'), 'utf8')}`;
+    const pipeSecurity = await fs.readFile(path.join(SOURCE, 'PipeSecurity.cs'), 'utf8');
+    assert.ok(pipeSecurity.includes(
+      '"D:P(A;;GA;;;SY)(A;;GA;;;" + ServiceSid + ")(A;;0x12018b;;;AU)"',
+    ));
+    assert.ok(pipeSecurity.includes(`ServiceSid = "${SERVICE_SID}"`));
+    for (const forbiddenTrustee of [';;;WD)', ';;;AN)', ';;;NU)', ';;;BA)', ';;;OW)']) {
+      assert.equal(pipeSecurity.includes(forbiddenTrustee), false, forbiddenTrustee);
+    }
+    const source = `${await fs.readFile(path.join(SOURCE, 'Program.cs'), 'utf8')}\n${await fs.readFile(path.join(SOURCE, 'DenialPipeProbe.cs'), 'utf8')}\n${await fs.readFile(path.join(SOURCE, 'NativeDenialPipeClient.cs'), 'utf8')}\n${await fs.readFile(path.join(SOURCE, 'PipeSecurity.cs'), 'utf8')}`;
+    assert.equal(source.match(/CreateFile\(/g)?.length, 2);
+    assert.ok(source.includes('GenericRead | FileWriteData | FileWriteAttributes'));
     for (const forbidden of [
       'System.Net', 'HttpClient', 'Socket', 'TcpListener', 'WinHttp', 'WSAStartup',
       'Process.Start', 'CreateProcess', 'System.Diagnostics', 'System.IO.',
-      'CreateFile', 'Microsoft.Win32', 'Registry.',
+      'Microsoft.Win32', 'Registry.',
       'Environment.GetEnvironmentVariable', 'Manifest', 'Vault',
     ]) {
       assert.equal(source.includes(forbidden), false, forbidden);
@@ -179,6 +162,14 @@ describe('native Windows helper service host scaffold', () => {
       assert.match(first.digest, /^[0-9a-f]{64}$/);
       assert.equal(first.digest, second.digest);
 
+      const systemRoot = process.env.SystemRoot;
+      assert.equal(typeof systemRoot, 'string');
+      const sc = path.join(systemRoot, 'System32', 'sc.exe');
+      const serviceSidResult = await execFileAsync(sc, [
+        'showsid', 'BitwardenAgentCredentialBridgeHelper',
+      ], { windowsHide: true, timeout: 10000, maxBuffer: 4096, encoding: 'utf8' });
+      assert.ok(serviceSidResult.stdout.includes(SERVICE_SID));
+
       const selfTest = await execFileAsync(first.executable, ['--self-test'], {
         windowsHide: true, timeout: 10000, maxBuffer: 4096, encoding: 'utf8',
       });
@@ -190,8 +181,8 @@ describe('native Windows helper service host scaffold', () => {
         scm_entrypoint_compiled: true,
         scm_lifecycle_live_verified: false,
         console_denial_pipe_compiled: true,
+        explicit_pipe_dacl_compiled: true,
         service_pipe_activation_absent: true,
-        service_pipe_acl_absent: true,
         manifest_executor_absent: true,
         network_stack_absent: true,
         vault_client_absent: true,
@@ -199,106 +190,48 @@ describe('native Windows helper service host scaffold', () => {
       });
 
       const nonce = 'a'.repeat(64);
-      const child = spawn(first.executable, ['--console-pipe-denial', nonce], {
-        windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'],
-      });
-      const stdout = [];
-      const stderr = [];
-      child.stdout.on('data', (chunk) => stdout.push(chunk));
-      child.stderr.on('data', (chunk) => stderr.push(chunk));
-      const [pipeResponse, childResult] = await Promise.all([
-        connectToDenialPipe(nonce), waitForExit(child),
-      ]);
-      assert.deepEqual(childResult, { code: 0, signal: null });
-      assert.equal(Buffer.concat(stdout).length, 0);
-      assert.equal(Buffer.concat(stderr).length, 0);
-      assert.deepEqual(JSON.parse(pipeResponse), {
+      const valid = await runPipePair(first.executable, nonce, 'valid');
+      assert.deepEqual(valid.clientResult, { code: 0, signal: null });
+      assert.deepEqual(valid.serverResult, { code: 0, signal: null });
+      assert.equal(valid.serverStdout, '');
+      assert.equal(valid.serverStderr, '');
+      assert.equal(valid.clientStderr, '');
+      assert.deepEqual(JSON.parse(valid.clientStdout), {
         schema_version: 1,
-        local_transport: true,
-        remote_clients_rejected: true,
-        first_instance: true,
-        client_pid_bound: true,
-        caller_token_bound: true,
-        helper_token_bound: true,
-        same_token_user: true,
-        different_principal: false,
+        narrow_pipe_rights: true,
+        create_pipe_instance_right_absent: true,
+        response_schema_exact: true,
+        server_identity_verified: false,
         authorization_denied: true,
       });
 
-      const mismatchChild = spawn(first.executable, ['--console-pipe-denial', nonce], {
-        windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'],
-      });
-      const [mismatchResponse, mismatchResult] = await Promise.all([
-        connectToDenialPipe('b'.repeat(64)), waitForExit(mismatchChild),
-      ]);
-      assert.equal(mismatchResponse, '');
-      assert.deepEqual(mismatchResult, { code: 12, signal: null });
-
-      for (const malformed of ['a'.repeat(8), `${'a'.repeat(64)}\r`, `${'a'.repeat(64)}\nextra`]) {
-        const malformedChild = spawn(first.executable, ['--console-pipe-denial', nonce], {
-          windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'],
-        });
-        const [malformedResponse, malformedResult] = await Promise.all([
-          connectToDenialPipe(malformed), waitForExit(malformedChild),
-        ]);
-        assert.equal(malformedResponse, '');
-        assert.deepEqual(malformedResult, { code: 12, signal: null });
+      for (const mode of ['mismatch', 'partial', 'crlf', 'oversize']) {
+        const malformed = await runPipePair(first.executable, nonce, mode);
+        assert.deepEqual(malformed.serverResult, { code: 12, signal: null });
+        assert.deepEqual(malformed.clientResult, { code: 0, signal: null });
+        assert.equal(malformed.serverStdout, '');
+        assert.equal(malformed.serverStderr, '');
+        assert.equal(malformed.clientStdout, '');
+        assert.equal(malformed.clientStderr, '');
       }
 
-      const idleChild = spawn(first.executable, ['--console-pipe-denial', nonce], {
-        windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'],
-      });
       const idleStartedAt = Date.now();
-      const [idleResponse, idleResult] = await Promise.all([
-        connectToDenialPipe(null), waitForExit(idleChild),
-      ]);
-      assert.equal(idleResponse, '');
-      assert.deepEqual(idleResult, { code: 12, signal: null });
+      const idle = await runPipePair(first.executable, nonce, 'idle');
+      assert.deepEqual(idle.serverResult, { code: 12, signal: null });
+      assert.deepEqual(idle.clientResult, { code: 0, signal: null });
+      assert.equal(idle.serverStdout + idle.serverStderr + idle.clientStdout + idle.clientStderr, '');
       assert.ok(Date.now() - idleStartedAt >= 1000);
       assert.ok(Date.now() - idleStartedAt < 5000);
 
-      const noAckChild = spawn(first.executable, ['--console-pipe-denial', nonce], {
-        windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'],
-      });
-      const noAckStartedAt = Date.now();
-      const [noAckResponse, noAckResult] = await Promise.all([
-        connectToDenialPipe(nonce, false), waitForExit(noAckChild),
-      ]);
-      assert.deepEqual(JSON.parse(noAckResponse), {
-        schema_version: 1,
-        local_transport: true,
-        remote_clients_rejected: true,
-        first_instance: true,
-        client_pid_bound: true,
-        caller_token_bound: true,
-        helper_token_bound: true,
-        same_token_user: true,
-        different_principal: false,
-        authorization_denied: true,
-      });
-      assert.deepEqual(noAckResult, { code: 15, signal: null });
-      assert.ok(Date.now() - noAckStartedAt >= 1000);
-      assert.ok(Date.now() - noAckStartedAt < 5000);
-
-      const unreadChild = spawn(first.executable, ['--console-pipe-denial', nonce], {
-        windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'],
-      });
-      const unreadStdout = [];
-      const unreadStderr = [];
-      unreadChild.stdout.on('data', (chunk) => unreadStdout.push(chunk));
-      unreadChild.stderr.on('data', (chunk) => unreadStderr.push(chunk));
-      const unreadExit = waitForExit(unreadChild);
-      const unreadSocket = await connectAndPause(nonce);
-      const unreadStartedAt = Date.now();
-      try {
-        assert.deepEqual(await unreadExit, { code: 15, signal: null });
-      } finally {
-        unreadSocket.destroy();
+      for (const mode of ['no-ack', 'unread']) {
+        const stalledStartedAt = Date.now();
+        const stalled = await runPipePair(first.executable, nonce, mode);
+        assert.deepEqual(stalled.serverResult, { code: 15, signal: null });
+        assert.deepEqual(stalled.clientResult, { code: 0, signal: null });
+        assert.equal(stalled.serverStdout + stalled.serverStderr + stalled.clientStdout + stalled.clientStderr, '');
+        assert.ok(Date.now() - stalledStartedAt >= 1000);
+        assert.ok(Date.now() - stalledStartedAt < 5000);
       }
-      assert.equal(Buffer.concat(unreadStdout).length, 0);
-      assert.equal(Buffer.concat(unreadStderr).length, 0);
-      assert.ok(Date.now() - unreadStartedAt >= 1000);
-      assert.ok(Date.now() - unreadStartedAt < 5000);
 
       const noClientStartedAt = Date.now();
       await assert.rejects(
@@ -309,6 +242,16 @@ describe('native Windows helper service host scaffold', () => {
       );
       assert.ok(Date.now() - noClientStartedAt >= 1000);
       assert.ok(Date.now() - noClientStartedAt < 5000);
+
+      for (const serverMode of ['stall', 'trailing']) {
+        const fakeStartedAt = Date.now();
+        const fake = await runPipePair(first.executable, nonce, 'valid', serverMode);
+        assert.deepEqual(fake.serverResult, { code: 0, signal: null });
+        assert.deepEqual(fake.clientResult, { code: 23, signal: null });
+        assert.equal(fake.serverStdout + fake.serverStderr + fake.clientStdout + fake.clientStderr, '');
+        assert.ok(Date.now() - fakeStartedAt < 5000);
+        if (serverMode === 'stall') assert.ok(Date.now() - fakeStartedAt >= 1000);
+      }
 
       const occupyingServer = net.createServer();
       await new Promise((resolve, reject) => {
@@ -325,6 +268,23 @@ describe('native Windows helper service host scaffold', () => {
       } finally {
         await new Promise((resolve) => occupyingServer.close(resolve));
       }
+
+      const mutant = await publishOnce(path.join(root, 'mutant'), async (projectDir) => {
+        const securityPath = path.join(projectDir, 'PipeSecurity.cs');
+        const original = await fs.readFile(securityPath, 'utf8');
+        const mutated = original.replace(
+          ')(A;;0x12018b;;;AU)"',
+          ')(A;;0x12018b;;;AU)(A;;GR;;;WD)"',
+        );
+        assert.notEqual(mutated, original);
+        await fs.writeFile(securityPath, mutated, 'utf8');
+      });
+      await assert.rejects(
+        execFileAsync(mutant.executable, ['--console-pipe-denial', nonce], {
+          windowsHide: true, timeout: 10000, maxBuffer: 4096, encoding: 'utf8',
+        }),
+        (error) => error.code === 18 && error.stdout === '' && error.stderr === '',
+      );
 
       await assert.rejects(
         execFileAsync(first.executable, ['--console-pipe-denial', 'NOT-A-NONCE'], {

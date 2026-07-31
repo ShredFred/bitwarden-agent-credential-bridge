@@ -1,6 +1,7 @@
 using System;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Threading;
 
 namespace BitwardenAgentCredentialBridgeHelper;
 
@@ -24,9 +25,14 @@ internal static class DenialPipeProbe
     private static readonly IntPtr InvalidHandleValue = new(-1);
     private static readonly byte[] DenialResponse = Encoding.ASCII.GetBytes(
         "{\"schema_version\":1,\"local_transport\":true,\"remote_clients_rejected\":true," +
-        "\"first_instance\":true,\"client_pid_bound\":true,\"caller_token_bound\":true," +
+        "\"first_instance\":true,\"explicit_pipe_dacl_verified\":true," +
+        "\"service_sid_ace_verified\":true,\"authenticated_client_narrow_access_ace_verified\":true," +
+        "\"client_pid_bound\":true,\"caller_token_bound\":true," +
         "\"helper_token_bound\":true,\"same_token_user\":true,\"different_principal\":false," +
         "\"authorization_denied\":true}\n"
+    );
+    private static readonly byte[] TrailingJunkResponse = Encoding.ASCII.GetBytes(
+        Encoding.ASCII.GetString(DenialResponse) + "junk"
     );
 
     internal static bool IsCanonicalNonce(string value)
@@ -47,16 +53,38 @@ internal static class DenialPipeProbe
 
     internal static int Run(string expectedNonce)
     {
-        IntPtr pipe = CreateNamedPipe(
-            PipePath,
-            PipeAccessDuplex | FileFlagFirstPipeInstance | FileFlagOverlapped,
-            PipeTypeMessage | PipeReadModeMessage | PipeWait | PipeRejectRemoteClients,
-            PipeUnlimitedInstances,
-            4096,
-            4096,
-            0,
-            IntPtr.Zero
-        );
+        return RunCore(expectedNonce, "normal");
+    }
+
+    internal static int RunSelfTestServer(string mode, string expectedNonce)
+    {
+        return RunCore(expectedNonce, mode);
+    }
+
+    private static int RunCore(string expectedNonce, string mode)
+    {
+        if (!PipeSecurity.TryCreateAttributes(out IntPtr attributes, out IntPtr descriptor))
+        {
+            return 17;
+        }
+        IntPtr pipe;
+        try
+        {
+            pipe = CreateNamedPipe(
+                PipePath,
+                PipeAccessDuplex | FileFlagFirstPipeInstance | FileFlagOverlapped,
+                PipeTypeMessage | PipeReadModeMessage | PipeWait | PipeRejectRemoteClients,
+                PipeUnlimitedInstances,
+                4096,
+                4096,
+                0,
+                attributes
+            );
+        }
+        finally
+        {
+            PipeSecurity.FreeAttributes(attributes, descriptor);
+        }
         if (pipe == InvalidHandleValue)
         {
             return 10;
@@ -64,6 +92,10 @@ internal static class DenialPipeProbe
 
         try
         {
+            if (!PipeSecurity.HasExpectedKernelDacl(pipe))
+            {
+                return 18;
+            }
             if (!ConnectWithDeadline(pipe))
             {
                 return 11;
@@ -75,6 +107,15 @@ internal static class DenialPipeProbe
             if (!TryBindSameTokenUser(pipe, out bool sameTokenUser) || !sameTokenUser)
             {
                 return 13;
+            }
+            if (mode == "stall")
+            {
+                Thread.Sleep(2500);
+                return 0;
+            }
+            if (mode == "trailing")
+            {
+                return WriteAll(pipe, TrailingJunkResponse) ? 0 : 14;
             }
             if (!WriteAll(pipe, DenialResponse))
             {

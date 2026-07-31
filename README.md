@@ -259,6 +259,7 @@ docs/phase5h8-windows-passwordless-service-plan.md pure passwordless service con
 docs/phase5h9-windows-service-boundary-preflight.md native read-only service check
 docs/phase5h10-native-windows-service-host.md deterministic native lifecycle scaffold
 docs/phase5h11-native-pipe-denial.md native local pipe/token denial probe
+docs/phase5h12-explicit-pipe-dacl.md fixed protected native pipe DACL proof
 test/*.test.js                      functional + exposure tests
 AGENTS.md                           experiment rules for agents
 ```
@@ -305,6 +306,9 @@ AGENTS.md                           experiment rules for agents
   first-instance enforcement, live client PID/token binding, and explicit
   same-`TokenUser` denial. The service entrypoint still does not activate IPC,
   has no service-specific pipe DACL, and remains ineligible for installation.
+- Phase 5h.12 replaces the ambient pipe DACL with an exact protected three-ACE
+  descriptor and verifies the created kernel object's DACL before accepting a
+  client. Service-mode IPC and installation remain disabled.
 - No browser/website automation, query, cookie, form, process-env,
   SSH, database, RDP, or desktop credential injection.
 - Not a substitute for vault, OS keychain, or production broker hardening.

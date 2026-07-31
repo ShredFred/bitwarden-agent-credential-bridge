@@ -32,7 +32,7 @@ internal static class Program
     {
         if (args.Length == 1 && string.Equals(args[0], "--self-test", StringComparison.Ordinal))
         {
-            Console.Out.Write("{\"schema_version\":1,\"platform_win32\":true,\"service_name_bound\":true,\"scm_entrypoint_compiled\":true,\"scm_lifecycle_live_verified\":false,\"console_denial_pipe_compiled\":true,\"service_pipe_activation_absent\":true,\"service_pipe_acl_absent\":true,\"manifest_executor_absent\":true,\"network_stack_absent\":true,\"vault_client_absent\":true,\"install_gate_eligible\":false}\n");
+            Console.Out.Write("{\"schema_version\":1,\"platform_win32\":true,\"service_name_bound\":true,\"scm_entrypoint_compiled\":true,\"scm_lifecycle_live_verified\":false,\"console_denial_pipe_compiled\":true,\"explicit_pipe_dacl_compiled\":true,\"service_pipe_activation_absent\":true,\"manifest_executor_absent\":true,\"network_stack_absent\":true,\"vault_client_absent\":true,\"install_gate_eligible\":false}\n");
             return 0;
         }
         if (args.Length == 2 &&
@@ -40,6 +40,19 @@ internal static class Program
             DenialPipeProbe.IsCanonicalNonce(args[1]))
         {
             return DenialPipeProbe.Run(args[1]);
+        }
+        if (args.Length == 3 &&
+            string.Equals(args[0], "--self-test-pipe-client", StringComparison.Ordinal) &&
+            IsPipeClientMode(args[1]) && DenialPipeProbe.IsCanonicalNonce(args[2]))
+        {
+            return NativeDenialPipeClient.Run(args[1], args[2]);
+        }
+        if (args.Length == 3 &&
+            string.Equals(args[0], "--self-test-pipe-server", StringComparison.Ordinal) &&
+            (args[1] == "stall" || args[1] == "trailing") &&
+            DenialPipeProbe.IsCanonicalNonce(args[2]))
+        {
+            return DenialPipeProbe.RunSelfTestServer(args[1], args[2]);
         }
         if (args.Length != 0)
         {
@@ -56,6 +69,12 @@ internal static class Program
             return Marshal.GetLastWin32Error() == ErrorFailedServiceControllerConnect ? 3 : 4;
         }
         return _serviceFailure == 0 ? 0 : 5;
+    }
+
+    private static bool IsPipeClientMode(string value)
+    {
+        return value == "valid" || value == "mismatch" || value == "partial" || value == "crlf" ||
+            value == "oversize" || value == "idle" || value == "no-ack" || value == "unread";
     }
 
     private static void ServiceMain(uint argumentCount, IntPtr arguments)

@@ -431,3 +431,22 @@ the executable still has no service-specific pipe DACL, manifest executor,
 network stack, vault client, or install eligibility. This phase does not install
 or start a service, elevate, mutate ACLs/registry/files, access normal user roots,
 execute a manifest, or connect to Bitwarden.
+
+## Phase 5h.12 scope
+
+Phase 5h.12 may replace the console denial pipe's ambient default DACL with one
+fixed protected DACL compiled into the native helper. The DACL contains exactly
+three Allow ACEs: LocalSystem and the fixed service-specific SID receive full
+control; Authenticated Users receive file-generic read plus `FILE_WRITE_DATA`
+and `FILE_WRITE_ATTRIBUTES` only, so a future native local Bridge client can set
+message read mode and complete the handshake without receiving
+`FILE_CREATE_PIPE_INSTANCE`. It must contain no Everyone, Anonymous,
+Network, Builtin Administrators, owner-rights, inherited, Deny, or extra ACE.
+
+The helper must query the created kernel pipe object and verify the protected
+DACL, exact ACE count/order/types/flags, masks, and SIDs before accepting a
+client. It returns fixed booleans only and preserves every Phase 5h.11 timeout,
+framing, token, and same-principal denial property. ServiceMain still must not
+activate the listener in this phase, and install eligibility remains false.
+No service install/start, elevation, filesystem/registry/ACL mutation, manifest
+execution, normal-root access, network access, or Bitwarden access is permitted.
