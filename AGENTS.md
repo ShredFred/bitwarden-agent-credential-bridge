@@ -310,3 +310,27 @@ false, no manifest executor is called, and success under a distinct principal
 is not representable in this phase. It must not create accounts/services,
 change ACLs, access normal user roots or Bitwarden, or claim that the separate
 writer boundary is complete.
+
+## Phase 5h.7 scope
+
+Phase 5h.7 may extend the Phase 5h.6 denial session only for a first-install
+manifest whose five canonical target paths are absent. The caller sends the
+canonical bounded helper request over the already PID/token-bound named pipe.
+Launcher bytes must travel separately through an anonymous, unlinked read-only
+handle inherited as the probe's stdin. The probe independently parses the
+request, binds workspace root/nonce and first-install observed state, reads the
+launcher handle to EOF with a 1 MiB cap, and verifies exact length and SHA-256.
+
+The probe may use `DuplicateToken` plus Win32 `AccessCheck` against the caller
+and helper tokens for all five bound target paths. Existing ancestors must stay
+inside the disposable root and contain no reparse point; absent targets are
+checked against the nearest existing ancestor for the exact first missing file
+or directory creation right. `all_targets_checked` is true only after all five
+checks complete. On this same-user host the honest result is caller write not
+denied, helper write allowed, and authorization still terminates earlier at
+`same_principal_rejected`.
+
+This phase accepts no caller-selected handle, path, pipe, PID, command,
+executable, environment, or evidence. It does not support upgrade/backup
+manifests, execute any manifest action, create a second principal, change target
+ACLs, access normal user roots or Bitwarden, or claim production readiness.

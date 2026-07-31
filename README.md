@@ -128,6 +128,7 @@ npm run test:phase3
 npm run test:phase5h4
 npm run test:phase5h5
 npm run test:phase5h6
+npm run test:phase5h7
 node src/run-demo.js
 ```
 
@@ -250,6 +251,7 @@ docs/phase5h3-linux-helper-evidence.md   pure Linux host-UID/peercred evidence c
 docs/phase5h4-macos-helper-evidence.md   pure macOS XPC/audit-token evidence compiler
 docs/phase5h5-inherited-launcher-transfer.md real disposable inherited-handle check
 docs/phase5h6-windows-helper-pipe-session.md real local pipe/token denial check
+docs/phase5h7-windows-native-denial-session.md combined pipe/handle/AccessCheck denial
 test/*.test.js                      functional + exposure tests
 AGENTS.md                           experiment rules for agents
 ```
@@ -277,6 +279,9 @@ AGENTS.md                           experiment rules for agents
 - Phase 5h.6 uses a real Windows named pipe with remote clients rejected and
   live process-token inspection, but deliberately proves only that the current
   same-user helper is rejected.
+- Phase 5h.7 additionally carries the canonical request over that pipe, verifies
+  an inherited launcher handle inside the probe, and performs native AccessCheck
+  calls for every first-install target. It still cannot authorize the same user.
 - No browser/website automation, query, cookie, form, process-env,
   SSH, database, RDP, or desktop credential injection.
 - Not a substitute for vault, OS keychain, or production broker hardening.

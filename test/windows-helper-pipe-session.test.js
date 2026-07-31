@@ -28,11 +28,11 @@ async function fixture() {
     requestId: 'c'.repeat(32), workspace, manifest, launcherSha256,
     launcherByteLength: launcherBytes.byteLength,
   });
-  return { workspace, launcherSha256, launcherByteLength: launcherBytes.byteLength, manifest, request };
+  return { workspace, launcherBytes, launcherSha256, launcherByteLength: launcherBytes.byteLength, manifest, request };
 }
 
 async function cleanup(workspace) {
-  await fs.rm(workspace.root, { recursive: true, force: true });
+  await fs.rm(workspace.root, { recursive: true, force: true, maxRetries: 20, retryDelay: 100 });
 }
 
 describe('Windows native helper named-pipe session', () => {
@@ -45,6 +45,7 @@ describe('Windows native helper named-pipe session', () => {
         workspace: value.workspace,
         requestBytes: value.request.bytes,
         manifest: value.manifest,
+        launcherBytes: value.launcherBytes,
         launcherSha256: value.launcherSha256,
         launcherByteLength: value.launcherByteLength,
       });
@@ -52,9 +53,14 @@ describe('Windows native helper named-pipe session', () => {
         local_transport: true,
         identity_verified: true,
         different_principal: false,
+        caller_write_denied: false,
+        helper_write_allowed: true,
+        request_verified: true,
+        launcher_handle_verified: true,
         authorization_code: 'same_principal_rejected',
       });
       assert.equal(JSON.stringify(result).includes('S-1-'), false);
+      assert.equal((await fs.readdir(value.workspace.root)).some((name) => name.startsWith('.native-launcher-')), false);
     } finally {
       await cleanup(value.workspace);
     }
@@ -78,6 +84,8 @@ describe('Windows native helper named-pipe session', () => {
       all_targets_checked: false,
       caller_effective_write_denied: false,
       helper_required_write_allowed: false,
+      request_verified: true,
+      launcher_handle_verified: true,
     })}\n`);
     const facts = parseWindowsPipeFacts(raw);
     assert.equal(facts.client_pid_verified, true);
@@ -108,6 +116,7 @@ describe('Windows native helper named-pipe session', () => {
             workspace: value.workspace,
             requestBytes: value.request.bytes,
             manifest: value.manifest,
+            launcherBytes: value.launcherBytes,
             launcherSha256: value.launcherSha256,
             launcherByteLength: value.launcherByteLength,
             ...extra,
@@ -115,6 +124,64 @@ describe('Windows native helper named-pipe session', () => {
           (error) => error instanceof WindowsHelperPipeSessionError && error.code === 'invalid_input',
         );
       }
+    } finally {
+      await cleanup(value.workspace);
+    }
+  });
+
+  it('rejects launcher bytes that do not match the canonical request before starting the probe', async () => {
+    const value = await fixture();
+    try {
+      const differentBytes = Buffer.from('different launcher bytes');
+      await assert.rejects(
+        verifyWindowsHelperPipeSamePrincipal({
+          workspace: value.workspace,
+          requestBytes: value.request.bytes,
+          manifest: value.manifest,
+          launcherBytes: differentBytes,
+          launcherSha256: createHash('sha256').update(differentBytes).digest('hex'),
+          launcherByteLength: differentBytes.byteLength,
+        }),
+        (error) => error instanceof WindowsHelperPipeSessionError && error.code === 'request_binding_mismatch',
+      );
+      assert.equal((await fs.readdir(value.workspace.root)).some((name) => name.startsWith('.native-launcher-')), false);
+    } finally {
+      await cleanup(value.workspace);
+    }
+  });
+
+  it('rejects an upgrade manifest in the native first-install probe', {
+    skip: process.platform !== 'win32',
+  }, async () => {
+    const value = await fixture();
+    try {
+      const upgradeManifest = buildApplyManifest({
+        platform: value.workspace.platform,
+        homedir: value.workspace.homedir,
+        env: value.workspace.env,
+        launcherBytes: value.launcherBytes,
+        observed: {
+          config_dir: 'absent', config_file: 'absent',
+          install_root: 'secure_directory', bin_dir: 'secure_directory',
+          launcher: { kind: 'managed_file', sha256: 'd'.repeat(64) },
+        },
+      });
+      const upgradeRequest = buildHelperRequest({
+        requestId: 'd'.repeat(32), workspace: value.workspace, manifest: upgradeManifest,
+        launcherSha256: value.launcherSha256, launcherByteLength: value.launcherByteLength,
+      });
+      await assert.rejects(
+        verifyWindowsHelperPipeSamePrincipal({
+          workspace: value.workspace,
+          requestBytes: upgradeRequest.bytes,
+          manifest: upgradeManifest,
+          launcherBytes: value.launcherBytes,
+          launcherSha256: value.launcherSha256,
+          launcherByteLength: value.launcherByteLength,
+        }),
+        (error) => error instanceof WindowsHelperPipeSessionError && error.code === 'probe_request_failed',
+      );
+      assert.equal((await fs.readdir(value.workspace.root)).some((name) => name.startsWith('.native-launcher-')), false);
     } finally {
       await cleanup(value.workspace);
     }

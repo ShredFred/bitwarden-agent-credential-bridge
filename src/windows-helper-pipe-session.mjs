@@ -1,11 +1,13 @@
-import { randomBytes } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import { spawn } from 'node:child_process';
+import fs from 'node:fs/promises';
 import net from 'node:net';
 import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
+import { canonicalJson } from './apply-manifest.mjs';
 import { verifyDisposableWorkspace } from './disposable-workspace.mjs';
-import { authorizeHelperRequest, HelperProtocolError } from './helper-protocol.mjs';
+import { authorizeHelperRequest, HelperProtocolError, parseHelperRequest } from './helper-protocol.mjs';
 import { evaluateWindowsHelperPeerEvidence } from './windows-helper-evidence.mjs';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -17,6 +19,7 @@ const FACT_FIELDS = new Set([
   'caller_token_user_sha256', 'helper_token_user_sha256', 'caller_is_restricted',
   'caller_is_app_container', 'acl_checks_verified', 'all_targets_checked',
   'caller_effective_write_denied', 'helper_required_write_allowed',
+  'request_verified', 'launcher_handle_verified',
 ]);
 const BOOLEAN_FIELDS = [...FACT_FIELDS].filter((field) => ![
   'schema_version', 'transport_kind', 'caller_token_user_sha256', 'helper_token_user_sha256',
@@ -31,13 +34,18 @@ export class WindowsHelperPipeSessionError extends Error {
 }
 
 /**
- * Exercise a real PIPE_REJECT_REMOTE_CLIENTS transport and live TokenUser probes.
- * Same-user execution must end in same_principal_rejected and never applies.
+ * Exercise a real local pipe, inherited launcher, TokenUser, and AccessCheck path.
+ * Same-user first-install execution must end in same_principal_rejected and never applies.
  */
 export async function verifyWindowsHelperPipeSamePrincipal(input, options = {}) {
   if (process.platform !== 'win32') throw new WindowsHelperPipeSessionError('unsupported_platform');
   const values = exactInput(input);
   await verifyDisposableWorkspace(values.workspace);
+  const launcherDigest = createHash('sha256').update(values.launcherBytes).digest('hex');
+  if (launcherDigest !== values.launcherSha256 || values.launcherBytes.byteLength !== values.launcherByteLength) {
+    throw new WindowsHelperPipeSessionError('request_binding_mismatch');
+  }
+  verifyRequestBinding(values);
   const timeoutMs = options.timeoutMs ?? 10000;
   if (!Number.isInteger(timeoutMs) || timeoutMs < 1000 || timeoutMs > 30000) {
     throw new WindowsHelperPipeSessionError('invalid_timeout');
@@ -45,19 +53,22 @@ export async function verifyWindowsHelperPipeSamePrincipal(input, options = {}) 
 
   const spawnImpl = options.spawnImpl ?? spawn;
   const pipeName = `bw-agent-bridge-${randomBytes(16).toString('hex')}`;
+  const transfer = await createAnonymousLauncherHandle(values.workspace, values.launcherBytes);
   let server;
   try {
     server = startServer(
-      spawnImpl, pipeName, process.pid, process.pid, values.workspace, options.powershellPath,
+      spawnImpl, pipeName, process.pid, process.pid, values.workspace, transfer.reader.fd,
+      options.powershellPath,
     );
   } catch (error) {
+    await transfer.close();
     throw error;
   }
-  const client = connectCallerToPipe(pipeName, values.workspace.nonce, timeoutMs);
+  const client = connectCallerToPipe(pipeName, values.workspace.nonce, values.requestBytes, timeoutMs);
 
   let results;
   try {
-    results = await withTimeout(Promise.all([client.completion, server.completion]), timeoutMs, () => {
+    results = await withTimeout(Promise.allSettled([client.completion, server.completion]), timeoutMs, () => {
       client.abort();
       server.abort();
     });
@@ -66,14 +77,27 @@ export async function verifyWindowsHelperPipeSamePrincipal(input, options = {}) 
     server.abort();
     if (error instanceof WindowsHelperPipeSessionError) throw error;
     throw new WindowsHelperPipeSessionError('session_failed');
+  } finally {
+    await transfer.close();
   }
-  const [, serverResult] = results;
+  const [clientOutcome, serverOutcome] = results;
+  if (serverOutcome.status === 'rejected') throw serverOutcome.reason;
+  const serverResult = serverOutcome.value;
   if (serverResult.code !== 0 || serverResult.stderr.byteLength !== 0) {
-    throw new WindowsHelperPipeSessionError('probe_failed');
+    throw new WindowsHelperPipeSessionError(parseProbeFailure(serverResult.stderr));
   }
+  if (clientOutcome.status === 'rejected') throw clientOutcome.reason;
 
   const facts = parseWindowsPipeFacts(serverResult.stdout);
-  const peerEvidence = evaluateWindowsHelperPeerEvidence(facts);
+  if (!facts.request_verified || !facts.launcher_handle_verified) {
+    throw new WindowsHelperPipeSessionError('launcher_handle_unverified');
+  }
+  const {
+    request_verified: _requestVerified,
+    launcher_handle_verified: _launcherHandleVerified,
+    ...platformFacts
+  } = facts;
+  const peerEvidence = evaluateWindowsHelperPeerEvidence(platformFacts);
   let authorizationCode;
   try {
     authorizeHelperRequest(values.requestBytes, {
@@ -98,8 +122,45 @@ export async function verifyWindowsHelperPipeSamePrincipal(input, options = {}) 
     local_transport: peerEvidence.local_transport,
     identity_verified: peerEvidence.identity_verified,
     different_principal: peerEvidence.different_principal,
+    caller_write_denied: peerEvidence.caller_write_denied,
+    helper_write_allowed: peerEvidence.helper_write_allowed,
+    request_verified: facts.request_verified,
+    launcher_handle_verified: facts.launcher_handle_verified,
     authorization_code: authorizationCode,
   });
+}
+
+function verifyRequestBinding(values) {
+  try {
+    const request = parseHelperRequest(values.requestBytes);
+    if (request.workspace.platform !== values.workspace.platform ||
+        request.workspace.root !== values.workspace.root ||
+        request.workspace.marker_nonce !== values.workspace.nonce ||
+        canonicalJson(request.manifest) !== canonicalJson(values.manifest) ||
+        request.confirmation !== values.manifest.confirmation ||
+        request.launcher.sha256 !== values.launcherSha256 ||
+        request.launcher.byte_length !== values.launcherByteLength ||
+        request.launcher.transport !== 'inherited_readonly_handle') {
+      throw new WindowsHelperPipeSessionError('request_binding_mismatch');
+    }
+  } catch (error) {
+    if (error instanceof WindowsHelperPipeSessionError) throw error;
+    throw new WindowsHelperPipeSessionError('request_binding_mismatch');
+  }
+}
+
+function parseProbeFailure(raw) {
+  const allowed = new Set([
+    'input', 'compile', 'pipe', 'request', 'launcher', 'token', 'access', 'accesscaller',
+    'accesshelper', 'accesswin', 'accesswin32', 'accessmethod', 'accessdenied',
+    'accessargument', 'accessother', 'response', 'output',
+  ]);
+  try {
+    const text = new TextDecoder('utf-8', { fatal: true }).decode(raw).trim();
+    const match = /^probe_([a-z0-9]+)_failed$/.exec(text);
+    if (match !== null && allowed.has(match[1])) return `probe_${match[1]}_failed`;
+  } catch { /* generic fixed failure below */ }
+  return 'probe_failed';
 }
 
 export function parseWindowsPipeFacts(raw) {
@@ -131,7 +192,7 @@ export function parseWindowsPipeFacts(raw) {
   return Object.freeze({ ...value });
 }
 
-function startServer(spawnImpl, pipeName, clientPid, callerPid, workspace, powershellOverride) {
+function startServer(spawnImpl, pipeName, clientPid, callerPid, workspace, launcherFd, powershellOverride) {
   const systemRoot = process.env.SystemRoot;
   if (typeof systemRoot !== 'string' || !path.win32.isAbsolute(systemRoot)) {
     throw new WindowsHelperPipeSessionError('invalid_system_root');
@@ -142,15 +203,16 @@ function startServer(spawnImpl, pipeName, clientPid, callerPid, workspace, power
   return startBoundedProcess(spawnImpl, executable, [
     '-NoLogo', '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass',
     '-File', SERVER_SCRIPT, pipeName, String(clientPid), String(callerPid), workspace.nonce,
+    workspace.root,
   ], {
     cwd: workspace.root,
     env: { SystemRoot: systemRoot, WINDIR: systemRoot, TEMP: workspace.root, TMP: workspace.root },
     windowsHide: true,
-    stdio: ['ignore', 'pipe', 'pipe'],
+    stdio: [launcherFd, 'pipe', 'pipe'],
   }, 'probe_start_failed');
 }
 
-function connectCallerToPipe(pipeName, nonce, timeoutMs) {
+function connectCallerToPipe(pipeName, nonce, requestBytes, timeoutMs) {
   const endpoint = `\\\\.\\pipe\\${pipeName}`;
   const deadline = Date.now() + timeoutMs;
   let activeSocket;
@@ -181,7 +243,13 @@ function connectCallerToPipe(pipeName, nonce, timeoutMs) {
     let response = '';
     socket.setEncoding('utf8');
     socket.setTimeout(Math.min(1000, timeoutMs));
-    socket.once('connect', () => socket.write(`${nonce}\n`));
+    socket.once('connect', () => {
+      const length = requestBytes.byteLength.toString(16).padStart(8, '0');
+      socket.write(Buffer.concat([
+        Buffer.from(`${nonce}\n${length}\n`, 'ascii'),
+        requestBytes,
+      ]));
+    });
     socket.on('data', (chunk) => {
       response += chunk;
       if (response.length > 16) socket.destroy();
@@ -262,7 +330,9 @@ function withTimeout(promise, timeoutMs, abort) {
 }
 
 function exactInput(value) {
-  const fields = ['workspace', 'requestBytes', 'manifest', 'launcherSha256', 'launcherByteLength'];
+  const fields = [
+    'workspace', 'requestBytes', 'manifest', 'launcherSha256', 'launcherByteLength', 'launcherBytes',
+  ];
   if (value === null || typeof value !== 'object' || Array.isArray(value) ||
       Object.getPrototypeOf(value) !== Object.prototype || Reflect.ownKeys(value).length !== fields.length ||
       Reflect.ownKeys(value).some((key) => typeof key !== 'string' || !fields.includes(key))) {
@@ -272,7 +342,9 @@ function exactInput(value) {
     const descriptor = Object.getOwnPropertyDescriptor(value, key);
     if (descriptor === undefined || !('value' in descriptor)) throw new WindowsHelperPipeSessionError('invalid_input');
   }
-  if (!(value.requestBytes instanceof Uint8Array) || !Object.isFrozen(value.workspace) ||
+  if (!(value.requestBytes instanceof Uint8Array) || !(value.launcherBytes instanceof Uint8Array) ||
+      value.launcherBytes.byteLength < 1 || value.launcherBytes.byteLength > 1024 * 1024 ||
+      !Object.isFrozen(value.workspace) ||
       !Object.isFrozen(value.manifest) ||
       typeof value.launcherSha256 !== 'string' || !/^[0-9a-f]{64}$/.test(value.launcherSha256) ||
       !Number.isSafeInteger(value.launcherByteLength) || value.launcherByteLength < 1) {
@@ -284,5 +356,35 @@ function exactInput(value) {
     manifest: value.manifest,
     launcherSha256: value.launcherSha256,
     launcherByteLength: value.launcherByteLength,
+    launcherBytes: Buffer.from(value.launcherBytes),
   });
+}
+
+async function createAnonymousLauncherHandle(workspace, launcherBytes) {
+  const tempPath = path.join(workspace.root, `.native-launcher-${randomBytes(16).toString('hex')}`);
+  let writer;
+  let reader;
+  try {
+    writer = await fs.open(tempPath, 'wx+', 0o600);
+    await writer.writeFile(launcherBytes);
+    await writer.sync();
+    reader = await fs.open(tempPath, 'r');
+    await fs.unlink(tempPath);
+    await writer.close();
+    writer = undefined;
+    let closed = false;
+    return {
+      reader,
+      async close() {
+        if (closed) return;
+        closed = true;
+        try { await reader.close(); } catch { /* stable cleanup */ }
+      },
+    };
+  } catch {
+    try { await writer?.close(); } catch { /* stable cleanup */ }
+    try { await reader?.close(); } catch { /* stable cleanup */ }
+    try { await fs.unlink(tempPath); } catch { /* stable cleanup */ }
+    throw new WindowsHelperPipeSessionError('launcher_handle_failed');
+  }
 }
