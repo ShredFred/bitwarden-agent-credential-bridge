@@ -2,8 +2,9 @@
 
 Sample-only security experiment. Phase 1 tests a **credential-bridge contract**.
 Phase 2 adds an offline, non-mutating OneCLI readiness audit. Phase 3 adds
-offline supply-chain evidence and a not-run disposable live-test design. None
-of these phases tests Bitwarden product security or OneCLI production security.
+offline supply-chain evidence and a not-run disposable live-test design. Phase
+4a adds a fake-only, policy-pinned HTTP API-key header contract. None of these
+phases tests Bitwarden product security or OneCLI production security.
 
 ## What Phase 1 covers
 
@@ -20,6 +21,28 @@ of these phases tests Bitwarden product security or OneCLI production security.
 Bitwarden pairing, OneCLI deployment, TLS interception, certificate installation, firewall mutation, background services, browser login, MFA, SSH, databases, RDP, or desktop credential handling.
 
 Do not connect this harness to a personal or company Bitwarden vault.
+
+## What Phase 4a covers
+
+- A strict version-2 `http_api_key_header` policy with exactly one lowercase
+  ASCII header name of at most 128 characters and an exact `{{credential}}`
+  value placeholder.
+- Broker-start revalidation, case-insensitive caller credential/protocol-header
+  stripping, and exactly one outbound policy-pinned API-key header.
+- Rejection of query/fragment-like request targets and upstream redirects.
+- A 1 MiB (`MAX_UPSTREAM_RESPONSE_BODY_BYTES`) upstream response limit, matching
+  the request limit. Valid `Content-Length` values are checked before reading;
+  streamed chunks are counted again before the complete buffer is scanned.
+- Functional and exposure tests for spoofed/duplicate headers, split response
+  chunks, decoded response headers, oversized responses, and raw or encoded
+  runtime sentinel non-disclosure.
+
+Phase 4a remains local, fake-only, foreground-only, and Node standard-library
+only. Version-1 `http_bearer` policies remain compatible. Browser and website
+passwords, Basic Auth, query/cookie/form injection, process-environment
+injection, SSH, databases, and desktop credentials remain unsupported.
+
+See [`docs/phase4a-http-api-key.md`](docs/phase4a-http-api-key.md).
 
 ## What Phase 2 covers
 
@@ -73,6 +96,7 @@ approved disposable test passes and its evidence is reviewed. See
 
 ```bash
 npm test
+npm run test:phase4a
 npm run test:phase3
 node src/run-demo.js
 ```
@@ -92,15 +116,21 @@ or pair OneCLI.
 
 ## Contract under test
 
-1. The **caller** (stand-in for an agent) never receives the plaintext sentinel in the HTTP response body, sanitized headers, broker logs, stdout/stderr, `process.env`, or tracked worktree files.
-2. The **broker** listens on the policy bind URL, accepts only the allow-listed method/path, strips caller `Authorization`, and injects `Authorization: Bearer <runtime-sentinel>` only on the outbound upstream request.
-3. Policy `authorization` must be exactly `{{credential}}`. Literal credential values and any other placeholder are rejected.
-4. **Bind** and **upstream** must be `http` loopback only (`127.0.0.1` or `localhost`) with an explicit port (`0` allowed for ephemeral bind).
-5. **Unsupported credential classes** fail closed at validation and again at broker start. There is no fallback to printing secrets or injecting them into the general process environment.
+1. The **caller** (stand-in for an agent) never receives the sentinel or its percent-encoded, Base64, or Base64url forms in the HTTP response body, sanitized headers, broker logs, stdout/stderr, `process.env`, or tracked worktree files.
+2. For version 1, the **broker** strips caller credential/protocol headers and injects `Authorization: Bearer <runtime-sentinel>` only on the outbound upstream request.
+3. For version 2, the broker strips the pinned API-key header and caller credential/protocol headers case-insensitively, then injects exactly one pinned header whose value is the runtime sentinel.
+4. Version-1 `authorization` and version-2 `header_value` must be exactly `{{credential}}`. Literal credential values, unsupported placeholders, extra fields, unsafe API-key header names, and API-key header names longer than 128 ASCII characters are rejected.
+5. Requests with query or fragment-like syntax are rejected. Upstream redirects fail closed, and upstream bodies larger than 1 MiB produce a generic `502` before any partial body is forwarded.
+6. **Bind** and **upstream** must be `http` loopback only (`127.0.0.1` or `localhost`) with an explicit port (`0` allowed for ephemeral bind).
+7. **Unsupported credential classes** fail closed at validation and again at broker start. There is no fallback to printing secrets or injecting them into the general process environment.
 
 ## Runtime sentinel
 
-No bearer token is hard-coded in tracked source. Each demo/test process calls `generateFakeSentinel()` (cryptographically random) and passes that value explicitly into the fake API and broker. Appearance of that runtime value on agent-readable surfaces is a hard test failure.
+No bearer token or API key is hard-coded in tracked source. Each demo/test
+process calls `generateFakeSentinel()` (cryptographically random) and passes
+that value explicitly into the fake API and broker. It is never stored in a
+policy, file, or environment variable. Appearance of that runtime value on an
+agent-readable surface is a hard test failure.
 
 ## Sample policy shape
 
@@ -119,10 +149,28 @@ No bearer token is hard-coded in tracked source. Each demo/test process calls `g
 
 Demo/tests rewrite `upstream` to the fake API’s concrete loopback origin after it binds.
 
+The version-2 sample is equally strict:
+
+```json
+{
+  "version": 2,
+  "service": "fake-sample-api",
+  "credential_class": "http_api_key_header",
+  "bind": "http://127.0.0.1:0",
+  "upstream": "http://127.0.0.1:0",
+  "method": "GET",
+  "path": "/v1/resource",
+  "header_name": "x-fake-api-key",
+  "header_value": "{{credential}}"
+}
+```
+
 ## Layout
 
 ```
 policies/sample-fake-service.json   declarative sample policy
+policies/sample-fake-api-key-service.json
+                                      strict version-2 API-key sample
 upstream/onecli.lock.json            corrected Phase 2 upstream revisions
 upstream/supply-chain.lock.json      Phase 3 offline digest/revision evidence
 samples/onecli/secure-local.example.json
@@ -140,15 +188,19 @@ src/supply-chain-audit.mjs          pure Phase 3 evidence validators
 scripts/preflight-onecli.mjs        read-only, value-free readiness report
 docs/phase2-onecli-readiness.md     evidence, platform path, threat boundaries
 docs/phase3-disposable-live-test.md approval-gated, not-run live-test plan
+docs/phase4a-http-api-key.md         fake-only version-2 contract and limits
 test/*.test.js                      functional + exposure tests
 AGENTS.md                           experiment rules for agents
 ```
 
 ## Limitations
 
-- Single credential class (`http_bearer`) and a single sample service.
+- Two fake HTTP credential classes (`http_bearer` and
+  `http_api_key_header`) for a single sample service.
 - Sample policy uses port `0` for bind/upstream placeholders; runtime code supplies the concrete upstream origin after the fake API listens.
 - No TLS, no persistence, no multi-writer coordination beyond “one writer at a time” for this repo.
+- No browser/website password, Basic Auth, query, cookie, form, process-env,
+  SSH, database, RDP, or desktop credential injection.
 - Not a substitute for vault, OS keychain, or production broker hardening.
 - Phase 2 validates a proposal and local prerequisites only. It does not verify
   remote tags, images, relay reachability, Docker permissions, or runtime

@@ -1,0 +1,11 @@
+{
+  "version": 2,
+  "service": "fake-sample-api",
+  "credential_class": "http_api_key_header",
+  "bind": "http://127.0.0.1:0",
+  "upstream": "http://127.0.0.1:0",
+  "method": "GET",
+  "path": "/v1/resource",
+  "header_name": "x-fake-api-key",
+  "header_value": "{{credential}}"
+}

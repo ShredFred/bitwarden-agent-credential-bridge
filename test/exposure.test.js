@@ -11,6 +11,11 @@ import { loadPolicy, withUpstream } from '../src/policy.js';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const samplePolicyPath = path.join(root, 'policies', 'sample-fake-service.json');
+const sampleV2PolicyPath = path.join(
+  root,
+  'policies',
+  'sample-fake-api-key-service.json',
+);
 
 const SKIP_DIR_NAMES = new Set([
   '.git',
@@ -28,10 +33,19 @@ const SKIP_DIR_NAMES = new Set([
 function assertNoSentinel(label, value, sentinel) {
   const text =
     typeof value === 'string' ? value : JSON.stringify(value, null, 2);
-  assert.ok(
-    !text.includes(sentinel),
-    `${label} must not contain the runtime sentinel`,
-  );
+  const variants = new Set([
+    sentinel,
+    encodeURIComponent(sentinel),
+    Buffer.from(sentinel, 'utf8').toString('base64'),
+    Buffer.from(sentinel, 'utf8').toString('base64url'),
+  ]);
+  variants.delete('');
+  for (const variant of variants) {
+    assert.ok(
+      !text.includes(variant),
+      `${label} must not contain the runtime sentinel or an encoded variant`,
+    );
+  }
 }
 
 /**
@@ -147,6 +161,51 @@ describe('exposure: runtime sentinel must not reach agent-readable surfaces', ()
     assertNoSentinel('captured stdout', stdoutChunks.join('\n'), sentinel);
     assertNoSentinel('captured stderr', stderrChunks.join('\n'), sentinel);
     assertNoSentinel('process.env', process.env, sentinel);
+  });
+
+  it('keeps a v2 API-key sentinel off every agent-readable runtime surface', async () => {
+    const sample = await loadPolicy(sampleV2PolicyPath);
+    assert.equal(sample.credential_class, 'http_api_key_header');
+    const apiKeyApi = await startFakeApi({
+      sentinel,
+      path: sample.path,
+      method: sample.method,
+      credentialClass: sample.credential_class,
+      headerName: sample.header_name,
+    });
+    /** @type {import('../src/broker.js').BrokerLogEntry[]} */
+    const apiKeyLogs = [];
+    const apiKeyBroker = await startBroker({
+      policy: withUpstream(sample, apiKeyApi.baseUrl),
+      sentinel,
+      log: (entry) => {
+        apiKeyLogs.push(entry);
+        console.info(`[broker:${entry.level}] ${entry.message}`);
+      },
+    });
+
+    try {
+      const res = await fetch(apiKeyBroker.url, {
+        headers: {
+          'X-Fake-Api-Key': 'caller-spoof-must-be-stripped',
+          Authorization: 'Bearer caller-value',
+          Cookie: 'caller-cookie=value',
+        },
+      });
+      const bodyText = await res.text();
+      const headerObj = Object.fromEntries(res.headers.entries());
+
+      assert.equal(res.status, 200);
+      assertNoSentinel('v2 response body', bodyText, sentinel);
+      assertNoSentinel('v2 response headers', headerObj, sentinel);
+      assertNoSentinel('v2 broker logs', apiKeyLogs, sentinel);
+      assertNoSentinel('captured stdout', stdoutChunks.join('\n'), sentinel);
+      assertNoSentinel('captured stderr', stderrChunks.join('\n'), sentinel);
+      assertNoSentinel('process.env', process.env, sentinel);
+    } finally {
+      await apiKeyBroker.close();
+      await apiKeyApi.close();
+    }
   });
 
   it('keeps the runtime sentinel out of every tracked/worktree repo file', async () => {

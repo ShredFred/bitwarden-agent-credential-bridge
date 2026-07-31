@@ -6,6 +6,8 @@ import { fileURLToPath } from 'node:url';
 import {
   BrokerError,
   MAX_REQUEST_BODY_BYTES,
+  MAX_UPSTREAM_RESPONSE_BODY_BYTES,
+  redactSentinel,
   startBroker,
 } from '../src/broker.js';
 import {
@@ -20,6 +22,12 @@ const samplePolicyPath = path.join(
   '..',
   'policies',
   'sample-fake-service.json',
+);
+const sampleV2PolicyPath = path.join(
+  path.dirname(fileURLToPath(import.meta.url)),
+  '..',
+  'policies',
+  'sample-fake-api-key-service.json',
 );
 
 describe('foreground HTTP broker', () => {
@@ -95,6 +103,103 @@ describe('foreground HTTP broker', () => {
     }
   });
 
+  it('supports a strict v2 pinned API-key header while stripping caller spoofing', async () => {
+    const sample = await loadPolicy(sampleV2PolicyPath);
+    assert.equal(sample.credential_class, 'http_api_key_header');
+    const headerName = sample.header_name;
+    const localApi = await startFakeApi({
+      sentinel,
+      path: sample.path,
+      method: sample.method,
+      credentialClass: sample.credential_class,
+      headerName,
+    });
+    /** @type {Record<string, string> | null} */
+    let seenHeaders = null;
+    const localBroker = await startBroker({
+      policy: withUpstream(sample, localApi.baseUrl),
+      sentinel,
+      fetchImpl: async (url, init) => {
+        seenHeaders = Object.fromEntries(new Headers(init?.headers).entries());
+        return fetch(url, init);
+      },
+    });
+
+    try {
+      const response = await rawRequest(localBroker.baseUrl, sample.path, [
+        ['X-Fake-Api-Key', 'caller-spoof-one'],
+        ['x-fake-api-key', 'caller-spoof-two'],
+        ['Authorization', 'Bearer caller-value'],
+        ['Proxy-Authorization', 'Basic caller-value'],
+        ['Cookie', 'session=caller-value'],
+        ['Connection', 'keep-alive, x-remove-me'],
+        ['Keep-Alive', 'timeout=5'],
+        ['TE', 'trailers'],
+        ['Upgrade', 'websocket'],
+        ['Content-Length', '0'],
+        ['Content-Type', 'application/x-caller-value'],
+        ['X-Forwarded-For', '203.0.113.10'],
+        ['X-Remove-Me', 'connection-nominated'],
+      ]);
+
+      assert.equal(response.status, 200);
+      assert.deepEqual(JSON.parse(response.body), FAKE_API_CONSTANT_BODY);
+      assert.ok(seenHeaders);
+      assert.equal(seenHeaders[headerName], sentinel);
+      assert.equal(
+        Object.keys(seenHeaders).filter(
+          (name) => name.toLowerCase() === headerName,
+        ).length,
+        1,
+      );
+      for (const stripped of [
+        'authorization',
+        'proxy-authorization',
+        'cookie',
+        'connection',
+        'keep-alive',
+        'te',
+        'upgrade',
+        'content-length',
+        'content-type',
+        'x-forwarded-for',
+        'x-remove-me',
+      ]) {
+        assert.equal(seenHeaders[stripped], undefined, stripped);
+      }
+    } finally {
+      await localBroker.close();
+      await localApi.close();
+    }
+  });
+
+  it('revalidates v2 class, header, placeholder, and exact schema at broker start', async () => {
+    const sample = await loadPolicy(sampleV2PolicyPath);
+    const invalidPolicies = [
+      { ...sample, header_name: 'Authorization' },
+      { ...sample, header_value: 'literal-value' },
+      { ...sample, credential_class: 'http_bearer' },
+      { ...sample, extra: true },
+    ];
+
+    for (const invalidPolicy of invalidPolicies) {
+      await assert.rejects(
+        () =>
+          startBroker({
+            policy: /** @type {import('../src/policy.js').Policy} */ (
+              invalidPolicy
+            ),
+            sentinel,
+          }),
+        (err) =>
+          err instanceof BrokerError &&
+          (err.code === 'invalid_policy' ||
+            err.code === 'invalid_authorization_placeholder') &&
+          !err.message.includes(sentinel),
+      );
+    }
+  });
+
   it('rejects wrong method', async () => {
     const res = await fetch(broker.url, { method: 'POST' });
     assert.equal(res.status, 404);
@@ -110,6 +215,36 @@ describe('foreground HTTP broker', () => {
   it('rejects wrong path', async () => {
     const res = await fetch(`${broker.baseUrl}/v1/other`, { method: 'GET' });
     assert.equal(res.status, 404);
+  });
+
+  it('rejects query and fragment-like request targets without calling upstream', async () => {
+    let upstreamCalls = 0;
+    const localBroker = await startBroker({
+      policy,
+      sentinel,
+      fetchImpl: async () => {
+        upstreamCalls += 1;
+        return new Response('{}');
+      },
+    });
+
+    try {
+      const queryResponse = await fetch(`${localBroker.url}?unconfigured=1`);
+      assert.equal(queryResponse.status, 400);
+      assert.deepEqual(await queryResponse.json(), {
+        error: 'invalid_request_target',
+      });
+
+      const fragmentLikeResponse = await rawRequest(
+        localBroker.baseUrl,
+        `${policy.path}#ambiguous`,
+        [],
+      );
+      assert.equal(fragmentLikeResponse.status, 400);
+      assert.equal(upstreamCalls, 0);
+    } finally {
+      await localBroker.close();
+    }
   });
 
   it('fails closed for unsupported credential classes at broker start', async () => {
@@ -200,6 +335,37 @@ describe('foreground HTTP broker', () => {
     }
   });
 
+  it('returns generic 502 when an upstream body echoes the Base64 sentinel', async () => {
+    const encodedSentinel = `${generateFakeSentinel()}:\u00ff?`;
+    const base64Sentinel = Buffer.from(encodedSentinel, 'utf8').toString('base64');
+    const variants = sensitiveVariantsForTest(encodedSentinel);
+    /** @type {import('../src/broker.js').BrokerLogEntry[]} */
+    const localLogs = [];
+    const localBroker = await startBroker({
+      policy,
+      sentinel: encodedSentinel,
+      log: (entry) => localLogs.push(entry),
+      fetchImpl: async () =>
+        new Response(`echoed:${base64Sentinel}`, {
+          status: 200,
+          headers: { 'content-type': 'text/plain' },
+        }),
+    });
+
+    try {
+      const res = await fetch(localBroker.url);
+      const bodyText = await res.text();
+      const headerObj = Object.fromEntries(res.headers.entries());
+      assert.equal(res.status, 502);
+      assert.deepEqual(JSON.parse(bodyText), { error: 'upstream_failed' });
+      assertNoSensitiveVariants('response body', bodyText, variants);
+      assertNoSensitiveVariants('response headers', headerObj, variants);
+      assertNoSensitiveVariants('broker logs', localLogs, variants);
+    } finally {
+      await localBroker.close();
+    }
+  });
+
   it('returns generic 502 when upstream header echoes the sentinel', async () => {
     /** @type {import('../src/broker.js').BrokerLogEntry[]} */
     const localLogs = [];
@@ -228,6 +394,254 @@ describe('foreground HTTP broker', () => {
       assert.ok(!JSON.stringify(headerObj).includes(sentinel));
       assert.ok(!JSON.stringify(localLogs).includes(sentinel));
       assert.deepEqual(JSON.parse(bodyText), { error: 'upstream_failed' });
+    } finally {
+      await localBroker.close();
+    }
+  });
+
+  it('returns generic 502 when an upstream header echoes the Base64url sentinel', async () => {
+    const encodedSentinel = `${generateFakeSentinel()}:\u00ff?`;
+    const base64urlSentinel = Buffer.from(encodedSentinel, 'utf8').toString(
+      'base64url',
+    );
+    const variants = sensitiveVariantsForTest(encodedSentinel);
+    /** @type {import('../src/broker.js').BrokerLogEntry[]} */
+    const localLogs = [];
+    const localBroker = await startBroker({
+      policy,
+      sentinel: encodedSentinel,
+      log: (entry) => localLogs.push(entry),
+      fetchImpl: async () =>
+        new Response('safe-body', {
+          status: 200,
+          headers: { 'x-debug-token': base64urlSentinel },
+        }),
+    });
+
+    try {
+      const res = await fetch(localBroker.url);
+      const bodyText = await res.text();
+      const headerObj = Object.fromEntries(res.headers.entries());
+      assert.equal(res.status, 502);
+      assert.deepEqual(JSON.parse(bodyText), { error: 'upstream_failed' });
+      assert.equal(res.headers.get('x-debug-token'), null);
+      assertNoSensitiveVariants('response body', bodyText, variants);
+      assertNoSensitiveVariants('response headers', headerObj, variants);
+      assertNoSensitiveVariants('broker logs', localLogs, variants);
+    } finally {
+      await localBroker.close();
+    }
+  });
+
+  it('removes the pinned API-key and connection-nominated response headers', async () => {
+    const sample = await loadPolicy(sampleV2PolicyPath);
+    const localBroker = await startBroker({
+      policy: sample,
+      sentinel,
+      fetchImpl: async () =>
+        new Response('safe-body', {
+          status: 200,
+          headers: {
+            [sample.header_name]: 'non-credential-debug-value',
+            connection: 'x-hop-by-hop',
+            'x-hop-by-hop': 'remove-me',
+            'x-safe': 'keep-me',
+          },
+        }),
+    });
+
+    try {
+      const res = await fetch(localBroker.url);
+      assert.equal(res.status, 200);
+      assert.equal(await res.text(), 'safe-body');
+      assert.equal(res.headers.get(sample.header_name), null);
+      assert.equal(res.headers.get('x-hop-by-hop'), null);
+      assert.equal(res.headers.get('x-safe'), 'keep-me');
+    } finally {
+      await localBroker.close();
+    }
+  });
+
+  it('removes content-encoding after fetch exposes decoded response bytes', async () => {
+    const localBroker = await startBroker({
+      policy,
+      sentinel,
+      fetchImpl: async () =>
+        new Response('already-decoded', {
+          status: 200,
+          headers: {
+            'content-encoding': 'gzip',
+            'content-type': 'text/plain',
+          },
+        }),
+    });
+
+    try {
+      const response = await rawRequest(localBroker.baseUrl, policy.path, []);
+      assert.equal(response.status, 200);
+      assert.equal(response.body, 'already-decoded');
+      assert.equal(response.headers['content-encoding'], undefined);
+      assert.equal(
+        response.headers['content-length'],
+        String(Buffer.byteLength('already-decoded')),
+      );
+    } finally {
+      await localBroker.close();
+    }
+  });
+
+  it('rejects a declared oversized upstream response and cancels its body', async () => {
+    let cancelled = false;
+    const localBroker = await startBroker({
+      policy,
+      sentinel,
+      fetchImpl: async () =>
+        new Response(
+          new ReadableStream({
+            pull(controller) {
+              controller.enqueue(Buffer.from('not-read'));
+            },
+            cancel() {
+              cancelled = true;
+            },
+          }),
+          {
+            status: 200,
+            headers: {
+              'content-length': String(MAX_UPSTREAM_RESPONSE_BODY_BYTES + 1),
+            },
+          },
+        ),
+    });
+
+    try {
+      const res = await fetch(localBroker.url);
+      const bodyText = await res.text();
+      assert.equal(res.status, 502);
+      assert.deepEqual(JSON.parse(bodyText), { error: 'upstream_failed' });
+      assert.ok(cancelled);
+      assert.ok(!bodyText.includes(sentinel));
+    } finally {
+      await localBroker.close();
+    }
+  });
+
+  it('rejects a chunked oversized upstream response and cancels on overflow', async () => {
+    let cancelled = false;
+    let emitted = false;
+    const localBroker = await startBroker({
+      policy,
+      sentinel,
+      fetchImpl: async () =>
+        new Response(
+          new ReadableStream({
+            pull(controller) {
+              if (!emitted) {
+                emitted = true;
+                controller.enqueue(
+                  Buffer.alloc(MAX_UPSTREAM_RESPONSE_BODY_BYTES, 0x61),
+                );
+                return;
+              }
+              controller.enqueue(Buffer.from('b'));
+            },
+            cancel() {
+              cancelled = true;
+            },
+          }),
+          { status: 200 },
+        ),
+    });
+
+    try {
+      const res = await fetch(localBroker.url);
+      const bodyText = await res.text();
+      assert.equal(res.status, 502);
+      assert.deepEqual(JSON.parse(bodyText), { error: 'upstream_failed' });
+      assert.ok(cancelled);
+      assert.ok(!bodyText.includes(sentinel));
+    } finally {
+      await localBroker.close();
+    }
+  });
+
+  it('best-effort cancels a reader after read failure and keeps that error authoritative', async () => {
+    let cancelled = false;
+    let released = false;
+    /** @type {import('../src/broker.js').BrokerLogEntry[]} */
+    const localLogs = [];
+    const localBroker = await startBroker({
+      policy,
+      sentinel,
+      log: (entry) => localLogs.push(entry),
+      fetchImpl: async () =>
+        /** @type {Response} */ ({
+          type: 'basic',
+          status: 200,
+          headers: new Headers(),
+          body: {
+            getReader() {
+              return {
+                async read() {
+                  throw new Error('original read failure');
+                },
+                async cancel() {
+                  cancelled = true;
+                  throw new Error('secondary cancellation failure');
+                },
+                releaseLock() {
+                  released = true;
+                  throw new Error('secondary release failure');
+                },
+              };
+            },
+          },
+        }),
+    });
+
+    try {
+      const res = await fetch(localBroker.url);
+      assert.equal(res.status, 502);
+      assert.deepEqual(await res.json(), { error: 'upstream_failed' });
+      assert.ok(cancelled);
+      assert.ok(released);
+      const errorLog = localLogs.find(
+        (entry) => entry.message === 'failed to read upstream response',
+      );
+      assert.equal(errorLog?.meta?.error, 'original read failure');
+    } finally {
+      await localBroker.close();
+    }
+  });
+
+  it('scans the concatenated response buffer for a sentinel split across chunks', async () => {
+    /** @type {import('../src/broker.js').BrokerLogEntry[]} */
+    const localLogs = [];
+    const splitAt = Math.floor(sentinel.length / 2);
+    const localBroker = await startBroker({
+      policy,
+      sentinel,
+      log: (entry) => localLogs.push(entry),
+      fetchImpl: async () =>
+        new Response(
+          new ReadableStream({
+            start(controller) {
+              controller.enqueue(Buffer.from(`prefix:${sentinel.slice(0, splitAt)}`));
+              controller.enqueue(Buffer.from(`${sentinel.slice(splitAt)}:suffix`));
+              controller.close();
+            },
+          }),
+          { status: 200 },
+        ),
+    });
+
+    try {
+      const res = await fetch(localBroker.url);
+      const bodyText = await res.text();
+      assert.equal(res.status, 502);
+      assert.deepEqual(JSON.parse(bodyText), { error: 'upstream_failed' });
+      assert.ok(!bodyText.includes(sentinel));
+      assert.ok(!JSON.stringify(localLogs).includes(sentinel));
     } finally {
       await localBroker.close();
     }
@@ -262,6 +676,61 @@ describe('foreground HTTP broker', () => {
     } finally {
       await localBroker.close();
     }
+  });
+
+  it('redacts Base64 and Base64url sentinel variants from error logs and caller surfaces', async () => {
+    const encodedSentinel = `${generateFakeSentinel()}:\u00ff?`;
+    const variants = sensitiveVariantsForTest(encodedSentinel);
+    const base64Sentinel = Buffer.from(encodedSentinel, 'utf8').toString('base64');
+    const base64urlSentinel = Buffer.from(encodedSentinel, 'utf8').toString(
+      'base64url',
+    );
+    const percentEncodedSentinel = encodeURIComponent(encodedSentinel);
+    /** @type {import('../src/broker.js').BrokerLogEntry[]} */
+    const localLogs = [];
+    const localBroker = await startBroker({
+      policy,
+      sentinel: encodedSentinel,
+      log: (entry) => localLogs.push(entry),
+      fetchImpl: async () => {
+        throw new Error(
+          `encoded failure ${percentEncodedSentinel}, ${base64Sentinel}, then ${base64urlSentinel}`,
+        );
+      },
+    });
+
+    try {
+      const res = await fetch(localBroker.url);
+      const bodyText = await res.text();
+      const headerObj = Object.fromEntries(res.headers.entries());
+      assert.equal(res.status, 502);
+      assert.deepEqual(JSON.parse(bodyText), { error: 'upstream_failed' });
+      const errorLog = localLogs.find(
+        (entry) => entry.message === 'upstream request failed',
+      );
+      assert.ok(errorLog);
+      assert.match(String(errorLog.meta?.error ?? ''), /\[REDACTED\]/);
+      assertNoSensitiveVariants('response body', bodyText, variants);
+      assertNoSensitiveVariants('response headers', headerObj, variants);
+      assertNoSensitiveVariants('broker logs', localLogs, variants);
+    } finally {
+      await localBroker.close();
+    }
+  });
+
+  it('preserves redactSentinel while recursively redacting every sensitive variant', () => {
+    const encodedSentinel = `${generateFakeSentinel()}:\u00ff?`;
+    const variants = sensitiveVariantsForTest(encodedSentinel);
+    const nested = {
+      detail: [
+        variants.join('|'),
+        { [variants.at(-1) ?? 'variant']: { error: variants } },
+      ],
+    };
+
+    const redacted = redactSentinel(nested, encodedSentinel);
+    assertNoSensitiveVariants('nested redaction result', redacted, variants);
+    assert.match(JSON.stringify(redacted), /\[REDACTED\]/);
   });
 
   it('returns generic 413 for oversized request bodies without buffering more', async () => {
@@ -312,6 +781,72 @@ describe('foreground HTTP broker', () => {
     }
   });
 });
+
+/**
+ * Mirror the required runtime transforms only to assert caller non-disclosure.
+ * @param {string} sentinel
+ * @returns {string[]}
+ */
+function sensitiveVariantsForTest(sentinel) {
+  return [
+    ...new Set([
+      sentinel,
+      encodeURIComponent(sentinel),
+      Buffer.from(sentinel, 'utf8').toString('base64'),
+      Buffer.from(sentinel, 'utf8').toString('base64url'),
+    ]),
+  ].filter((value) => value.length > 0);
+}
+
+/**
+ * @param {string} label
+ * @param {unknown} value
+ * @param {string[]} variants
+ */
+function assertNoSensitiveVariants(label, value, variants) {
+  const text = typeof value === 'string' ? value : JSON.stringify(value);
+  for (const variant of variants) {
+    assert.ok(!text.includes(variant), `${label} exposed a sensitive variant`);
+  }
+}
+
+/**
+ * Send raw header pairs so duplicate case variants reach the broker unchanged.
+ * @param {string} baseUrl
+ * @param {string} requestPath
+ * @param {[string, string][]} headers
+ * @returns {Promise<{ status: number | undefined, body: string, headers: http.IncomingHttpHeaders }>}
+ */
+function rawRequest(baseUrl, requestPath, headers) {
+  const url = new URL(baseUrl);
+  return new Promise((resolve, reject) => {
+    const req = http.request(
+      {
+        host: url.hostname,
+        port: url.port,
+        path: requestPath,
+        method: 'GET',
+        headers: [['Host', url.host], ...headers].flat(),
+      },
+      (res) => {
+        let body = '';
+        res.setEncoding('utf8');
+        res.on('data', (chunk) => {
+          body += chunk;
+        });
+        res.on('end', () => {
+          resolve({
+            status: res.statusCode,
+            body,
+            headers: res.headers,
+          });
+        });
+      },
+    );
+    req.on('error', reject);
+    req.end();
+  });
+}
 
 /**
  * Minimal POST upstream that counts received body bytes.

@@ -14,9 +14,58 @@ const HTTP_METHODS = new Set([
   'DELETE',
   'OPTIONS',
 ]);
+const COMMON_POLICY_FIELDS = Object.freeze([
+  'version',
+  'service',
+  'credential_class',
+  'bind',
+  'upstream',
+  'method',
+  'path',
+]);
+const VERSION_1_POLICY_FIELDS = new Set([
+  ...COMMON_POLICY_FIELDS,
+  'authorization',
+]);
+const VERSION_2_POLICY_FIELDS = new Set([
+  ...COMMON_POLICY_FIELDS,
+  'header_name',
+  'header_value',
+]);
+const FORBIDDEN_API_KEY_HEADER_NAMES = new Set([
+  'authorization',
+  'connection',
+  'cookie',
+  'expect',
+  'host',
+  'http2-settings',
+  'keep-alive',
+  'max-forwards',
+  'proxy-authenticate',
+  'proxy-authorization',
+  'proxy-connection',
+  'set-cookie',
+  'te',
+  'trailer',
+  'transfer-encoding',
+  'upgrade',
+  'via',
+  'www-authenticate',
+]);
+const FORBIDDEN_API_KEY_HEADER_PREFIXES = Object.freeze([
+  'access-control-',
+  'content-',
+  'forwarded',
+  'proxy-',
+  'sec-',
+  'x-forwarded-',
+]);
+const LOWERCASE_ASCII_HEADER_NAME = /^[!#$%&'*+\-.^_`|~0-9a-z]+$/;
+/** Conservative protocol-name bound; ASCII characters are one byte each. */
+const MAX_API_KEY_HEADER_NAME_LENGTH = 128;
 
 /**
- * @typedef {object} Policy
+ * @typedef {object} PolicyBase
  * @property {number} version
  * @property {string} service
  * @property {string} credential_class
@@ -24,8 +73,13 @@ const HTTP_METHODS = new Set([
  * @property {string} upstream
  * @property {string} method
  * @property {string} path
- * @property {string} authorization
  */
+
+/** @typedef {PolicyBase & {version: 1, credential_class: 'http_bearer', authorization: string}} BearerPolicy */
+
+/** @typedef {PolicyBase & {version: 2, credential_class: 'http_api_key_header', header_name: string, header_value: string}} ApiKeyHeaderPolicy */
+
+/** @typedef {BearerPolicy | ApiKeyHeaderPolicy} Policy */
 
 /**
  * Validate a declarative policy object. Unsupported credential classes fail closed.
@@ -40,9 +94,14 @@ export function validatePolicy(raw) {
   /** @type {Record<string, unknown>} */
   const obj = /** @type {Record<string, unknown>} */ (raw);
 
-  if (obj.version !== 1) {
-    throw new PolicyValidationError('policy.version must be 1');
+  if (obj.version !== 1 && obj.version !== 2) {
+    throw new PolicyValidationError('policy.version must be 1 or 2');
   }
+
+  validateExactFields(
+    obj,
+    obj.version === 1 ? VERSION_1_POLICY_FIELDS : VERSION_2_POLICY_FIELDS,
+  );
 
   if (typeof obj.service !== 'string' || obj.service.trim() === '') {
     throw new PolicyValidationError('policy.service must be a non-empty string');
@@ -54,9 +113,21 @@ export function validatePolicy(raw) {
     );
   }
 
-  if (!SUPPORTED_CREDENTIAL_CLASSES.includes(obj.credential_class)) {
+  if (
+    !SUPPORTED_CREDENTIAL_CLASSES.includes(
+      /** @type {string} */ (obj.credential_class),
+    )
+  ) {
     throw new PolicyValidationError(
-      `unsupported credential_class "${obj.credential_class}"; Phase 1 supports only: ${SUPPORTED_CREDENTIAL_CLASSES.join(', ')}`,
+      `unsupported credential_class; supported classes: ${SUPPORTED_CREDENTIAL_CLASSES.join(', ')}`,
+    );
+  }
+
+  const expectedClass =
+    obj.version === 1 ? 'http_bearer' : 'http_api_key_header';
+  if (obj.credential_class !== expectedClass) {
+    throw new PolicyValidationError(
+      `policy.version ${obj.version} requires credential_class "${expectedClass}"`,
     );
   }
 
@@ -69,27 +140,54 @@ export function validatePolicy(raw) {
     );
   }
 
-  if (typeof obj.path !== 'string' || !obj.path.startsWith('/')) {
+  if (
+    typeof obj.path !== 'string' ||
+    !obj.path.startsWith('/') ||
+    obj.path.startsWith('//')
+  ) {
     throw new PolicyValidationError(
-      'policy.path must be a string starting with "/"',
+      'policy.path must be an origin-relative string starting with one "/"',
     );
   }
 
-  if (typeof obj.authorization !== 'string') {
-    throw new PolicyValidationError('policy.authorization must be a string');
+  if (obj.path.includes('?') || obj.path.includes('#')) {
+    throw new PolicyValidationError(
+      'policy.path must not include query or fragment syntax',
+    );
   }
 
-  validateAuthorizationPlaceholder(obj.authorization);
-
-  return {
-    version: 1,
+  const common = {
     service: obj.service,
-    credential_class: obj.credential_class,
     bind: bind.href.replace(/\/$/, ''),
     upstream: upstream.href.replace(/\/$/, ''),
     method: obj.method,
     path: obj.path,
-    authorization: CREDENTIAL_PLACEHOLDER,
+  };
+
+  if (obj.version === 1) {
+    if (typeof obj.authorization !== 'string') {
+      throw new PolicyValidationError('policy.authorization must be a string');
+    }
+    validateCredentialPlaceholder(obj.authorization, 'policy.authorization');
+    return {
+      version: 1,
+      ...common,
+      credential_class: 'http_bearer',
+      authorization: CREDENTIAL_PLACEHOLDER,
+    };
+  }
+
+  validateApiKeyHeaderName(obj.header_name);
+  if (typeof obj.header_value !== 'string') {
+    throw new PolicyValidationError('policy.header_value must be a string');
+  }
+  validateCredentialPlaceholder(obj.header_value, 'policy.header_value');
+  return {
+    version: 2,
+    ...common,
+    credential_class: 'http_api_key_header',
+    header_name: /** @type {string} */ (obj.header_name),
+    header_value: CREDENTIAL_PLACEHOLDER,
   };
 }
 
@@ -210,9 +308,55 @@ export function parseLoopbackHttpUrl(value, fieldName) {
 }
 
 /**
- * @param {string} value
+ * @param {Record<string, unknown>} obj
+ * @param {Set<string>} allowed
  */
-function validateAuthorizationPlaceholder(value) {
+function validateExactFields(obj, allowed) {
+  const extras = Object.keys(obj).filter((key) => !allowed.has(key));
+  if (extras.length > 0) {
+    throw new PolicyValidationError(
+      `policy contains unknown field(s): ${extras.sort().join(', ')}`,
+    );
+  }
+}
+
+/**
+ * @param {unknown} value
+ */
+function validateApiKeyHeaderName(value) {
+  if (
+    typeof value !== 'string' ||
+    value.length === 0 ||
+    !LOWERCASE_ASCII_HEADER_NAME.test(value)
+  ) {
+    throw new PolicyValidationError(
+      'policy.header_name must be a canonical lowercase ASCII HTTP header name',
+    );
+  }
+
+  if (value.length > MAX_API_KEY_HEADER_NAME_LENGTH) {
+    throw new PolicyValidationError(
+      `policy.header_name must be at most ${MAX_API_KEY_HEADER_NAME_LENGTH} ASCII characters`,
+    );
+  }
+
+  if (
+    FORBIDDEN_API_KEY_HEADER_NAMES.has(value) ||
+    FORBIDDEN_API_KEY_HEADER_PREFIXES.some(
+      (prefix) => value === prefix || value.startsWith(prefix),
+    )
+  ) {
+    throw new PolicyValidationError(
+      'policy.header_name is forbidden for API-key injection',
+    );
+  }
+}
+
+/**
+ * @param {string} value
+ * @param {string} fieldName
+ */
+function validateCredentialPlaceholder(value, fieldName) {
   if (value === CREDENTIAL_PLACEHOLDER) {
     return;
   }
@@ -220,12 +364,12 @@ function validateAuthorizationPlaceholder(value) {
   const placeholders = value.match(/\{\{[^}]*\}\}/g) ?? [];
   if (placeholders.length > 0) {
     throw new PolicyValidationError(
-      `policy.authorization must be exactly ${CREDENTIAL_PLACEHOLDER}; unsupported placeholder rejected`,
+      `${fieldName} must be exactly ${CREDENTIAL_PLACEHOLDER}; unsupported placeholder rejected`,
     );
   }
 
   throw new PolicyValidationError(
-    `policy.authorization must be exactly ${CREDENTIAL_PLACEHOLDER}; literal credential values are rejected`,
+    `${fieldName} must be exactly ${CREDENTIAL_PLACEHOLDER}; literal credential values are rejected`,
   );
 }
 

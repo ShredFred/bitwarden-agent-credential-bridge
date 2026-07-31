@@ -3,18 +3,48 @@ import {
   CREDENTIAL_PLACEHOLDER,
   SUPPORTED_CREDENTIAL_CLASSES,
 } from './constants.js';
-import { parseLoopbackHttpUrl } from './policy.js';
+import { parseLoopbackHttpUrl, validatePolicy } from './policy.js';
 
 /** Maximum inbound request body accepted by the broker (1 MiB). */
 export const MAX_REQUEST_BODY_BYTES = 1 * 1024 * 1024;
+/** Maximum upstream response body buffered by the broker (1 MiB). */
+export const MAX_UPSTREAM_RESPONSE_BODY_BYTES = 1 * 1024 * 1024;
 
 const REDACTED = '[REDACTED]';
+const UNSAFE_CALLER_HEADER_NAMES = new Set([
+  'authorization',
+  'connection',
+  'cookie',
+  'expect',
+  'host',
+  'http2-settings',
+  'keep-alive',
+  'max-forwards',
+  'proxy-authenticate',
+  'proxy-authorization',
+  'proxy-connection',
+  'set-cookie',
+  'te',
+  'trailer',
+  'transfer-encoding',
+  'upgrade',
+  'via',
+  'www-authenticate',
+]);
+const UNSAFE_CALLER_HEADER_PREFIXES = Object.freeze([
+  'access-control-',
+  'content-',
+  'forwarded',
+  'proxy-',
+  'sec-',
+  'x-forwarded-',
+]);
 
 /**
  * Foreground-only HTTP credential broker.
  * Binds to a loopback URL from policy, accepts only the allowed method/path,
- * strips caller Authorization, injects the runtime sentinel on the outbound
- * request only, and returns a sanitized response to the caller.
+ * strips caller credential/protocol headers, injects the runtime sentinel at
+ * the outbound boundary, and returns a bounded sanitized response.
  */
 
 export class BrokerError extends Error {
@@ -37,26 +67,57 @@ export class BrokerError extends Error {
  */
 
 /**
- * Redact every exact occurrence of the runtime sentinel from strings and
- * nested log metadata before anything is logged or surfaced.
+ * Redact the runtime sentinel and its deterministic encoded forms from strings
+ * and nested log metadata before anything is logged or surfaced.
  * @param {unknown} value
  * @param {string} sentinel
  * @returns {unknown}
  */
 export function redactSentinel(value, sentinel) {
+  return redactSensitiveVariants(value, buildSensitiveVariants(sentinel));
+}
+
+/**
+ * @param {string} sentinel
+ * @returns {Set<string>}
+ */
+function buildSensitiveVariants(sentinel) {
+  return new Set(
+    [
+      sentinel,
+      encodeURIComponent(sentinel),
+      Buffer.from(sentinel, 'utf8').toString('base64'),
+      Buffer.from(sentinel, 'utf8').toString('base64url'),
+    ].filter((variant) => variant.length > 0),
+  );
+}
+
+/**
+ * @param {unknown} value
+ * @param {Set<string>} sensitiveVariants
+ * @returns {unknown}
+ */
+function redactSensitiveVariants(value, sensitiveVariants) {
   if (typeof value === 'string') {
-    return sentinel.length === 0
-      ? value
-      : value.split(sentinel).join(REDACTED);
+    let safe = value;
+    for (const variant of sensitiveVariants) {
+      safe = safe.split(variant).join(REDACTED);
+    }
+    return safe;
   }
   if (Array.isArray(value)) {
-    return value.map((item) => redactSentinel(item, sentinel));
+    return value.map((item) =>
+      redactSensitiveVariants(item, sensitiveVariants),
+    );
   }
   if (value !== null && typeof value === 'object') {
     /** @type {Record<string, unknown>} */
     const out = {};
     for (const [key, nested] of Object.entries(value)) {
-      out[key] = redactSentinel(nested, sentinel);
+      const safeKey = /** @type {string} */ (
+        redactSensitiveVariants(key, sensitiveVariants)
+      );
+      out[safeKey] = redactSensitiveVariants(nested, sensitiveVariants);
     }
     return out;
   }
@@ -83,7 +144,11 @@ export function redactSentinel(value, sentinel) {
  * }>}
  */
 export async function startBroker(options) {
-  const { policy, sentinel, fetchImpl = globalThis.fetch } = options;
+  const {
+    policy: suppliedPolicy,
+    sentinel,
+    fetchImpl = globalThis.fetch,
+  } = options;
   /** @type {BrokerLogEntry[]} */
   const logs = [];
 
@@ -98,6 +163,7 @@ export async function startBroker(options) {
       code: 'missing_sentinel',
     });
   }
+  const sensitiveVariants = buildSensitiveVariants(sentinel);
 
   /**
    * @param {BrokerLogEntry} entry
@@ -106,30 +172,47 @@ export async function startBroker(options) {
     /** @type {BrokerLogEntry} */
     const safe = {
       level: entry.level,
-      message: /** @type {string} */ (redactSentinel(entry.message, sentinel)),
+      message: /** @type {string} */ (
+        redactSensitiveVariants(entry.message, sensitiveVariants)
+      ),
     };
     if (entry.meta !== undefined) {
       safe.meta = /** @type {Record<string, unknown>} */ (
-        redactSentinel(entry.meta, sentinel)
+        redactSensitiveVariants(entry.meta, sensitiveVariants)
       );
     }
     rawLog(safe);
   };
 
+  const suppliedClass =
+    suppliedPolicy !== null &&
+    typeof suppliedPolicy === 'object' &&
+    'credential_class' in suppliedPolicy
+      ? suppliedPolicy.credential_class
+      : undefined;
   if (
-    !SUPPORTED_CREDENTIAL_CLASSES.includes(policy.credential_class) ||
-    policy.credential_class !== 'http_bearer'
+    typeof suppliedClass !== 'string' ||
+    !SUPPORTED_CREDENTIAL_CLASSES.includes(suppliedClass)
   ) {
     throw new BrokerError(
-      `unsupported credential_class "${policy.credential_class}"; refusing to inject`,
+      'unsupported credential_class; refusing to inject',
       { code: 'unsupported_credential_class' },
     );
   }
 
-  if (policy.authorization !== CREDENTIAL_PLACEHOLDER) {
+  let policy;
+  try {
+    policy = validatePolicy(suppliedPolicy);
+  } catch {
+    const code =
+      suppliedClass === 'http_bearer' &&
+      /** @type {{ authorization?: unknown }} */ (suppliedPolicy)
+        .authorization !== CREDENTIAL_PLACEHOLDER
+        ? 'invalid_authorization_placeholder'
+        : 'invalid_policy';
     throw new BrokerError(
-      'policy.authorization must be the credential placeholder; refusing to inject',
-      { code: 'invalid_authorization_placeholder' },
+      'policy failed broker-start validation; refusing to inject',
+      { code },
     );
   }
 
@@ -142,6 +225,7 @@ export async function startBroker(options) {
     void handleBrokerRequest(req, res, {
       policy,
       sentinel,
+      sensitiveVariants,
       upstreamOrigin: upstreamUrl.href.replace(/\/$/, ''),
       fetchImpl,
       log,
@@ -191,14 +275,38 @@ export async function startBroker(options) {
  * @param {{
  *   policy: import('./policy.js').Policy,
  *   sentinel: string,
+ *   sensitiveVariants: Set<string>,
  *   upstreamOrigin: string,
  *   fetchImpl: typeof fetch,
  *   log: (entry: BrokerLogEntry) => void,
  * }} ctx
  */
 async function handleBrokerRequest(req, res, ctx) {
-  const { policy, sentinel, upstreamOrigin, fetchImpl, log } = ctx;
-  const requestUrl = new URL(req.url ?? '/', `http://${req.headers.host ?? '127.0.0.1'}`);
+  const {
+    policy,
+    sentinel,
+    sensitiveVariants,
+    upstreamOrigin,
+    fetchImpl,
+    log,
+  } = ctx;
+  const requestTarget = req.url ?? '/';
+
+  if (
+    !requestTarget.startsWith('/') ||
+    requestTarget.startsWith('//') ||
+    requestTarget.includes('?') ||
+    requestTarget.includes('#')
+  ) {
+    log({
+      level: 'warn',
+      message: 'request denied: query or ambiguous request target',
+    });
+    writeJson(res, 400, { error: 'invalid_request_target' });
+    return;
+  }
+
+  const requestUrl = new URL(requestTarget, 'http://127.0.0.1');
 
   if (req.method !== policy.method || requestUrl.pathname !== policy.path) {
     log({
@@ -210,20 +318,38 @@ async function handleBrokerRequest(req, res, ctx) {
     return;
   }
 
-  // Strip any caller-supplied Authorization; sentinel is injected outbound only.
+  // Strip caller credential/protocol headers before the single policy-pinned injection.
   /** @type {Record<string, string>} */
   const outboundHeaders = {};
+  const connectionHeader = req.headers.connection;
+  const connectionTokens = new Set(
+    (Array.isArray(connectionHeader)
+      ? connectionHeader.join(',')
+      : (connectionHeader ?? '')
+    )
+      .split(',')
+      .map((name) => name.trim().toLowerCase())
+      .filter(Boolean),
+  );
   for (const [key, value] of Object.entries(req.headers)) {
     if (value === undefined) continue;
     const lower = key.toLowerCase();
-    if (lower === 'authorization' || lower === 'host' || lower === 'connection') {
+    const pinnedHeader =
+      policy.credential_class === 'http_api_key_header'
+        ? policy.header_name
+        : null;
+    if (isUnsafeCallerHeader(lower, pinnedHeader, connectionTokens)) {
       continue;
     }
-    outboundHeaders[key] = Array.isArray(value) ? value.join(', ') : value;
+    outboundHeaders[lower] = Array.isArray(value) ? value.join(', ') : value;
   }
-  outboundHeaders.Authorization = `Bearer ${sentinel}`;
+  if (policy.credential_class === 'http_bearer') {
+    outboundHeaders.authorization = `Bearer ${sentinel}`;
+  } else {
+    outboundHeaders[policy.header_name] = sentinel;
+  }
 
-  const outboundUrl = `${upstreamOrigin}${policy.path}${requestUrl.search}`;
+  const outboundUrl = `${upstreamOrigin}${policy.path}`;
 
   log({
     level: 'info',
@@ -281,6 +407,7 @@ async function handleBrokerRequest(req, res, ctx) {
   }
 
   if (isRedirectResponse(upstreamResponse)) {
+    await cancelResponseBody(upstreamResponse);
     log({
       level: 'warn',
       message: 'upstream redirect rejected',
@@ -290,12 +417,10 @@ async function handleBrokerRequest(req, res, ctx) {
     return;
   }
 
-  const responseBody = Buffer.from(await upstreamResponse.arrayBuffer());
-
   if (
-    bufferContainsExactSentinel(responseBody, sentinel) ||
-    headersContainExactSentinel(upstreamResponse.headers, sentinel)
+    headersContainSensitiveVariant(upstreamResponse.headers, sensitiveVariants)
   ) {
+    await cancelResponseBody(upstreamResponse);
     log({
       level: 'error',
       message: 'upstream response contained credential material; refusing to forward',
@@ -304,7 +429,47 @@ async function handleBrokerRequest(req, res, ctx) {
     return;
   }
 
-  const sanitizedHeaders = sanitizeResponseHeaders(upstreamResponse.headers);
+  let responseBody;
+  try {
+    responseBody = await readBoundedResponseBody(
+      upstreamResponse,
+      MAX_UPSTREAM_RESPONSE_BODY_BYTES,
+    );
+  } catch (err) {
+    const tooLarge = isResponseBodyTooLarge(err);
+    log({
+      level: tooLarge ? 'warn' : 'error',
+      message: tooLarge
+        ? 'upstream response exceeds size limit'
+        : 'failed to read upstream response',
+      meta: tooLarge
+        ? { limit: MAX_UPSTREAM_RESPONSE_BODY_BYTES }
+        : {
+            error: err instanceof Error ? err.message : String(err),
+          },
+    });
+    writeJson(res, 502, { error: 'upstream_failed' });
+    return;
+  }
+
+  if (bufferContainsSensitiveVariant(responseBody, sensitiveVariants)) {
+    log({
+      level: 'error',
+      message: 'upstream response contained credential material; refusing to forward',
+    });
+    writeJson(res, 502, { error: 'upstream_failed' });
+    return;
+  }
+
+  const pinnedHeader =
+    policy.credential_class === 'http_api_key_header'
+      ? policy.header_name
+      : null;
+  const sanitizedHeaders = sanitizeResponseHeaders(
+    upstreamResponse.headers,
+    pinnedHeader,
+    responseBody.length,
+  );
 
   res.writeHead(upstreamResponse.status, sanitizedHeaders);
   res.end(responseBody);
@@ -323,35 +488,55 @@ function isRedirectResponse(response) {
 
 /**
  * @param {Buffer} body
- * @param {string} sentinel
+ * @param {Set<string>} sensitiveVariants
  * @returns {boolean}
  */
-function bufferContainsExactSentinel(body, sentinel) {
-  if (sentinel.length === 0) return false;
-  return body.includes(sentinel);
+function bufferContainsSensitiveVariant(body, sensitiveVariants) {
+  for (const variant of sensitiveVariants) {
+    if (body.includes(variant)) return true;
+  }
+  return false;
 }
 
 /**
  * @param {Headers} headers
- * @param {string} sentinel
+ * @param {Set<string>} sensitiveVariants
  * @returns {boolean}
  */
-function headersContainExactSentinel(headers, sentinel) {
-  if (sentinel.length === 0) return false;
+function headersContainSensitiveVariant(headers, sensitiveVariants) {
   for (const value of headers.values()) {
-    if (value.includes(sentinel)) {
-      return true;
+    for (const variant of sensitiveVariants) {
+      if (value.includes(variant)) return true;
     }
   }
   return false;
 }
 
 /**
+ * @param {string} name
+ * @param {string | null} pinnedHeader
+ * @param {Set<string>} connectionTokens
+ * @returns {boolean}
+ */
+function isUnsafeCallerHeader(name, pinnedHeader, connectionTokens) {
+  return (
+    name === pinnedHeader ||
+    connectionTokens.has(name) ||
+    UNSAFE_CALLER_HEADER_NAMES.has(name) ||
+    UNSAFE_CALLER_HEADER_PREFIXES.some(
+      (prefix) => name === prefix || name.startsWith(prefix),
+    )
+  );
+}
+
+/**
  * Drop hop-by-hop and credential-bearing headers from the upstream response.
  * @param {Headers} headers
+ * @param {string | null} pinnedHeader
+ * @param {number} bodyLength
  * @returns {Record<string, string>}
  */
-function sanitizeResponseHeaders(headers) {
+function sanitizeResponseHeaders(headers, pinnedHeader, bodyLength) {
   /** @type {Record<string, string>} */
   const out = {};
   const blocked = new Set([
@@ -363,7 +548,19 @@ function sanitizeResponseHeaders(headers) {
     'connection',
     'transfer-encoding',
     'keep-alive',
+    'proxy-authenticate',
+    'proxy-connection',
+    'te',
+    'trailer',
+    'upgrade',
+    'content-encoding',
+    'content-length',
   ]);
+  for (const name of (headers.get('connection') ?? '').split(',')) {
+    const normalized = name.trim().toLowerCase();
+    if (normalized) blocked.add(normalized);
+  }
+  if (pinnedHeader !== null) blocked.add(pinnedHeader);
 
   for (const [key, value] of headers.entries()) {
     if (blocked.has(key.toLowerCase())) continue;
@@ -373,8 +570,96 @@ function sanitizeResponseHeaders(headers) {
   if (!out['content-type']) {
     out['content-type'] = 'application/octet-stream';
   }
+  out['content-length'] = String(bodyLength);
 
   return out;
+}
+
+/**
+ * Read an upstream body into one complete bounded buffer. A valid declared
+ * Content-Length is checked before reading; streaming bytes are counted again
+ * so missing, invalid, or inaccurate declarations cannot bypass the limit.
+ *
+ * @param {Response} response
+ * @param {number} maxBytes
+ * @returns {Promise<Buffer>}
+ */
+async function readBoundedResponseBody(response, maxBytes) {
+  const declaredHeader = response.headers.get('content-length');
+  if (declaredHeader !== null && /^\d+$/.test(declaredHeader)) {
+    if (BigInt(declaredHeader) > BigInt(maxBytes)) {
+      await cancelResponseBody(response);
+      throw responseBodyTooLargeError();
+    }
+  }
+
+  if (response.body === null) {
+    return Buffer.alloc(0);
+  }
+
+  const reader = response.body.getReader();
+  /** @type {Buffer[]} */
+  const chunks = [];
+  let total = 0;
+
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      const chunk = Buffer.from(value);
+      total += chunk.length;
+      if (total > maxBytes) {
+        chunks.length = 0;
+        throw responseBodyTooLargeError();
+      }
+      chunks.push(chunk);
+    }
+  } catch (err) {
+    chunks.length = 0;
+    try {
+      await reader.cancel();
+    } catch {
+      // The original read or size failure remains authoritative.
+    }
+    try {
+      reader.releaseLock();
+    } catch {
+      // The original read or size failure remains authoritative.
+    }
+    throw err;
+  }
+
+  reader.releaseLock();
+  return Buffer.concat(chunks, total);
+}
+
+/** @param {Response} response */
+async function cancelResponseBody(response) {
+  if (response.body === null) return;
+  try {
+    await response.body.cancel();
+  } catch {
+    // A generic broker failure is returned; cancellation details stay internal.
+  }
+}
+
+function responseBodyTooLargeError() {
+  return Object.assign(new Error('upstream response body too large'), {
+    code: 'response_body_too_large',
+  });
+}
+
+/**
+ * @param {unknown} err
+ * @returns {boolean}
+ */
+function isResponseBodyTooLarge(err) {
+  return (
+    typeof err === 'object' &&
+    err !== null &&
+    'code' in err &&
+    /** @type {{ code?: string }} */ (err).code === 'response_body_too_large'
+  );
 }
 
 /**

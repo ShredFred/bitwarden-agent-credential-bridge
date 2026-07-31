@@ -50,3 +50,22 @@ in the strong-boundary design; only the scoped gateway may be exposed to an agen
 Phase 3 still must not download/install `aac`, pull or start images, generate or
 persist deployment secrets, pair any vault, or change host networking. The live
 runbook must use a disposable Bitwarden account/item and require explicit approval.
+
+## Phase 4a scope
+
+Phase 4a remains fake-only and may add one narrowly tagged version-2 credential
+contract for a policy-pinned HTTP API-key header. Runtime fake values stay explicit
+function inputs and must never be written into a policy, environment variable, file,
+log, response, or error surface. Version 1 bearer policies remain compatible.
+
+The version-2 policy must describe exactly one `http_api_key_header` injection with
+an exact `{{credential}}` placeholder and a canonical lowercase ASCII header name.
+Reject forbidden protocol, hop-by-hop, cookie, authorization, framing, and content
+headers. Strip the pinned header and every credential/protocol header supplied by
+the caller before injecting exactly one outbound value.
+
+Phase 4a must also reject unconfigured query strings and bound upstream response
+bodies before buffering them. Keep redirects fail-closed and test split response
+chunks, duplicate/case-varied caller headers, forbidden header names, oversized
+responses, and all agent-readable surfaces. Do not add Basic Auth, query, cookie,
+form, browser, process-env, SSH, database, or arbitrary-template injection yet.
