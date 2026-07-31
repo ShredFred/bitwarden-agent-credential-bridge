@@ -252,3 +252,21 @@ five shared booleans; raw UIDs, PIDs, uid maps, namespace identifiers, paths,
 capabilities, filters, ACLs, and errors must not escape. This phase performs no
 socket or `/proc` I/O, namespace creation, helper launch, mount, permission
 mutation, manifest execution, real-root access, or Bitwarden connection.
+
+## Phase 5h.4 scope
+
+Phase 5h.4 may add only a pure macOS peer-evidence evaluator over trusted,
+injected XPC and audit-token collector facts. It must require a bound Mach
+service, verified XPC peer and caller/helper process generations, verified
+audit tokens and effective UIDs, a pinned helper code requirement, unequal
+effective-UID digests, and complete symlink-safe effective-access checks over
+every bound target.
+
+App Sandbox, Hardened Runtime, code signatures, differing code requirements,
+audit sessions, and sandbox write restrictions are defense-in-depth signals
+only. They must never establish a distinct principal when effective-UID
+digests are equal. Returned evidence contains only the five shared booleans;
+raw UIDs, audit tokens, PIDs, pidversions, code identities, paths, entitlements,
+ACLs, and errors must not escape. This phase performs no XPC/Mach or Security
+framework I/O, helper launch, authorization-service changes, permission
+mutation, manifest execution, real-root access, or Bitwarden connection.

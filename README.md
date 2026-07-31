@@ -125,6 +125,7 @@ npm run test:phase5e
 npm run test:phase5f
 npm run test:phase5g
 npm run test:phase3
+npm run test:phase5h4
 node src/run-demo.js
 ```
 
@@ -244,6 +245,7 @@ docs/phase5g-disposable-executor.md    real install/upgrade/rollback in temp onl
 docs/phase5h-helper-protocol.md         pure separate-writer helper wire contract
 docs/phase5h2-windows-helper-evidence.md pure Windows token/ACL evidence compiler
 docs/phase5h3-linux-helper-evidence.md   pure Linux host-UID/peercred evidence compiler
+docs/phase5h4-macos-helper-evidence.md   pure macOS XPC/audit-token evidence compiler
 test/*.test.js                      functional + exposure tests
 AGENTS.md                           experiment rules for agents
 ```
@@ -262,6 +264,9 @@ AGENTS.md                           experiment rules for agents
   distinct writer when their `TokenUser` SID remains the caller's SID.
 - Phase 5h.3 similarly refuses to treat namespace-local UID 0, seccomp, Landlock,
   capabilities, or no-new-privs as a distinct Linux host principal.
+- Phase 5h.4 refuses to treat App Sandbox, Hardened Runtime, signing identity,
+  or a different audit session as a distinct macOS writer when the effective
+  UID remains equal.
 - No browser/website automation, query, cookie, form, process-env,
   SSH, database, RDP, or desktop credential injection.
 - Not a substitute for vault, OS keychain, or production broker hardening.
