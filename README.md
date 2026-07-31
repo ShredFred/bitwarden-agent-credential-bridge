@@ -123,6 +123,7 @@ npm run test:phase5c
 npm run test:phase5d
 npm run test:phase5e
 npm run test:phase5f
+npm run test:phase5g
 npm run test:phase3
 node src/run-demo.js
 ```
@@ -239,6 +240,7 @@ docs/phase5c-windows-security-adapter.md
 docs/phase5d-apply-live-test-gate.md   explicit mutation and disposable-test gate
 docs/phase5e-disposable-workspace.md   marked OS-temp-only execution boundary
 docs/phase5f-disposable-permissions.md OS-specific hardening inside marked roots
+docs/phase5g-disposable-executor.md    real install/upgrade/rollback in temp only
 test/*.test.js                      functional + exposure tests
 AGENTS.md                           experiment rules for agents
 ```
@@ -249,6 +251,9 @@ AGENTS.md                           experiment rules for agents
   `http_api_key_header`, and `http_basic`) for a single sample service.
 - Sample policy uses port `0` for bind/upstream placeholders; runtime code supplies the concrete upstream origin after the fake API listens.
 - No TLS, no persistence, no multi-writer coordination beyond “one writer at a time” for this repo.
+- The disposable executor does not isolate against a malicious concurrent process
+  running as the same OS user; production use requires a separate identity or
+  equivalent sandbox that is not implemented yet.
 - No browser/website automation, query, cookie, form, process-env,
   SSH, database, RDP, or desktop credential injection.
 - Not a substitute for vault, OS keychain, or production broker hardening.

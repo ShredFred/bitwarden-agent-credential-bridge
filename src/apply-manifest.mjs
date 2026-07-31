@@ -95,7 +95,7 @@ export function buildApplyManifest(input) {
     rollback.unshift(action('remove_file_if_digest_matches', paths.launcher, {
       expected_sha256: launcherSha256,
     }));
-  } else {
+  } else if (observed.launcher.sha256 !== launcherSha256) {
     add(forward, 'assert_path_absent', backup);
     add(forward, 'move_file_exclusive', paths.launcher, {
       destination: backup,
@@ -105,10 +105,14 @@ export function buildApplyManifest(input) {
       content_sha256: launcherSha256,
       permission,
     });
+    add(forward, 'commit_remove_backup_if_digest_matches', backup, {
+      expected_sha256: observed.launcher.sha256,
+    });
     rollback.unshift(
       action('restore_file_exclusive', backup, {
         destination: paths.launcher,
         expected_source_sha256: observed.launcher.sha256,
+        destination_may_be_absent: true,
         expected_destination_sha256: launcherSha256,
       }),
     );

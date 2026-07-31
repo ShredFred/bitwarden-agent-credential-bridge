@@ -181,3 +181,22 @@ FullControl for only current user, LocalSystem, and Builtin Administrators.
 The setter must be silent on success and expose stable value-free failures only.
 It must not accept paths outside the marked root, create/delete/move files,
 operate on normal user roots, access Bitwarden, or execute manifests.
+
+## Phase 5g scope
+
+Phase 5g may execute confirmed manifests only inside a valid, permission-hardened
+disposable workspace. A test scaffold may create only the synthetic OS base
+directories that stand in for an existing home/LocalAppData/XDG/Application
+Support root. Manifest paths and launcher digest must be rebuilt from the
+workspace and match exactly before execution.
+
+Every action re-verifies workspace authorization, target containment, observed
+state, link/reparse/hardlink rules, digest, and permissions. File publication and
+moves use same-filesystem exclusive hard links; writes use same-directory temp
+files with sync before publication. Failures run only activated rollback actions
+in strict reverse order with digest/state checks. The executor must support
+first install, idempotent reinstall, upgrade, injected failure, and rollback in
+the disposable root only; it must never accept normal user roots or access a vault.
+This phase does not claim protection from a malicious concurrent process running
+as the same OS user. A production executor requires a separate identity or
+equivalent sandbox boundary.

@@ -62,8 +62,26 @@ describe('pure apply/rollback manifest', () => {
     assert.equal(manifest.payload.forward[0].kind, 'assert_path_absent');
     assert.match(manifest.payload.forward[0].target, /\.rollback-[0-9a-f]{24}$/);
     assert.equal(manifest.payload.forward[1].expected_sha256, prior);
+    assert.equal(manifest.payload.forward.at(-1).kind, 'commit_remove_backup_if_digest_matches');
     assert.equal(manifest.payload.rollback[0].kind, 'restore_file_exclusive');
     assert.equal(manifest.payload.rollback[0].expected_source_sha256, prior);
+    assert.equal(manifest.payload.rollback[0].destination_may_be_absent, true);
+  });
+
+  it('makes a managed identical launcher an idempotent no-op', () => {
+    const first = buildApplyManifest(base);
+    const manifest = buildApplyManifest({
+      ...base,
+      observed: {
+        config_dir: 'secure_directory',
+        config_file: 'secure_file',
+        install_root: 'secure_directory',
+        bin_dir: 'secure_directory',
+        launcher: { kind: 'managed_file', sha256: first.payload.content.launcher_sha256 },
+      },
+    });
+    assert.deepEqual(manifest.payload.forward, []);
+    assert.deepEqual(manifest.payload.rollback, []);
   });
 
   it('requires full-digest confirmation and rejects any payload tampering', () => {
