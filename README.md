@@ -119,6 +119,7 @@ npm run test:phase4a
 npm run test:phase4b
 npm run test:phase5a
 npm run test:phase5b
+npm run test:phase5c
 npm run test:phase3
 node src/run-demo.js
 ```
@@ -135,6 +136,17 @@ The preflight prints JSON and exits non-zero when a prerequisite is missing, a
 required port is occupied, or a probe cannot establish readiness. It does not
 print command output or environment values. A pass is not permission to deploy
 or pair OneCLI.
+
+To inspect the derived per-user bridge layout without reading configuration
+contents or changing the machine:
+
+```bash
+npm run preflight:bootstrap
+```
+
+The command emits only fixed check IDs/status/reasons and exits non-zero when
+the bridge has not been installed securely. A pass is not authorization to
+install, pair Bitwarden, or access a vault.
 
 ## Contract under test
 
@@ -219,6 +231,9 @@ docs/phase5a-portable-bootstrap-plan.md
                                       pure cross-platform machine/repo boundary
 docs/phase5b-read-only-host-preflight.md
                                       value-free metadata and integrity audit
+docs/phase5c-windows-security-adapter.md
+                                      bounded read-only Windows ACL probe
+docs/phase5d-apply-live-test-gate.md   explicit mutation and disposable-test gate
 test/*.test.js                      functional + exposure tests
 AGENTS.md                           experiment rules for agents
 ```

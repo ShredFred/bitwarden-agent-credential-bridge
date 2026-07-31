@@ -125,3 +125,18 @@ Reports contain fixed check ids/status/reasons only: never raw OS command output
 ACL principals, SIDs, usernames, config values, vault references, or exception
 messages. Phase 5b remains non-mutating and must not create, repair, chmod, install,
 pair, authenticate, access Bitwarden, or start the broker.
+
+## Phase 5c scope
+
+Phase 5c may implement the Windows security adapter required by Phase 5b using a
+repo-owned PowerShell probe launched with argument-array semantics. The probe may
+read item attributes and ACL metadata only. It must require current-user ownership,
+reject reparse points, and conservatively mark any write-capable Allow ACE unsafe
+unless its SID is the current user, LocalSystem, or Builtin Administrators. Broad
+Allows remain unsafe even when a Deny might reduce their effective rights.
+
+The Node adapter must use a hidden, non-interactive, no-profile process with a
+short timeout and small output bound. It accepts exactly one JSON object with
+three booleans and rejects stderr, extra output/fields, non-zero exit, timeout,
+or malformed data with stable value-free errors. It must never return raw command
+output, paths, principals, SIDs, usernames, or exception messages.
