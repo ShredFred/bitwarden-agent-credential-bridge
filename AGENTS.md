@@ -388,3 +388,26 @@ OS system-directory API. A mutable in-process `SystemRoot` still selects the
 initial PowerShell binary, so no Phase 5h.9 result may be authorization evidence.
 It does not start/install/delete a service, mutate registry/SCM/files/ACLs,
 execute the helper, access a vault, or authorize a live apply.
+
+## Phase 5h.10 scope
+
+Phase 5h.10 may add an application-dependency-free .NET 8 Windows own-process service
+lifecycle scaffold using direct SCM P/Invoke. It may be copied and published
+only inside disposable temporary workspaces, producing one same-source,
+same-pinned-toolchain reproducible framework-dependent single-file `win-x64`
+executable. SDK `8.0.423`, .NET 8 runtime baseline `8.0.29` with explicit
+`LatestPatch` roll-forward, and the locally cached
+ILLink package digest are pinned; restore uses an explicit source-cleared config
+plus a one-package digest-verified local feed. The only console mode is
+exact `--self-test`, with fixed value-free booleans; unknown arguments and
+non-SCM no-argument launches exit silently non-zero.
+
+The scaffold may register stop/shutdown controls and report SCM lifecycle state.
+It must contain no IPC listener, manifest executor, vault client, network stack,
+process launcher, secret input, config reader, or filesystem mutation. Its
+self-test must explicitly report `ipc_listener_absent=true`,
+`manifest_executor_absent=true`, `scm_lifecycle_live_verified=false`, and
+`install_gate_eligible=false`. Therefore it is not installable under the live
+gate and must never be treated as a functional helper. This phase performs no
+service install/start, elevation, ACL/registry mutation, real-root access, or
+Bitwarden access.

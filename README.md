@@ -131,6 +131,7 @@ npm run test:phase5h6
 npm run test:phase5h7
 npm run test:phase5h8
 npm run test:phase5h9
+npm run test:phase5h10
 node src/run-demo.js
 ```
 
@@ -256,6 +257,7 @@ docs/phase5h6-windows-helper-pipe-session.md real local pipe/token denial check
 docs/phase5h7-windows-native-denial-session.md combined pipe/handle/AccessCheck denial
 docs/phase5h8-windows-passwordless-service-plan.md pure passwordless service contract
 docs/phase5h9-windows-service-boundary-preflight.md native read-only service check
+docs/phase5h10-native-windows-service-host.md deterministic native lifecycle scaffold
 test/*.test.js                      functional + exposure tests
 AGENTS.md                           experiment rules for agents
 ```
@@ -293,6 +295,11 @@ AGENTS.md                           experiment rules for agents
   service and its binary/security boundary. The expected current result is not
   present because the service has not been installed. Even a matching path-based
   snapshot remains advisory and cannot authorize an apply.
+- Phase 5h.10 builds a same-source, pinned-toolchain reproducible native Windows
+  service lifecycle executable without application `PackageReference` dependencies,
+  entirely in disposable roots. It deliberately has no IPC listener or manifest
+  executor, does not claim a live-verified SCM
+  lifecycle, and is not eligible for installation.
 - No browser/website automation, query, cookie, form, process-env,
   SSH, database, RDP, or desktop credential injection.
 - Not a substitute for vault, OS keychain, or production broker hardening.

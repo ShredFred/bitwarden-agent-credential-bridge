@@ -27,6 +27,7 @@
     "test:phase5h7": "node --test test/windows-helper-pipe-session.test.js",
     "test:phase5h8": "node --test test/windows-service-boundary-plan.test.js",
     "test:phase5h9": "node --test test/windows-service-boundary-preflight.test.js",
+    "test:phase5h10": "node --test test/windows-native-service-host.test.js",
     "test:phase2": "node --test test/onecli-audit.test.js test/onecli-artifacts.test.js test/onecli-preflight.test.js",
     "test:phase3": "node --test test/supply-chain-audit.test.js test/phase3-artifacts.test.js",
     "preflight:onecli": "node scripts/preflight-onecli.mjs",
