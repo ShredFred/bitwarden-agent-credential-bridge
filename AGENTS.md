@@ -38,3 +38,15 @@ Phase 2 may add only a non-mutating OneCLI/Bitwarden readiness layer:
 Phase 2 must not start/stop Docker, pull images, pair a vault, call the Bitwarden
 relay, create real agent tokens, install certificates, modify firewall/proxy
 settings, or read/write a real secret. Those require a later explicit live-test gate.
+
+## Phase 3 scope
+
+Phase 3 may add offline supply-chain evidence, pure verifiers, non-deployable
+Compose templates, and a disposable live-test runbook. It must distinguish the
+Agent Access crate actually linked by OneCLI from newer `aac` releases and source
+audit references. Postgres and the administrative dashboard must be internal-only
+in the strong-boundary design; only the scoped gateway may be exposed to an agent.
+
+Phase 3 still must not download/install `aac`, pull or start images, generate or
+persist deployment secrets, pair any vault, or change host networking. The live
+runbook must use a disposable Bitwarden account/item and require explicit approval.

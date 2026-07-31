@@ -10,8 +10,14 @@ prove OneCLI or Bitwarden production security, or authorize a live pairing.
 - repository: `https://github.com/onecli/onecli.git`
 - release: `1.45.0`
 - OneCLI commit: `84ccaf74ce6350f8925675457b48272c29f32c1a`
-- audited Bitwarden Agent Access commit:
-  `9cd303f65dc501c19d1d513fb4cf88fe5f44936a`
+- crates.io `ap-client` `0.9.0`, the dependency actually linked by OneCLI,
+  checksum
+  `7c7dfbe9db85d3e17e654afa4117ae76c5ec16750cee817a80432b2e93f724a2`
+- matching Agent Access v0.9.0 source tag commit:
+  `fc858195ccabd88737a0255a0fda60a7a02c2286`
+- later workspace `0.12.0` source-audit reference
+  `9cd303f65dc501c19d1d513fb4cf88fe5f44936a`, which is **not** the linked
+  OneCLI dependency
 - audited OneCLI Docker Compose default ports: dashboard `10254`, gateway
   `10255`, and Postgres `5432`
 - audited Bitwarden provider credential cache TTL: `60` seconds
@@ -19,8 +25,8 @@ prove OneCLI or Bitwarden production security, or authorize a live pairing.
 The lock is evidence metadata, not an installer and not a trust-on-first-use
 mechanism. This harness never clones the repository, resolves tags, downloads
 images, or checks a remote. A later publication or live-test review must
-independently verify that the release, commit, source tree, image, and Agent
-Access revision correspond before using them.
+independently verify that the release, commit, source tree, image, crate
+checksum, and matching Agent Access source tag correspond before using them.
 
 The cache TTL is hard-coded source behavior in the audited Bitwarden provider;
 it is not a Docker Compose setting and cannot be configured by this baseline.

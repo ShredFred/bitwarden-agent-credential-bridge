@@ -12,15 +12,26 @@ async function readJson(...parts) {
 }
 
 describe('OneCLI Phase 2 artifacts', () => {
-  it('pins the reviewed upstream and Agent Access revisions', async () => {
+  it('pins the reviewed upstream and distinguishes linked Agent Access evidence', async () => {
     const lock = await readJson('upstream', 'onecli.lock.json');
     assert.deepEqual(lock, {
-      version: 1,
+      version: 2,
       repository: 'https://github.com/onecli/onecli.git',
       release: '1.45.0',
       commit: '84ccaf74ce6350f8925675457b48272c29f32c1a',
-      bitwardenAgentAccessCommit:
-        '9cd303f65dc501c19d1d513fb4cf88fe5f44936a',
+      linkedAgentAccess: {
+        crate: 'ap-client',
+        registry: 'crates.io',
+        version: '0.9.0',
+        checksum:
+          '7c7dfbe9db85d3e17e654afa4117ae76c5ec16750cee817a80432b2e93f724a2',
+        sourceTagCommit: 'fc858195ccabd88737a0255a0fda60a7a02c2286',
+      },
+      laterSourceAuditReference: {
+        workspaceVersion: '0.12.0',
+        commit: '9cd303f65dc501c19d1d513fb4cf88fe5f44936a',
+        relationshipToOnecli: 'not-the-linked-onecli-dependency',
+      },
       auditedDefaultPorts: {
         dashboard: 10254,
         gateway: 10255,

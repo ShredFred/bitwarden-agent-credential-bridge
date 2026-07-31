@@ -10,6 +10,7 @@
   "scripts": {
     "test": "node --test \"./test/*.test.js\"",
     "test:phase2": "node --test test/onecli-audit.test.js test/onecli-artifacts.test.js test/onecli-preflight.test.js",
+    "test:phase3": "node --test test/supply-chain-audit.test.js test/phase3-artifacts.test.js",
     "preflight:onecli": "node scripts/preflight-onecli.mjs",
     "start:api": "node src/run-fake-api.js",
     "start:demo": "node src/run-demo.js"

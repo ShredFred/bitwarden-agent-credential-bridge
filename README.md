@@ -1,8 +1,9 @@
 # Agent Credential Bridge Experiment
 
 Sample-only security experiment. Phase 1 tests a **credential-bridge contract**.
-Phase 2 adds an offline, non-mutating OneCLI readiness audit. Neither phase
-tests Bitwarden product security or OneCLI production security.
+Phase 2 adds an offline, non-mutating OneCLI readiness audit. Phase 3 adds
+offline supply-chain evidence and a not-run disposable live-test design. None
+of these phases tests Bitwarden product security or OneCLI production security.
 
 ## What Phase 1 covers
 
@@ -23,7 +24,7 @@ Do not connect this harness to a personal or company Bitwarden vault.
 ## What Phase 2 covers
 
 - An upstream lock for OneCLI release `1.45.0`, its reviewed source commit, and
-  the audited Bitwarden Agent Access commit.
+  the crates.io `ap-client` `0.9.0` dependency actually linked by OneCLI.
 - Pure proposed-configuration validators for audited local binds, pinned images,
   deployment values, relay transport, the source-fixed cache TTL, and runtime
   separation.
@@ -42,6 +43,28 @@ For the pinned baseline, the audited Bitwarden provider hard-codes
 `credentialCacheTtlSeconds` to `60`; this is source behavior, not a Compose
 setting.
 
+## What Phase 3 covers
+
+- An offline evidence lock for the supplied OneCLI and Postgres OCI index and
+  Linux platform-manifest digests.
+- An explicit distinction between OneCLI's linked crates.io `ap-client`
+  `0.9.0`, candidate AAC `0.11.0`, and the later Agent Access workspace
+  `0.12.0` source-audit reference.
+- Pure validators for canonical SHA-256 values, three-part versions, exact
+  platform-manifest selection, and the candidate's required `unverified`
+  compatibility status.
+- A deliberately non-deployable Compose example: digest placeholders only,
+  internal-only Postgres, no host-published dashboard, and a loopback-only
+  gateway.
+- A gated disposable live-test runbook covering artifact checks, isolation,
+  non-disclosure, denial tests, cache/revocation behavior, cleanup, and
+  redacted evidence.
+
+Phase 3 artifacts have not been deployed or paired. Candidate AAC `0.11.0`
+compatibility with OneCLI `1.45.0` remains **unverified** until the separately
+approved disposable test passes and its evidence is reviewed. See
+[`docs/phase3-disposable-live-test.md`](docs/phase3-disposable-live-test.md).
+
 ## Requirements
 
 - Node.js 20+ (ESM, standard library only — no npm dependencies)
@@ -50,6 +73,7 @@ setting.
 
 ```bash
 npm test
+npm run test:phase3
 node src/run-demo.js
 ```
 
@@ -99,9 +123,12 @@ Demo/tests rewrite `upstream` to the fake API’s concrete loopback origin after
 
 ```
 policies/sample-fake-service.json   declarative sample policy
-upstream/onecli.lock.json            reviewed Phase 2 upstream revisions
+upstream/onecli.lock.json            corrected Phase 2 upstream revisions
+upstream/supply-chain.lock.json      Phase 3 offline digest/revision evidence
 samples/onecli/secure-local.example.json
                                       rejected deployment placeholders
+deploy/compose.disposable.example.yaml
+                                      non-deployable bounded template
 src/constants.js                    constant API body + sentinel generator
 src/policy.js                       load + validate (loopback + placeholder rules)
 src/fake-api.js                     local fake HTTP API
@@ -109,8 +136,10 @@ src/broker.js                       foreground loopback HTTP broker
 src/run-fake-api.js                 foreground API process
 src/run-demo.js                     end-to-end foreground demo
 src/onecli-audit.mjs                pure proposed-config validators
+src/supply-chain-audit.mjs          pure Phase 3 evidence validators
 scripts/preflight-onecli.mjs        read-only, value-free readiness report
 docs/phase2-onecli-readiness.md     evidence, platform path, threat boundaries
+docs/phase3-disposable-live-test.md approval-gated, not-run live-test plan
 test/*.test.js                      functional + exposure tests
 AGENTS.md                           experiment rules for agents
 ```
@@ -124,6 +153,9 @@ AGENTS.md                           experiment rules for agents
 - Phase 2 validates a proposal and local prerequisites only. It does not verify
   remote tags, images, relay reachability, Docker permissions, or runtime
   isolation.
+- Phase 3 records supplied evidence but performs no network verification,
+  download, install, image pull, deployment, pairing, or live compatibility
+  test.
 
 ## Publication
 

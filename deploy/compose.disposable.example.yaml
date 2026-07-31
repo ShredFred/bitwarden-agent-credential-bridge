@@ -1,0 +1,59 @@
+# WARNING: NON-DEPLOYABLE PHASE 3 TEMPLATE
+# DO NOT RUN this file. It contains intentionally invalid image/command placeholders,
+# is gated behind an inactive profile, and has never been rendered or deployed here.
+# Copy it only into a separately approved disposable-test workspace. Verify the real
+# OneCLI configuration interface from the locked source before replacing placeholders.
+
+name: phase3-disposable-example
+
+services:
+  postgres:
+    profiles: ["explicit-approval-required"]
+    image: "${POSTGRES_IMAGE_REPOSITORY:?REQUIRED_REVIEWED_REPOSITORY}@sha256:${POSTGRES_PLATFORM_MANIFEST_SHA256:?REQUIRED_LOCKED_PLATFORM_DIGEST}"
+    pull_policy: never
+    restart: "no"
+    environment:
+      POSTGRES_USER: "${DISPOSABLE_POSTGRES_USER:?REQUIRED_GENERATED_DISPOSABLE_VALUE}"
+      POSTGRES_PASSWORD: "${DISPOSABLE_POSTGRES_PASSWORD:?REQUIRED_GENERATED_DISPOSABLE_VALUE}"
+      POSTGRES_DB: "${DISPOSABLE_POSTGRES_DB:?REQUIRED_GENERATED_DISPOSABLE_VALUE}"
+    tmpfs:
+      - /var/lib/postgresql/data
+    networks:
+      - disposable-data
+    security_opt:
+      - no-new-privileges:true
+
+  onecli:
+    profiles: ["explicit-approval-required"]
+    image: "${ONECLI_IMAGE_REPOSITORY:?REQUIRED_REVIEWED_REPOSITORY}@sha256:${ONECLI_PLATFORM_MANIFEST_SHA256:?REQUIRED_LOCKED_PLATFORM_DIGEST}"
+    pull_policy: never
+    restart: "no"
+    # Intentionally invalid: replace only after source review at the approval gate.
+    command: ["<REPLACE_WITH_REVIEWED_ONECLI_COMMAND>"]
+    environment:
+      # These PHASE3_* names are documentary placeholders, not verified OneCLI keys.
+      PHASE3_POSTGRES_USER: "${DISPOSABLE_POSTGRES_USER:?REQUIRED_GENERATED_DISPOSABLE_VALUE}"
+      PHASE3_POSTGRES_PASSWORD: "${DISPOSABLE_POSTGRES_PASSWORD:?REQUIRED_GENERATED_DISPOSABLE_VALUE}"
+      PHASE3_POSTGRES_DB: "${DISPOSABLE_POSTGRES_DB:?REQUIRED_GENERATED_DISPOSABLE_VALUE}"
+      PHASE3_ONECLI_ENCRYPTION_KEY: "${DISPOSABLE_ONECLI_ENCRYPTION_KEY:?REQUIRED_GENERATED_DISPOSABLE_VALUE}"
+      PHASE3_BITWARDEN_RELAY_URL: "${DISPOSABLE_BITWARDEN_RELAY_URL:?REQUIRED_APPROVED_DISPOSABLE_ENDPOINT}"
+    depends_on:
+      - postgres
+    # The dashboard is visible only to attached containers; it is not host-published.
+    expose:
+      - "10254"
+    # The scoped gateway is the only host-published port and is loopback-only.
+    ports:
+      - "127.0.0.1:10255:10255/tcp"
+    networks:
+      - disposable-data
+      - controlled-egress-placeholder
+    security_opt:
+      - no-new-privileges:true
+
+networks:
+  # Postgres has no host port and no attachment to the egress-capable network.
+  disposable-data:
+    internal: true
+  # Compose alone is not an egress policy. Apply and test an external allow-list.
+  controlled-egress-placeholder: {}
