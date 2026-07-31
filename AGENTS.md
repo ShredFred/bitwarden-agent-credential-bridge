@@ -200,3 +200,21 @@ the disposable root only; it must never accept normal user roots or access a vau
 This phase does not claim protection from a malicious concurrent process running
 as the same OS user. A production executor requires a separate identity or
 equivalent sandbox boundary.
+
+## Phase 5h.1 scope
+
+Phase 5h.1 may define only the pure, offline wire contract for a future
+short-lived helper with a distinct writer identity. Requests must be canonical
+UTF-8 JSON bounded to 64 KiB and bind one disposable workspace root/marker nonce,
+one already-confirmed complete manifest, and the digest/length of launcher bytes
+delivered later through an inherited read-only handle. Requests must contain no
+secret values, vault references, arbitrary commands, executable paths, network
+addresses, or caller-selected mutation paths beyond the already-bound manifest.
+
+Authorization must fail closed unless an injected platform adapter proves a
+local transport, verified identity, a principal different from the caller, caller
+write denial, and helper write permission. Responses expose fixed codes and
+counts only. This phase must not launch a helper, open IPC, pass handles, create
+users/tokens/sandboxes, install services, mutate permissions, execute manifests,
+access real user roots, or connect to Bitwarden. Those require later OS-specific
+phases and an explicit live gate.

@@ -241,6 +241,7 @@ docs/phase5d-apply-live-test-gate.md   explicit mutation and disposable-test gat
 docs/phase5e-disposable-workspace.md   marked OS-temp-only execution boundary
 docs/phase5f-disposable-permissions.md OS-specific hardening inside marked roots
 docs/phase5g-disposable-executor.md    real install/upgrade/rollback in temp only
+docs/phase5h-helper-protocol.md         pure separate-writer helper wire contract
 test/*.test.js                      functional + exposure tests
 AGENTS.md                           experiment rules for agents
 ```
@@ -253,7 +254,8 @@ AGENTS.md                           experiment rules for agents
 - No TLS, no persistence, no multi-writer coordination beyond “one writer at a time” for this repo.
 - The disposable executor does not isolate against a malicious concurrent process
   running as the same OS user; production use requires a separate identity or
-  equivalent sandbox that is not implemented yet.
+  equivalent sandbox. Phase 5h.1 defines its fail-closed wire contract, but the
+  OS-specific identity boundary is not implemented yet.
 - No browser/website automation, query, cookie, form, process-env,
   SSH, database, RDP, or desktop credential injection.
 - Not a substitute for vault, OS keychain, or production broker hardening.
