@@ -218,3 +218,20 @@ counts only. This phase must not launch a helper, open IPC, pass handles, create
 users/tokens/sandboxes, install services, mutate permissions, execute manifests,
 access real user roots, or connect to Bitwarden. Those require later OS-specific
 phases and an explicit live gate.
+
+## Phase 5h.2 scope
+
+Phase 5h.2 may add only a pure Windows peer-evidence evaluator over trusted,
+injected Win32 probe facts. It must require a local named pipe with remote clients
+rejected, verified client/server process binding, verified caller/helper tokens,
+different `TokenUser` SID digests, complete ACL checks over every bound target,
+no caller effective write access, and required helper write access. Returned data
+contains only the five cross-platform authorization booleans.
+
+Restricted tokens, lowered integrity, capability SIDs, and AppContainer state do
+not establish a different principal when `TokenUser` remains equal. Evidence is
+exact-schema, boolean-exact, digest-only, accessor-free, and fail-closed; raw SIDs,
+PIDs, paths, ACLs, token details, and exception text must never be returned.
+This phase still must not inspect live tokens/ACLs, open a pipe, launch a helper,
+create an account/service/AppContainer, pass handles, mutate permissions, execute
+a manifest, access real user roots, or connect to Bitwarden.
