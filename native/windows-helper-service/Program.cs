@@ -32,8 +32,14 @@ internal static class Program
     {
         if (args.Length == 1 && string.Equals(args[0], "--self-test", StringComparison.Ordinal))
         {
-            Console.Out.Write("{\"schema_version\":1,\"platform_win32\":true,\"service_name_bound\":true,\"scm_entrypoint_compiled\":true,\"scm_lifecycle_live_verified\":false,\"ipc_listener_absent\":true,\"manifest_executor_absent\":true,\"network_stack_absent\":true,\"vault_client_absent\":true,\"install_gate_eligible\":false}\n");
+            Console.Out.Write("{\"schema_version\":1,\"platform_win32\":true,\"service_name_bound\":true,\"scm_entrypoint_compiled\":true,\"scm_lifecycle_live_verified\":false,\"console_denial_pipe_compiled\":true,\"service_pipe_activation_absent\":true,\"service_pipe_acl_absent\":true,\"manifest_executor_absent\":true,\"network_stack_absent\":true,\"vault_client_absent\":true,\"install_gate_eligible\":false}\n");
             return 0;
+        }
+        if (args.Length == 2 &&
+            string.Equals(args[0], "--console-pipe-denial", StringComparison.Ordinal) &&
+            DenialPipeProbe.IsCanonicalNonce(args[1]))
+        {
+            return DenialPipeProbe.Run(args[1]);
         }
         if (args.Length != 0)
         {

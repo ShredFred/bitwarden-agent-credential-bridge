@@ -258,6 +258,7 @@ docs/phase5h7-windows-native-denial-session.md combined pipe/handle/AccessCheck 
 docs/phase5h8-windows-passwordless-service-plan.md pure passwordless service contract
 docs/phase5h9-windows-service-boundary-preflight.md native read-only service check
 docs/phase5h10-native-windows-service-host.md deterministic native lifecycle scaffold
+docs/phase5h11-native-pipe-denial.md native local pipe/token denial probe
 test/*.test.js                      functional + exposure tests
 AGENTS.md                           experiment rules for agents
 ```
@@ -300,6 +301,10 @@ AGENTS.md                           experiment rules for agents
   entirely in disposable roots. It deliberately has no IPC listener or manifest
   executor, does not claim a live-verified SCM
   lifecycle, and is not eligible for installation.
+- Phase 5h.11 adds a console-only native named-pipe proof with remote rejection,
+  first-instance enforcement, live client PID/token binding, and explicit
+  same-`TokenUser` denial. The service entrypoint still does not activate IPC,
+  has no service-specific pipe DACL, and remains ineligible for installation.
 - No browser/website automation, query, cookie, form, process-env,
   SSH, database, RDP, or desktop credential injection.
 - Not a substitute for vault, OS keychain, or production broker hardening.

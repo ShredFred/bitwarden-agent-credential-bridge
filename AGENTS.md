@@ -411,3 +411,23 @@ self-test must explicitly report `ipc_listener_absent=true`,
 gate and must never be treated as a functional helper. This phase performs no
 service install/start, elevation, ACL/registry mutation, real-root access, or
 Bitwarden access.
+
+## Phase 5h.11 scope
+
+Phase 5h.11 may add one console-only denial probe to the native Windows helper
+executable. It uses one fixed local named-pipe name with
+`PIPE_REJECT_REMOTE_CLIENTS` and `FILE_FLAG_FIRST_PIPE_INSTANCE`, accepts only a
+canonical 64-character lowercase hexadecimal non-secret nonce, and obtains the
+connected client's live PID and `TokenUser` through Win32 APIs. It compares that
+token to the helper's live `TokenUser` internally and returns only fixed boolean
+facts. No PID, SID, token, path, nonce, OS error, or provider text may be emitted.
+Connect, read, and write must use bounded overlapped operations. The console pipe
+inherits the ambient default DACL and must not claim an exclusive admission
+boundary.
+
+The only successful Phase 5h.11 result on the current console host is explicit
+same-principal denial. The SCM service entrypoint must not activate the pipe, and
+the executable still has no service-specific pipe DACL, manifest executor,
+network stack, vault client, or install eligibility. This phase does not install
+or start a service, elevate, mutate ACLs/registry/files, access normal user roots,
+execute a manifest, or connect to Bitwarden.
