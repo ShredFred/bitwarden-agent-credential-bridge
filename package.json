@@ -60,6 +60,7 @@
     "test:phase5h40": "node --test --test-concurrency=1 test/macos-runner-provisioning.test.js test/macos-sudo-lifecycle-launcher.test.js test/macos-lifecycle-runner-package.test.js",
     "test:phase5h41": "node --test --test-concurrency=1 test/macos-lifecycle-provision-composition.test.js test/macos-lifecycle-approval.test.js test/macos-runner-provisioning.test.js test/macos-sudo-lifecycle-launcher.test.js test/macos-lifecycle-runner-package.test.js",
     "test:phase5h42": "node --test --test-concurrency=1 test/macos-provisioner-bootstrap-package.test.js test/macos-lifecycle-provision-composition.test.js test/macos-lifecycle-runner-package.test.js",
+    "test:phase5h43": "node --test --test-concurrency=1 test/macos-provisioner-distribution-readiness.test.js test/macos-provisioner-bootstrap-package.test.js",
     "test:phase2": "node --test test/onecli-audit.test.js test/onecli-artifacts.test.js test/onecli-preflight.test.js",
     "test:phase3": "node --test test/supply-chain-audit.test.js test/phase3-artifacts.test.js",
     "preflight:onecli": "node scripts/preflight-onecli.mjs",

@@ -181,3 +181,13 @@ installer scripts and exposes no lifecycle-package authority. Signature,
 notarization, installation, authorization, and live verification remain false.
 See `docs/phase5h42-macos-provisioner-bootstrap-package.md` and run
 `npm run test:phase5h42`; Windows should skip Apple package execution only.
+
+Phase 5h.43 adds a read-only, fail-closed distribution inspection over those
+exact branded PKG bytes. It uses only fixed `pkgutil --check-signature`, binds
+the private snapshot before and after the tool, and strictly recognizes the
+unsigned or Developer ID Installer certificate-chain grammar. No production
+certificate pin is approved yet, and network-backed ticket validation is out
+of scope, so signature, notarization, distribution, install, authorization,
+and live claims remain false. See
+`docs/phase5h43-macos-provisioner-distribution-readiness.md` and run
+`npm run test:phase5h43`; Windows must keep this Darwin integration skipped.
