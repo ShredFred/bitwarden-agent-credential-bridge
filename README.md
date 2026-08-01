@@ -279,6 +279,7 @@ docs/phase5h23-macos-launchd-lifecycle-evidence.md value-free lifecycle transcri
 docs/phase5h24-native-macos-launchd-helper.md compiled denial-only launchd helper scaffold
 docs/phase5h25-signed-macos-lifecycle-package.md real signed helper/plist bindings, non-installing
 docs/phase5h26-macos-lifecycle-read-only-dry-run.md no-input read-only lifecycle preflight
+docs/phase5h27-macos-retained-file-ownership.md native retained-FD publication/cleanup core
 test/*.test.js                      functional + exposure tests
 AGENTS.md                           experiment rules for agents
 ```
@@ -400,6 +401,9 @@ AGENTS.md                           experiment rules for agents
   macOS. It emits only bounded value-free facts, uses a non-activating system
   launchd-domain snapshot for Mach-name absence, performs no system mutation,
   and remains explicitly untrusted and ineligible for installation.
+- Phase 5h.27 implements and fixture-tests the native retained-FD ownership core
+  needed for system binary/plist publication and cleanup. Exclusive collisions
+  are preserved, and a replaced path is never adopted or deleted.
 - No browser/website automation, query, cookie, form, process-env,
   SSH, database, RDP, or desktop credential injection.
 - Not a substitute for vault, OS keychain, or production broker hardening.

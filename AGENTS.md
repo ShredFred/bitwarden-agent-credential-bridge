@@ -845,3 +845,22 @@ Keychain, vault, network, or return approval. Completion is point-in-time,
 structural, and untrusted; all mutation, live, authorization, collector-trust,
 and install flags remain false. A future executor must repeat the checks just
 before mutation and still requires explicit current operator approval.
+
+## Phase 5h.27 scope
+
+Phase 5h.27 may add only the native retained-FD file ownership primitive needed
+by the later single-process lifecycle controller. Publication must use a caller-
+retained directory descriptor plus `openat` with exclusive create and no-follow;
+all write, owner, mode, content, and identity verification must use retained
+descriptors. Cleanup may use `unlinkat` only after the retained descriptor,
+current no-follow directory entry, and recorded device/inode still match.
+
+A collision is a proven no-effect result. Any post-create failure or identity
+drift is ambiguous. A replaced entry is foreign and must be preserved, never
+adopted or deleted. The self-test may mutate only its own private canonical-temp
+fixture and must prove collision preservation, normal cleanup, replacement
+refusal, foreign-file preservation, and exact fixture cleanup.
+
+This component must contain no system paths, account or launchd operations,
+elevation, network, credential, Keychain/vault, manifest execution, approval,
+or install surface. It is reusable implementation work, not live evidence.
