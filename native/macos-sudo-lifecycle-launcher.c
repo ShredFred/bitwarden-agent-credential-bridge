@@ -24,7 +24,8 @@
 #define RUNNER_STOP_TIMEOUT_MS 5000
 
 static const char SUCCESS_OUTPUT[] =
-    "{\"schema_version\":1,\"denial_verified\":true,\"cleanup_complete\":true}\n";
+    "{\"schema_version\":1,\"mutation_complete\":true,\"denial_verified\":true,"
+    "\"cleanup_complete\":true,\"manual_recovery_required\":false}\n";
 static char *const FIXED_ENV[] = {
   "PATH=/usr/bin:/bin:/usr/sbin:/sbin", "LANG=C", "LC_ALL=C", NULL,
 };

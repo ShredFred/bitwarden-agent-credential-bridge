@@ -8,7 +8,8 @@
 #include <unistd.h>
 
 static const char SUCCESS_OUTPUT[] =
-    "{\"schema_version\":1,\"denial_verified\":true,\"cleanup_complete\":true}\n";
+    "{\"schema_version\":1,\"mutation_complete\":true,\"denial_verified\":true,"
+    "\"cleanup_complete\":true,\"manual_recovery_required\":false}\n";
 
 int main(int argc, char **argv) {
   bw_lifecycle_approval_bindings bindings;

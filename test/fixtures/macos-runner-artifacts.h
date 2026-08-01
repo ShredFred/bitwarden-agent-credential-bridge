@@ -1,0 +1,21 @@
+#ifndef BW_AGENT_MACOS_RUNNER_ARTIFACT_FIXTURE_H
+#define BW_AGENT_MACOS_RUNNER_ARTIFACT_FIXTURE_H
+
+__attribute__((used, section("__DATA_CONST,__bwhelper")))
+static const unsigned char BW_RUNNER_HELPER_BYTES[] = {0x68, 0x65, 0x6c, 0x70, 0x65, 0x72};
+__attribute__((used, section("__DATA_CONST,__bwplist")))
+static const unsigned char BW_RUNNER_PLIST_BYTES[] = {0x70, 0x6c, 0x69, 0x73, 0x74};
+#define BW_RUNNER_HELPER_LENGTH (sizeof(BW_RUNNER_HELPER_BYTES))
+#define BW_RUNNER_PLIST_LENGTH (sizeof(BW_RUNNER_PLIST_BYTES))
+#define BW_RUNNER_BINARY_SHA256_HEX "e81d3b0e9d82feaaf5f6e55bdff24731d7eee08632ffa63801e6397290c5d20a"
+#define BW_RUNNER_PLIST_SHA256_HEX "9ceec13202afbf12ee3abb994c669c711749c18e194326734db6123e94947e04"
+#define BW_RUNNER_REQUIREMENT_SHA256_HEX "1111111111111111111111111111111111111111111111111111111111111111"
+__attribute__((used, section("__DATA_CONST,__bwreq")))
+static const unsigned char BW_RUNNER_REQUIREMENT_SHA256[BW_APPROVAL_DIGEST_BYTES] = {
+  0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11,
+  0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11,
+  0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11,
+  0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11,
+};
+
+#endif
