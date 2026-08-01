@@ -35,6 +35,7 @@ npm run test:phase5h18
 npm run test:phase5h19
 npm run test:phase5h20
 npm run test:phase5h21
+npm run test:phase5h22
 npm run start:demo
 npm run preflight:bootstrap
 npm run preflight:onecli
@@ -101,9 +102,17 @@ kernel audit trailers on both directions. This console test uses only a random
 ephemeral bootstrap name; it does not claim the fixed launchd service or reviewed
 code requirement and sends no manifest request.
 
+Phase 5h.22 freezes the next lifecycle before any privileged implementation is
+allowed. Its in-process branded gate binds all reviewed artifact values and the
+exact preflight, exclusive-create, reverify, system-bootstrap, denial, and
+always-cleanup sequence. Files use retained-descriptor ownership; account and
+launchd cleanup use deliberately softer run-create/bootstrap identity evidence.
+Collisions and ambiguous outcomes are never adopted or deleted. The gate accepts
+no approval and performs no host mutation or live test.
+
 There is still no live production Mach service, installed distinct writer, Keychain
 integration, production installer, or real Bitwarden/OneCLI credential handoff
 on macOS. The next macOS milestone must be an explicitly approved disposable
-LaunchDaemon lifecycle that binds the fixed system service, distinct helper EUID,
+LaunchDaemon lifecycle collector that binds the fixed system service, distinct helper EUID,
 connected helper audit trailer, loaded launchd identity, and plan-pinned code
 requirement. It must still deny and must not execute a manifest or access credentials.

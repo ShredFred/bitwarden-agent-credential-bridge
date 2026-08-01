@@ -274,6 +274,7 @@ docs/phase5h18-macos-launchd-boundary-plan.md pure fixed launchd system-helper c
 docs/phase5h19-macos-launchd-boundary-preflight.md read-only fixed macOS host inspection
 docs/phase5h20-macos-code-snapshot-verification.md fd-content-bound Apple code verification
 docs/phase5h21-macos-mach-denial-session.md real same-EUID Mach audit-trailer denial
+docs/phase5h22-macos-launchd-lifecycle-gate.md pure distinct-EUID lifecycle gate
 test/*.test.js                      functional + exposure tests
 AGENTS.md                           experiment rules for agents
 ```
@@ -370,6 +371,11 @@ AGENTS.md                           experiment rules for agents
   including PID generations and EUID digests. It honestly reports a same-EUID
   denial, never claims the production launchd service or code requirement, sends
   no manifest request, and remains ineligible for installation or authorization.
+- Phase 5h.22 freezes the future explicitly approved distinct-EUID LaunchDaemon
+  denial lifecycle as a pure branded gate. It binds the reviewed binary, plist,
+  and designated-requirement values; encodes collision-safe soft ownership and
+  ordered cleanup; accepts no approval or host-selected values; performs no
+  mutation; and keeps installation and authorization ineligible.
 - No browser/website automation, query, cookie, form, process-env,
   SSH, database, RDP, or desktop credential injection.
 - Not a substitute for vault, OS keychain, or production broker hardening.

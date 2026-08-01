@@ -707,3 +707,28 @@ a LaunchDaemon, create an account, elevate, use the production service name,
 verify the production code requirement, pass a launcher/manifest, mutate target
 permissions, execute a manifest, access Keychain/vault/network/Bitwarden, use a
 real credential, or become authorization evidence.
+
+## Phase 5h.22 scope
+
+Phase 5h.22 may add only a pure, branded, non-executable lifecycle gate for a
+future explicitly approved macOS distinct-EUID LaunchDaemon denial test. It
+accepts only the in-process branded Phase 5h.18 boundary plan and binds the
+reviewed binary SHA-256 and length, designated-requirement SHA-256, and plist
+SHA-256. It accepts no approval, commands, paths, account names, UIDs, GUIDs,
+audit tokens, native output, or other host-selected values.
+
+The gate must freeze the exact preflight, exclusive create/reverify, system
+bootstrap, demand-activation, denial, and always-cleanup order. File ownership
+must remain bound to retained parent/file descriptors. Account ownership is
+only soft evidence from this run's successful create plus its recorded
+GeneratedUID/UniqueID, and launchd ownership is only soft evidence from this
+run's successful bootstrap plus the reverified loaded identity and bootstrap
+epoch. Pre-existing objects, collisions, uncertain outcomes, or identity drift
+must never be adopted or removed.
+
+Cleanup must proceed process stop, bootout, plist unlink, binary unlink,
+account deletion, then final absence verification, continuing after individual
+failures while preserving manual-recovery evidence. This phase performs no
+host inspection, elevation, account/file/job mutation, Mach I/O, Keychain/vault
+access, credential operation, or live test, and must keep every authorization
+and installation eligibility claim false.
