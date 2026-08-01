@@ -760,3 +760,31 @@ native output. Collector trust, live verification, authorization readiness, and
 installation eligibility remain false. This phase performs no collection,
 elevation, launchd/OpenDirectory/file/Mach mutation, credential access, or live
 test.
+
+## Phase 5h.24 scope
+
+Phase 5h.24 may add a native macOS denial-only helper scaffold with exactly two
+fixed modes. Its no-argument service mode must first verify that its effective
+UID belongs to the fixed hidden non-login helper account, then check in only to
+the fixed production launchd Mach service. It may receive one exact bounded,
+non-complex nonce probe with a kernel audit trailer and send only one send-once
+denial reply. It must never authorize, execute a manifest, access credentials,
+Keychain, vault, network or filesystem targets, launch a process, register or
+look up another service, accept caller-selected service/account/protocol values,
+or emit service-mode output.
+
+The fixed internal self-test may report compile-time booleans only. The Node
+runner accepts no input, reads the repo-owned C source through one retained
+no-follow descriptor, creates two exclusive read-only source snapshots in
+separate private canonical-temp roots, builds both with fixed Apple tooling and
+flags, requires same-host digest equality, runs the fixed self-test, proves the
+no-argument binary is silently rejected outside the fixed account/launchd
+context, and performs exact cleanup. It must not install, sign, elevate, create
+an account, write under `/Library`, invoke launchctl/OpenDirectory, access the
+production Mach service, or leave build artifacts.
+
+Same-host reproducibility and a compiled check-in path are not live launchd,
+distinct-EUID, loaded-code, collector-trust, authorization, or installation
+evidence. Every such flag remains false. The first real lifecycle still requires
+a separately reviewed collector and explicit current operator approval naming
+the exact disposable system test.

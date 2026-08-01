@@ -276,6 +276,7 @@ docs/phase5h20-macos-code-snapshot-verification.md fd-content-bound Apple code v
 docs/phase5h21-macos-mach-denial-session.md real same-EUID Mach audit-trailer denial
 docs/phase5h22-macos-launchd-lifecycle-gate.md pure distinct-EUID lifecycle gate
 docs/phase5h23-macos-launchd-lifecycle-evidence.md value-free lifecycle transcript grammar
+docs/phase5h24-native-macos-launchd-helper.md compiled denial-only launchd helper scaffold
 test/*.test.js                      functional + exposure tests
 AGENTS.md                           experiment rules for agents
 ```
@@ -382,6 +383,11 @@ AGENTS.md                           experiment rules for agents
   distinguishes proven no-effect from ambiguous mutation failures, enforces
   ownership-consistent cleanup and final absence, and still returns no trusted,
   live, authorizing, or installation-eligible evidence.
+- Phase 5h.24 compiles the real no-argument launchd/MachServices denial-only
+  entrypoint. It verifies the fixed non-login account before check-in, accepts
+  only one bounded audit-trailer nonce probe, and can only reply denied. Its
+  runner performs two source-snapshot-bound private-temp builds, fixed self-test,
+  ambient no-arg rejection, and exact cleanup; nothing is installed or trusted.
 - No browser/website automation, query, cookie, form, process-env,
   SSH, database, RDP, or desktop credential injection.
 - Not a substitute for vault, OS keychain, or production broker hardening.

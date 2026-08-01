@@ -37,6 +37,7 @@ npm run test:phase5h20
 npm run test:phase5h21
 npm run test:phase5h22
 npm run test:phase5h23
+npm run test:phase5h24
 npm run start:demo
 npm run preflight:bootstrap
 npm run preflight:onecli
@@ -118,9 +119,17 @@ cleanup of ambiguous account/job identities, and requires the aggregate
 read-only absence check last. Even a complete synthetic denial transcript is
 explicitly untrusted and cannot authorize installation or credential work.
 
+Phase 5h.24 compiles the real denial-only launchd helper entrypoint twice from
+the same retained-FD source snapshot. The no-argument path verifies the fixed
+hidden non-login account before checking in to the fixed Mach service; it accepts
+one exact bounded audit-trailer request and can only send a denial. The live Mac
+test runs only the fixed self-test and proves ambient no-argument execution is
+silently rejected. It does not install, elevate, touch `/Library`, or contact the
+production service.
+
 There is still no live production Mach service, installed distinct writer, Keychain
 integration, production installer, or real Bitwarden/OneCLI credential handoff
 on macOS. The next macOS milestone must be an explicitly approved disposable
-native LaunchDaemon lifecycle collector that binds the fixed system service, distinct helper EUID,
+native LaunchDaemon lifecycle collector/driver that binds the fixed system service, distinct helper EUID,
 connected helper audit trailer, loaded launchd identity, and plan-pinned code
 requirement. It must still deny and must not execute a manifest or access credentials.

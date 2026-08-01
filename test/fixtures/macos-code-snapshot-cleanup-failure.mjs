@@ -1,5 +1,4 @@
 import { execFile } from 'node:child_process';
-import { mkdirSync, rmdirSync, watch } from 'node:fs';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -15,16 +14,14 @@ const { stdout } = await execFileAsync('/usr/bin/codesign', ['-d', '-r-', '--', 
 });
 const requirementDigest = digestDesignatedRequirementStdout(stdout);
 let blockedRoot;
-const watcher = watch(os.tmpdir(), (_event, filename) => {
-  if (typeof filename !== 'string' || !filename.startsWith(PREFIX)) return;
-  const candidate = path.join(os.tmpdir(), filename);
-  try {
-    mkdirSync(path.join(candidate, 'cleanup-blocker'), { mode: 0o700 });
-    blockedRoot = candidate;
-  } catch {
-    // A later event retries if the verifier has not completed directory creation.
+const originalRmdir = fs.rmdir;
+fs.rmdir = async (target, ...args) => {
+  if (path.basename(target).startsWith(PREFIX)) {
+    blockedRoot = target;
+    throw new Error('injected cleanup failure');
   }
-});
+  return originalRmdir.call(fs, target, ...args);
+};
 
 let rejected = false;
 try {
@@ -32,10 +29,9 @@ try {
 } catch (error) {
   rejected = error instanceof Error && error.message === 'snapshot cleanup failed';
 } finally {
-  watcher.close();
+  fs.rmdir = originalRmdir;
   if (blockedRoot !== undefined) {
-    rmdirSync(path.join(blockedRoot, 'cleanup-blocker'));
-    rmdirSync(blockedRoot);
+    await originalRmdir.call(fs, blockedRoot);
   }
 }
 if (!rejected || blockedRoot === undefined) process.exitCode = 1;
