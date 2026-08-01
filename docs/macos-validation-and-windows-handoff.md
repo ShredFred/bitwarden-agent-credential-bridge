@@ -31,6 +31,7 @@ From the repository root:
 ```bash
 node --version
 npm test
+npm run test:phase5h18
 npm run start:demo
 npm run preflight:bootstrap
 npm run preflight:onecli
@@ -77,13 +78,13 @@ vault references, command output, or credential material.
 ## Security boundary retained
 
 This change improves cross-platform correctness; it does not widen authority.
-Unsupported platforms and malformed inputs still fail closed. The current macOS
-helper code remains a pure evidence evaluator. There is no live XPC/Mach service,
-distinct writer identity, Keychain integration, production installer, or real
-Bitwarden/OneCLI credential handoff on macOS yet.
+Unsupported platforms and malformed inputs still fail closed. Phase 5h.18 now
+defines the fixed system-domain launchd/Mach-service, distinct-EUID, binary, and
+designated-code-requirement contract, and Phase 5h.4 explicitly binds the XPC
+peer audit token to the authorizing caller. Both remain pure and non-executable.
 
-The next macOS security milestone should be specified as a separate phase before
-implementation: a fixed, code-signed, distinct-principal helper boundary with a
-pinned code requirement and value-free audit-token evidence. A same-user helper,
-App Sandbox, Hardened Runtime, or a different signing identity alone must not be
-treated as the required distinct writer.
+There is still no live XPC/Mach service, installed distinct writer, Keychain
+integration, production installer, or real Bitwarden/OneCLI credential handoff
+on macOS. The next macOS milestone should be a read-only native preflight that
+can report fixed value-free booleans only; it must precede any lifecycle or
+denial-session mutation.

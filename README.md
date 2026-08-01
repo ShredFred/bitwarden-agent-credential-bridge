@@ -132,6 +132,7 @@ npm run test:phase5h7
 npm run test:phase5h8
 npm run test:phase5h9
 npm run test:phase5h10
+npm run test:phase5h18
 node src/run-demo.js
 ```
 
@@ -266,6 +267,7 @@ docs/phase5h11-native-pipe-denial.md native local pipe/token denial probe
 docs/phase5h12-explicit-pipe-dacl.md fixed protected native pipe DACL proof
 docs/phase5h13-server-identity-verifier.md pre-request SCM/PID/token verifier
 docs/phase5h17-linux-systemd-boundary-plan.md pure fixed systemd system-service contract
+docs/phase5h18-macos-launchd-boundary-plan.md pure fixed launchd system-helper contract
 test/*.test.js                      functional + exposure tests
 AGENTS.md                           experiment rules for agents
 ```
@@ -339,6 +341,12 @@ AGENTS.md                           experiment rules for agents
   root-owned nonwritable artifacts, a filesystem AF_UNIX endpoint, and explicit
   sandbox requirements. It performs no host inspection, elevation, account/unit
   creation, socket I/O, or mutation and remains ineligible for installation.
+- Phase 5h.18 fixes the future macOS writer to the launchd system domain, a
+  static hidden non-login helper account, a fixed Mach service, and pinned
+  binary/designated-requirement digests. It also requires the accepted XPC peer
+  audit token to match the authorizing caller. It performs no host inspection,
+  signing, launchd/XPC I/O, elevation, account/daemon creation, Keychain access,
+  or mutation and remains ineligible for installation.
 - No browser/website automation, query, cookie, form, process-env,
   SSH, database, RDP, or desktop credential injection.
 - Not a substitute for vault, OS keychain, or production broker hardening.

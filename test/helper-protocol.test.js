@@ -157,6 +157,22 @@ describe('separate-identity helper protocol', () => {
     }
   });
 
+  it('rejects proxy-backed peer evidence before reading authorization booleans', () => {
+    const { bytes } = built();
+    let reads = 0;
+    const proxy = new Proxy({ ...peerEvidence }, {
+      get(target, property, receiver) {
+        reads += 1;
+        return Reflect.get(target, property, receiver);
+      },
+    });
+    assert.throws(
+      () => authorizeHelperRequest(bytes, expected({ peerEvidence: proxy })),
+      (error) => error instanceof HelperProtocolError && error.code === 'invalid_request',
+    );
+    assert.equal(reads, 0);
+  });
+
   it('encodes only fixed value-free response fields and enforces code consistency', () => {
     const bytes = encodeHelperResponse({
       requestId,

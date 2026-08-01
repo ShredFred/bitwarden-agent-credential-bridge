@@ -18,6 +18,7 @@ function evidence(overrides = {}) {
     mach_service_bound: true,
     xpc_peer_connection_verified: true,
     peer_audit_token_verified: true,
+    peer_audit_token_matches_caller_audit_token: true,
     peer_pid_verified: true,
     peer_pidversion_verified: true,
     helper_pid_verified: true,
@@ -120,12 +121,14 @@ describe('macOS helper peer-evidence evaluator', () => {
   it('fails every transport and identity proof closed independently', () => {
     for (const field of [
       'mach_service_bound', 'xpc_peer_connection_verified', 'peer_audit_token_verified',
+      'peer_audit_token_matches_caller_audit_token',
       'peer_pid_verified', 'peer_pidversion_verified', 'helper_pid_verified', 'helper_pidversion_verified',
     ]) {
       assert.equal(evaluateMacosHelperPeerEvidence(evidence({ [field]: false })).local_transport, false);
     }
     for (const field of [
       'caller_audit_token_verified', 'helper_audit_token_verified', 'caller_euid_verified',
+      'peer_audit_token_matches_caller_audit_token',
       'helper_euid_verified', 'audit_token_euid_matches_caller_euid',
       'audit_token_euid_matches_helper_euid',
       'helper_code_identity_verified', 'helper_code_requirement_satisfied',
@@ -134,6 +137,10 @@ describe('macOS helper peer-evidence evaluator', () => {
       assert.equal(result.identity_verified, false);
       assert.equal(result.different_principal, false);
     }
+    assert.equal(evaluateMacosHelperPeerEvidence(evidence({
+      peer_audit_token_verified: false,
+      peer_audit_token_matches_caller_audit_token: true,
+    })).identity_verified, false);
   });
 
   it('requires complete symlink-safe access checks for both write claims', () => {
@@ -205,6 +212,19 @@ describe('macOS helper peer-evidence evaluator', () => {
   it('makes protocol authorization reject an unbound Mach-service transport', () => {
     const fixture = protocolFixture();
     const peerEvidence = evaluateMacosHelperPeerEvidence(evidence({ mach_service_bound: false }));
+    assert.throws(
+      () => authorizeHelperRequest(fixture.request.bytes, authorizationContext(fixture, peerEvidence)),
+      (error) => error instanceof HelperProtocolError && error.code === 'peer_identity_unverified',
+    );
+  });
+
+  it('rejects a verified XPC peer that is not bound to the authorizing caller', () => {
+    const fixture = protocolFixture();
+    const peerEvidence = evaluateMacosHelperPeerEvidence(evidence({
+      peer_audit_token_matches_caller_audit_token: false,
+    }));
+    assert.equal(peerEvidence.local_transport, false);
+    assert.equal(peerEvidence.identity_verified, false);
     assert.throws(
       () => authorizeHelperRequest(fixture.request.bytes, authorizationContext(fixture, peerEvidence)),
       (error) => error instanceof HelperProtocolError && error.code === 'peer_identity_unverified',

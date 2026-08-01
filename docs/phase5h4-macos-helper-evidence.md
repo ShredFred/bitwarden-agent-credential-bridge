@@ -29,10 +29,12 @@ digests differ.
 ## Required native evidence
 
 A future collector must bind a fixed Mach service, obtain the peer audit token
-from the accepted XPC connection, and bind peer and helper PID plus pidversion
-to prevent PID-reuse substitution. It must independently verify the caller and
-helper audit tokens, effective UIDs, and the helper's designated code
-requirement.
+from the accepted XPC connection, and prove that token is exactly the
+authorizing caller audit token. A mismatch makes both transport and identity
+false. It must bind peer and helper PID plus pidversion to prevent PID-reuse
+substitution, independently verify caller and helper audit tokens and effective
+UIDs, and verify the helper's designated code requirement against the digest
+pinned by the branded Phase 5h.18 boundary plan.
 
 The write claims require symlink-safe effective-access checks for every target
 already bound by the confirmed manifest. Partial checks make both claims false.

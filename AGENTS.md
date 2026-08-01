@@ -258,7 +258,9 @@ mutation, manifest execution, real-root access, or Bitwarden connection.
 Phase 5h.4 may add only a pure macOS peer-evidence evaluator over trusted,
 injected XPC and audit-token collector facts. It must require a bound Mach
 service, verified XPC peer and caller/helper process generations, verified
-audit tokens and effective UIDs, a pinned helper code requirement, unequal
+audit tokens and effective UIDs, an exact match between the accepted XPC peer
+audit token and the independently verified authorizing caller audit token, a
+pinned helper code requirement, unequal
 effective-UID digests, and complete symlink-safe effective-access checks over
 every bound target.
 
@@ -583,3 +585,28 @@ creation, elevation, file/ACL mutation, socket I/O, helper launch, manifest
 execution, network/vault access, or Bitwarden connection is permitted. Those
 require later Linux-specific preflight, lifecycle, trusted-collector, and explicit
 operator-approval phases.
+
+## Phase 5h.18 scope
+
+Phase 5h.18 may add only a pure macOS boundary plan for the launchd system
+domain and tighten the existing pure macOS evidence contract. It fixes one
+LaunchDaemon label, Mach service, and static hidden passwordless non-login helper
+account with a stable effective UID distinct from the caller. LaunchAgents,
+GUI-domain services, same-EUID helpers, App Sandbox, Hardened Runtime, signing
+identity differences, and audit-session differences must not establish a
+distinct writer.
+
+The plan must bind the reviewed binary digest/length and the digest of one
+reviewed designated code requirement. Future trusted collectors must reverify
+the installed binary, code requirement, daemon definition, loaded identity,
+complete parent chains, XPC peer/helper PID and pidversion, and symlink-safe
+effective access over every manifest target. The accepted XPC peer audit token
+must match the independently verified authorizing caller audit token; unrelated
+peer and caller facts must fail both transport and identity closed. Ordinary
+user-home targets are forbidden for the production writer boundary.
+
+The plan is value-free, non-executable, and in-process branded. It must always
+report mutation unauthorized, live test not executed, and install gate
+ineligible. No host inspection, signing, launchd/XPC/Security-framework I/O,
+account or daemon creation, elevation, filesystem/ACL mutation, Keychain/vault
+access, network access, Bitwarden pairing, or credential use is permitted.

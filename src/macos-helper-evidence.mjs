@@ -7,6 +7,7 @@ const EVIDENCE_FIELDS = new Set([
   'mach_service_bound',
   'xpc_peer_connection_verified',
   'peer_audit_token_verified',
+  'peer_audit_token_matches_caller_audit_token',
   'peer_pid_verified',
   'peer_pidversion_verified',
   'helper_pid_verified',
@@ -64,7 +65,9 @@ export function evaluateMacosHelperPeerEvidence(raw) {
     Buffer.from(facts.caller_euid_sha256, 'hex'),
     Buffer.from(facts.helper_euid_sha256, 'hex'),
   );
-  const identityVerified = facts.caller_audit_token_verified && facts.helper_audit_token_verified &&
+  const identityVerified = facts.peer_audit_token_verified &&
+    facts.caller_audit_token_verified && facts.helper_audit_token_verified &&
+    facts.peer_audit_token_matches_caller_audit_token &&
     facts.caller_euid_verified && facts.helper_euid_verified &&
     facts.audit_token_euid_matches_caller_euid && facts.audit_token_euid_matches_helper_euid &&
     facts.helper_code_identity_verified &&
@@ -74,7 +77,8 @@ export function evaluateMacosHelperPeerEvidence(raw) {
 
   return Object.freeze({
     local_transport: facts.mach_service_bound && facts.xpc_peer_connection_verified &&
-      facts.peer_audit_token_verified && facts.peer_pid_verified && facts.peer_pidversion_verified &&
+      facts.peer_audit_token_verified && facts.peer_audit_token_matches_caller_audit_token &&
+      facts.peer_pid_verified && facts.peer_pidversion_verified &&
       facts.helper_pid_verified && facts.helper_pidversion_verified,
     identity_verified: identityVerified,
     different_principal: identityVerified && !sameEuid,
