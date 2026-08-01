@@ -437,6 +437,10 @@ AGENTS.md                           experiment rules for agents
   process snapshots preserve EUID, start time, and exact helper path. Private
   Mach tests prove valid denial and reject a wrong PID without using the fixed
   production service.
+- Phase 5h.36 adds the non-activating Mach-name presence collector. It streams a
+  bounded `launchctl print system`, matches only the exact endpoint-entry line,
+  rejects path/name substrings, and shares the hardened executable validator.
+  The live read-only result on this Mac is fixed-name absent.
 - No browser/website automation, query, cookie, form, process-env,
   SSH, database, RDP, or desktop credential injection.
 - Not a substitute for vault, OS keychain, or production broker hardening.

@@ -40,4 +40,6 @@ typedef bw_command_result (*bw_fixed_command_runner)(
     size_t maximum_output_bytes,
     bw_command_output *output);
 
+bool bw_fixed_executable_is_secure(const char *absolute_executable);
+
 #endif

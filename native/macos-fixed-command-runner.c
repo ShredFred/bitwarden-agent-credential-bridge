@@ -58,7 +58,7 @@ static bool acceptable_executable_stat(const struct stat *value) {
       (value->st_mode & (S_IXUSR | S_IXGRP | S_IXOTH)) != 0;
 }
 
-static bool regular_root_owned_executable(const char *path) {
+bool bw_fixed_executable_is_secure(const char *path) {
   struct stat path_value;
   struct stat fd_value;
   if (lstat(path, &path_value) != 0 || S_ISLNK(path_value.st_mode) ||
@@ -130,7 +130,7 @@ bw_command_result bw_run_fixed_command(
   memset(output, 0, sizeof(*output));
   output->exit_code = -1;
   if (!valid_invocation(absolute_executable, argv) ||
-      !regular_root_owned_executable(absolute_executable) || timeout_milliseconds < 1 ||
+      !bw_fixed_executable_is_secure(absolute_executable) || timeout_milliseconds < 1 ||
       timeout_milliseconds > 60000 || maximum_output_bytes < 1 ||
       maximum_output_bytes > BW_COMMAND_OUTPUT_CAPACITY) return BW_COMMAND_INVALID;
 

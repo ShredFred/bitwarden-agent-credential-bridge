@@ -53,6 +53,7 @@
     "test:phase5h33": "node --test test/macos-launchctl-job-adapter.test.js",
     "test:phase5h34": "node --test test/macos-lifecycle-controller.test.js test/macos-native-lifecycle-wiring.test.js",
     "test:phase5h35": "node --test test/macos-launchctl-job-adapter.test.js test/macos-mach-service-probes.test.js",
+    "test:phase5h36": "node --test test/macos-launchctl-mach-presence.test.js",
     "test:phase2": "node --test test/onecli-audit.test.js test/onecli-artifacts.test.js test/onecli-preflight.test.js",
     "test:phase3": "node --test test/supply-chain-audit.test.js test/phase3-artifacts.test.js",
     "preflight:onecli": "node scripts/preflight-onecli.mjs",

@@ -1036,3 +1036,24 @@ context, fixed service/identity, distinct current/helper EUIDs, and the exact
 account record. This phase still performs no production service lookup, account
 or launchd mutation, system write, elevation, credential, Keychain, vault, or
 network access.
+
+## Phase 5h.36 scope
+
+Phase 5h.36 may add the production non-activating Mach-name presence callback.
+It must execute only fixed `/bin/launchctl print system` with the hardened
+absolute-executable, fixed-environment, closed-FD, process-group, timeout, and
+kill/reap rules. It must stream and validate at most 8 MiB rather than buffer an
+unbounded domain snapshot; any stderr, invalid byte, long line, truncation,
+nonzero exit, timeout, or missing final newline is a probe error.
+
+Presence requires the exact trimmed launchctl endpoint-entry line
+`"de.frederikstadler.bitwarden-agent-credential-bridge.helper" = {`. Bare name
+occurrences in paths, labels, prefixes, or suffixes must not match. The collector
+must not call bootstrap lookup/check-in because those APIs can activate a
+demand-only service. A fixed probe bundle may combine this callback with the
+Phase 5h.35 denial callback for native lifecycle wiring.
+
+Tests may parse synthetic snapshots and perform the real read-only system-domain
+print, whose expected current result is fixed-name absence. They must not invoke
+bootstrap, kickstart, kill, bootout, Mach lookup, account or system mutation,
+elevation, credentials, Keychain, vault, or network access.
