@@ -821,3 +821,27 @@ load a daemon, sign with a private identity, access credentials/Keychain/vault/
 network, or persist build/package bytes. Ad-hoc signing is only a local reviewed-
 artifact mechanism, not distribution trust. Mutation, collector trust, live
 verification, authorization, and installation eligibility remain false.
+
+## Phase 5h.26 scope
+
+Phase 5h.26 may add only a no-input, ordinary-user, read-only lifecycle dry-run
+collector. It must first build and reverify the branded Phase 5h.25 package,
+then evaluate all seven Phase 5h.22 pre-mutation checks through fixed bounded
+argument-array tooling. The child schema contains booleans only and must never
+emit selected UIDs/GeneratedUIDs, paths, labels, account names, commands, native
+errors, tool output, or package bytes.
+
+Label absence must use the fixed system-domain service target. Mach-service
+absence must use a bounded non-activating system-domain snapshot; a label miss
+alone is insufficient, and Mach lookup APIs that can demand-activate a service
+are forbidden. Directory chains must be symlink-free, root-owned, not group or
+world writable, and caller-nonwritable. Every collision, output drift, timeout,
+truncation, incoherent result, or unsupported platform fails closed.
+
+The probe may use only read-only OpenDirectory searches, lstat/access checks,
+and launchctl print. It must not elevate, create/delete accounts, write under
+`/Library`, bootstrap/bootout/kickstart, perform Mach IPC, access credentials,
+Keychain, vault, network, or return approval. Completion is point-in-time,
+structural, and untrusted; all mutation, live, authorization, collector-trust,
+and install flags remain false. A future executor must repeat the checks just
+before mutation and still requires explicit current operator approval.
