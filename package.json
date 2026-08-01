@@ -42,6 +42,7 @@
     "test:phase5h22": "node --test test/macos-launchd-boundary-plan.test.js test/macos-launchd-lifecycle-gate.test.js",
     "test:phase5h23": "node --test test/macos-launchd-boundary-plan.test.js test/macos-launchd-lifecycle-gate.test.js test/macos-launchd-lifecycle-evidence.test.js",
     "test:phase5h24": "node --test test/macos-launchd-boundary-plan.test.js test/macos-native-launchd-helper.test.js",
+    "test:phase5h25": "node --test test/macos-launchd-boundary-rules.test.js test/macos-code-snapshot-verifier.test.js test/macos-launchd-lifecycle-gate.test.js test/macos-launchd-lifecycle-package.test.js",
     "test:phase2": "node --test test/onecli-audit.test.js test/onecli-artifacts.test.js test/onecli-preflight.test.js",
     "test:phase3": "node --test test/supply-chain-audit.test.js test/phase3-artifacts.test.js",
     "preflight:onecli": "node scripts/preflight-onecli.mjs",

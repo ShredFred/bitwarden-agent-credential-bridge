@@ -788,3 +788,30 @@ distinct-EUID, loaded-code, collector-trust, authorization, or installation
 evidence. Every such flag remains false. The first real lifecycle still requires
 a separately reviewed collector and explicit current operator approval naming
 the exact disposable system test.
+
+## Phase 5h.25 scope
+
+Phase 5h.25 may build only an in-memory, branded, non-installing lifecycle
+package from the fixed Phase 5h.24 source and exact fixed LaunchDaemon plist. It
+accepts no caller input. The builder must read one stable no-follow source
+snapshot, publish identical exclusive read-only source/plist snapshots into two
+private canonical-temp roots, compile with fixed Apple tooling, explicitly
+ad-hoc sign with the fixed identifier and Hardened Runtime, verify the signature,
+parse only the exact standard or Apple ad-hoc designated-requirement record,
+reverify the read binary bytes through the Phase 5h.20 FD-content snapshot path,
+require same-host byte/requirement reproducibility, validate the plist with
+`plutil` plus the pure fixed rules, run only the fixed self-test and ambient
+service rejection, then perform exact cleanup.
+
+The resulting real binary SHA-256/length, designated-requirement SHA-256, and
+plist SHA-256 must feed a branded Phase 5h.18 plan and Phase 5h.22 gate. Artifact
+bytes remain in a private WeakMap and may be retrieved only as fresh copies from
+the branded package; bytes are data and never approval or mutation authority.
+Clones, spreads, and forged packages must be rejected.
+
+This phase must not elevate, create/delete an account, write under `/Library`,
+invoke launchctl/OpenDirectory, contact the production Mach service, install or
+load a daemon, sign with a private identity, access credentials/Keychain/vault/
+network, or persist build/package bytes. Ad-hoc signing is only a local reviewed-
+artifact mechanism, not distribution trust. Mutation, collector trust, live
+verification, authorization, and installation eligibility remain false.

@@ -277,6 +277,7 @@ docs/phase5h21-macos-mach-denial-session.md real same-EUID Mach audit-trailer de
 docs/phase5h22-macos-launchd-lifecycle-gate.md pure distinct-EUID lifecycle gate
 docs/phase5h23-macos-launchd-lifecycle-evidence.md value-free lifecycle transcript grammar
 docs/phase5h24-native-macos-launchd-helper.md compiled denial-only launchd helper scaffold
+docs/phase5h25-signed-macos-lifecycle-package.md real signed helper/plist bindings, non-installing
 test/*.test.js                      functional + exposure tests
 AGENTS.md                           experiment rules for agents
 ```
@@ -388,6 +389,11 @@ AGENTS.md                           experiment rules for agents
   only one bounded audit-trailer nonce probe, and can only reply denied. Its
   runner performs two source-snapshot-bound private-temp builds, fixed self-test,
   ambient no-arg rejection, and exact cleanup; nothing is installed or trusted.
+- Phase 5h.25 produces the real local signed helper/plist package entirely in
+  private temporary roots. It verifies same-host reproducibility, exact ad-hoc
+  designated requirement, FD-content code identity, plist rules, and binds the
+  resulting digests into branded plans/gates while keeping all mutation and
+  authorization flags false.
 - No browser/website automation, query, cookie, form, process-env,
   SSH, database, RDP, or desktop credential injection.
 - Not a substitute for vault, OS keychain, or production broker hardening.

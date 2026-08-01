@@ -39,7 +39,8 @@ export function evaluateMacosLaunchdPlist(value) {
 export function digestDesignatedRequirementStdout(stdout) {
   if (typeof stdout !== 'string' || stdout.includes('\0') ||
       Buffer.byteLength(stdout, 'utf8') > MAX_REQUIREMENT_BYTES ||
-      !/^designated => [^\r\n]+\n$/.test(stdout)) return null;
+      !(/^designated => [^\r\n]+\n$/.test(stdout) ||
+        /^# designated => cdhash H"[0-9a-f]{40}"\n$/.test(stdout))) return null;
   return createHash('sha256').update(Buffer.from(stdout, 'utf8')).digest('hex');
 }
 

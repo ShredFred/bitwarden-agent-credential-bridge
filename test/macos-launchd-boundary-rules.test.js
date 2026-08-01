@@ -55,9 +55,17 @@ describe('macOS launchd boundary pure rules', () => {
       digestDesignatedRequirementStdout(record),
       createHash('sha256').update(Buffer.from(record, 'utf8')).digest('hex'),
     );
+    const adHocRecord = '# designated => cdhash H"0123456789abcdef0123456789abcdef01234567"\n';
+    assert.equal(
+      digestDesignatedRequirementStdout(adHocRecord),
+      createHash('sha256').update(Buffer.from(adHocRecord, 'utf8')).digest('hex'),
+    );
     for (const invalid of [
       record.trimEnd(), `${record}\n`, `Executable=/private/path\n${record}`,
-      'designated => one\ndesignated => two\n', 'designated => bad\0value\n', '', null,
+      'designated => one\ndesignated => two\n', 'designated => bad\0value\n',
+      '# designated => identifier "not-adhoc"\n',
+      '# designated => cdhash H"0123456789abcdef"\n',
+      '# designated => cdhash H"0123456789ABCDEF0123456789ABCDEF01234567"\n', '', null,
     ]) assert.equal(digestDesignatedRequirementStdout(invalid), null);
   });
 });

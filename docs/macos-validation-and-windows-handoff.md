@@ -38,6 +38,7 @@ npm run test:phase5h21
 npm run test:phase5h22
 npm run test:phase5h23
 npm run test:phase5h24
+npm run test:phase5h25
 npm run start:demo
 npm run preflight:bootstrap
 npm run preflight:onecli
@@ -126,6 +127,13 @@ one exact bounded audit-trailer request and can only send a denial. The live Mac
 test runs only the fixed self-test and proves ambient no-argument execution is
 silently rejected. It does not install, elevate, touch `/Library`, or contact the
 production service.
+
+Phase 5h.25 turns that source into an exact in-memory lifecycle package: two
+same-host reproducible Hardened-Runtime ad-hoc signed builds, strict Apple
+designated-requirement parsing, FD-content code snapshot verification, and one
+fixed linted demand-only plist. The real binary/plist/requirement bindings now
+feed branded Phase 5h.18 and 5h.22 objects. All artifacts are removed from disk;
+the package is still non-installing and non-authorizing.
 
 There is still no live production Mach service, installed distinct writer, Keychain
 integration, production installer, or real Bitwarden/OneCLI credential handoff
