@@ -171,3 +171,13 @@ there is no safe cold-start sudo target in a user-writable path under the stated
 same-user threat model. Windows Cursor must not reinterpret the packaged
 provisioner bytes as installation authorization, and must keep all Windows live
 service tests non-elevated/disposable until their separate gate is approved.
+
+Phase 5h.42 adds the non-installing bootstrap artifact for that trust anchor.
+`pkgbuild` receives only the exact branded provisioner in a private destination
+root. The result is expanded and checked against a pinned PackageInfo,
+`pkgutil --payload-files` manifest, root:wheel BOM modes, bounded AppleDouble
+metadata, exact extracted tree, and byte-equal executable. It contains no
+installer scripts and exposes no lifecycle-package authority. Signature,
+notarization, installation, authorization, and live verification remain false.
+See `docs/phase5h42-macos-provisioner-bootstrap-package.md` and run
+`npm run test:phase5h42`; Windows should skip Apple package execution only.
