@@ -2,6 +2,7 @@
 
 #include "macos-fixed-command-runner.h"
 
+#include <CommonCrypto/CommonDigest.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <libproc.h>
@@ -22,6 +23,13 @@
 #define OUTPUT_CAPACITY 4096
 #define CHILD_TIMEOUT_MS 130000
 #define RUNNER_STOP_TIMEOUT_MS 5000
+
+#if !defined(BW_SUDO_LAUNCHER_TESTING)
+#if !defined(BW_LAUNCHER_BINDING_HEADER)
+#error "BW_LAUNCHER_BINDING_HEADER must name the generated runner-package binding header"
+#endif
+#include BW_LAUNCHER_BINDING_HEADER
+#endif
 
 static const char SUCCESS_OUTPUT[] =
     "{\"schema_version\":1,\"mutation_complete\":true,\"denial_verified\":true,"
@@ -71,6 +79,53 @@ static void *answer_approval(void *raw) {
       context->socket_fd, context->approved, &context->runner_pid);
   return NULL;
 }
+
+#if !defined(BW_SUDO_LAUNCHER_TESTING)
+static bool same_file(const struct stat *left, const struct stat *right) {
+  return left->st_dev == right->st_dev && left->st_ino == right->st_ino &&
+      left->st_size == right->st_size && left->st_mode == right->st_mode &&
+      left->st_uid == right->st_uid && left->st_gid == right->st_gid &&
+      left->st_mtimespec.tv_sec == right->st_mtimespec.tv_sec &&
+      left->st_mtimespec.tv_nsec == right->st_mtimespec.tv_nsec &&
+      left->st_ctimespec.tv_sec == right->st_ctimespec.tv_sec &&
+      left->st_ctimespec.tv_nsec == right->st_ctimespec.tv_nsec;
+}
+
+static bool runner_matches_package(void) {
+  struct stat path_before;
+  struct stat fd_before;
+  struct stat fd_after;
+  struct stat path_after;
+  if (lstat(RUNNER_PATH, &path_before) != 0 || S_ISLNK(path_before.st_mode)) return false;
+  int fd = open(RUNNER_PATH, O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
+  if (fd < 0 || fstat(fd, &fd_before) != 0 || !same_file(&path_before, &fd_before) ||
+      fd_before.st_size < 1 || fd_before.st_size > (off_t)(8U * 1024U * 1024U)) {
+    if (fd >= 0) (void)close(fd);
+    return false;
+  }
+  CC_SHA256_CTX digest;
+  unsigned char actual[CC_SHA256_DIGEST_LENGTH];
+  unsigned char chunk[16384];
+  bool valid = CC_SHA256_Init(&digest) == 1;
+  while (valid) {
+    ssize_t count = read(fd, chunk, sizeof(chunk));
+    if (count > 0) valid = CC_SHA256_Update(&digest, chunk, (CC_LONG)count) == 1;
+    else if (count == 0) break;
+    else if (errno != EINTR) valid = false;
+  }
+  valid = valid && CC_SHA256_Final(actual, &digest) == 1 &&
+      fstat(fd, &fd_after) == 0 && lstat(RUNNER_PATH, &path_after) == 0 &&
+      same_file(&fd_before, &fd_after) && same_file(&fd_after, &path_after) &&
+      memcmp(actual, BW_LAUNCHER_RUNNER_SHA256, sizeof(actual)) == 0;
+  memset(&digest, 0, sizeof(digest));
+  memset(actual, 0, sizeof(actual));
+  memset(chunk, 0, sizeof(chunk));
+  (void)close(fd);
+  return valid;
+}
+#else
+static bool runner_matches_package(void) { return true; }
+#endif
 
 #if !defined(BW_SUDO_LAUNCHER_TESTING)
 static bool exact_runner_process(pid_t pid, struct proc_bsdinfo *snapshot) {
@@ -179,7 +234,7 @@ static bw_sudo_lifecycle_result launch(
   if (approved == NULL || executable == NULL || arguments == NULL) return result;
   if (production && (!controlling_tty_available() ||
       !bw_fixed_executable_is_secure(SUDO_PATH) ||
-      !bw_fixed_executable_is_secure(RUNNER_PATH))) return result;
+      !bw_fixed_executable_is_secure(RUNNER_PATH) || !runner_matches_package())) return result;
 
   int approval[2] = {-1, -1};
   int output[2] = {-1, -1};
@@ -253,13 +308,22 @@ done:
   return result;
 }
 
-bw_sudo_lifecycle_result bw_run_fixed_sudo_lifecycle(
-    const bw_lifecycle_approval_bindings *approved) {
+bw_sudo_lifecycle_result bw_run_fixed_sudo_lifecycle(void) {
+#if defined(BW_SUDO_LAUNCHER_TESTING)
+  return (bw_sudo_lifecycle_result){0};
+#else
+  bw_lifecycle_approval_bindings approved;
+  memcpy(approved.binary_sha256, BW_LAUNCHER_HELPER_SHA256, BW_APPROVAL_DIGEST_BYTES);
+  memcpy(approved.plist_sha256, BW_LAUNCHER_PLIST_SHA256, BW_APPROVAL_DIGEST_BYTES);
+  memcpy(approved.requirement_sha256, BW_LAUNCHER_REQUIREMENT_SHA256, BW_APPROVAL_DIGEST_BYTES);
   char *const arguments[] = {
     (char *)SUDO_PATH, "-k", "--", (char *)RUNNER_PATH,
     "--approved-denial-lifecycle", NULL,
   };
-  return launch(SUDO_PATH, arguments, true, approved);
+  bw_sudo_lifecycle_result result = launch(SUDO_PATH, arguments, true, &approved);
+  memset(&approved, 0, sizeof(approved));
+  return result;
+#endif
 }
 
 #if defined(BW_SUDO_LAUNCHER_TESTING)

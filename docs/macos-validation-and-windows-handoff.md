@@ -141,3 +141,17 @@ on macOS. The next macOS milestone must be an explicitly approved disposable
 native LaunchDaemon lifecycle collector/driver that binds the fixed system service, distinct helper EUID,
 connected helper audit trailer, loaded launchd identity, and plan-pinned code
 requirement. It must still deny and must not execute a manifest or access credentials.
+
+Phase 5h.40 adds the non-live bridge to that future approved run. The reproducible
+package now contains both the signed denial runner and a signed fixed launcher;
+the launcher embeds the exact helper, plist, helper-requirement, and runner
+digests and rehashes the fixed root-owned runner before invoking sudo. A separate
+root-side primitive exclusively publishes the runner through a retained parent
+descriptor, executes only through its retained `/dev/fd` identity, and performs
+identity-bound cleanup. Collision and replacement fixtures are preserved and
+reported for manual recovery. See `docs/phase5h40-macos-runner-provisioning.md`.
+
+Windows Cursor should run `npm run test:phase5h40` as a portability slice. The
+native macOS fixtures will skip where appropriate, while all source-contract
+checks must pass. This phase performed no sudo invocation or `/Library` mutation;
+those remain an explicit operator-approved live gate.

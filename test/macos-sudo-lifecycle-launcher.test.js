@@ -54,7 +54,9 @@ describe('fixed macOS sudo lifecycle launcher', () => {
         path.join(NATIVE, 'macos-sudo-lifecycle-launcher-self-test.c'), '-o', binary,
       ], { timeout: 15000, maxBuffer: 4096, encoding: 'utf8', env: TOOL_ENV });
       await execFileAsync('/usr/bin/clang', [
-        '-std=c17', '-D_DARWIN_C_SOURCE', '-Wall', '-Wextra', '-Werror', '-O2', '-c',
+        '-std=c17', '-D_DARWIN_C_SOURCE',
+        `-DBW_LAUNCHER_BINDING_HEADER=\"${path.join(ROOT, 'test', 'fixtures', 'macos-launcher-bindings.h')}\"`,
+        '-Wall', '-Wextra', '-Werror', '-O2', '-c',
         path.join(NATIVE, 'macos-sudo-lifecycle-launcher.c'),
         '-o', path.join(root, 'production-launcher.o'),
       ], { timeout: 15000, maxBuffer: 4096, encoding: 'utf8', env: TOOL_ENV });

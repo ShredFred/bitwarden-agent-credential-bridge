@@ -17,8 +17,7 @@ typedef struct {
  * Run only the fixed root-owned lifecycle runner through /usr/bin/sudo -k.
  * There is no executable, argv, environment, command, or output configuration.
  */
-bw_sudo_lifecycle_result bw_run_fixed_sudo_lifecycle(
-    const bw_lifecycle_approval_bindings *approved);
+bw_sudo_lifecycle_result bw_run_fixed_sudo_lifecycle(void);
 
 #if defined(BW_SUDO_LAUNCHER_TESTING)
 bw_sudo_lifecycle_result bw_run_sudo_lifecycle_fixture(

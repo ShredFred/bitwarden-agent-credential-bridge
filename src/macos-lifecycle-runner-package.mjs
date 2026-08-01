@@ -18,20 +18,27 @@ const execFileAsync = promisify(execFile);
 const NATIVE = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'native');
 const PREFIX = 'bw-agent-runner-package-';
 const HEADER = 'reviewed-artifacts.h';
+const LAUNCHER_HEADER = 'reviewed-launcher-bindings.h';
 const RUNNER = 'lifecycle-runner';
+const LAUNCHER = 'lifecycle-launcher';
 const RUNNER_IDENTIFIER = 'de.frederikstadler.bitwarden-agent-credential-bridge.lifecycle-runner';
+const LAUNCHER_IDENTIFIER = 'de.frederikstadler.bitwarden-agent-credential-bridge.lifecycle-launcher';
 const MAX_SOURCE_BYTES = 512 * 1024;
 const MAX_RUNNER_BYTES = 8 * 1024 * 1024;
 const TOOL_ENV = Object.freeze({
   PATH: '/usr/bin:/bin:/usr/sbin:/sbin', LANG: 'C', LC_ALL: 'C',
 });
-const C_SOURCES = Object.freeze([
+const RUNNER_C_SOURCES = Object.freeze([
   'macos-fixed-command-runner.c', 'macos-retained-file-ops.c', 'macos-account-ownership.c',
   'macos-launchd-job-ownership.c', 'macos-dscl-directory-adapter.c',
   'macos-launchctl-job-adapter.c', 'macos-lifecycle-controller.c',
   'macos-lifecycle-approval.c', 'macos-native-lifecycle-wiring.c',
   'macos-launchctl-mach-presence.c', 'macos-mach-service-probes.c',
   'macos-fixed-system-probes.c', 'macos-lifecycle-runner.c',
+]);
+const LAUNCHER_C_SOURCES = Object.freeze([
+  'macos-fixed-command-runner.c', 'macos-lifecycle-approval.c',
+  'macos-sudo-lifecycle-launcher.c', 'macos-sudo-lifecycle-launcher-main.c',
 ]);
 const HEADERS = Object.freeze([
   'macos-fixed-command-runner.h', 'macos-retained-file-ops.h', 'macos-account-ownership.h',
@@ -40,8 +47,9 @@ const HEADERS = Object.freeze([
   'macos-lifecycle-approval.h', 'macos-native-lifecycle-wiring.h',
   'macos-launchctl-mach-presence.h', 'macos-mach-service-probes.h',
   'macos-fixed-system-probes.h',
+  'macos-sudo-lifecycle-launcher.h',
 ]);
-const SNAPSHOT_NAMES = Object.freeze([...C_SOURCES, ...HEADERS]);
+const SNAPSHOT_NAMES = Object.freeze([...new Set([...RUNNER_C_SOURCES, ...LAUNCHER_C_SOURCES, ...HEADERS])]);
 const VALID_PACKAGES = new WeakSet();
 const PACKAGE_BYTES = new WeakMap();
 
@@ -81,25 +89,46 @@ export async function buildMacosLifecycleRunnerPackage() {
   }
   const builds = [];
   try {
-    builds.push(await buildOne(tempBase, snapshots, generatedHeader));
-    builds.push(await buildOne(tempBase, snapshots, generatedHeader));
+    builds.push(await buildOne(tempBase, snapshots, generatedHeader,
+      lifecyclePackage.artifact_bindings));
+    builds.push(await buildOne(tempBase, snapshots, generatedHeader,
+      lifecyclePackage.artifact_bindings));
     if (!safeEqual(builds[0].bytes, builds[1].bytes) ||
-        builds[0].requirement !== builds[1].requirement) {
+        builds[0].requirement !== builds[1].requirement ||
+        !safeEqual(builds[0].launcherBytes, builds[1].launcherBytes) ||
+        builds[0].launcherRequirement !== builds[1].launcherRequirement) {
       throw new MacosLifecycleRunnerPackageError('non_reproducible_runner');
     }
     const runnerSha256 = sha256(builds[0].bytes);
     const runnerRequirementSha256 = digestDesignatedRequirementStdout(builds[0].requirement);
+    const launcherSha256 = sha256(builds[0].launcherBytes);
+    const launcherRequirementSha256 =
+      digestDesignatedRequirementStdout(builds[0].launcherRequirement);
     if (runnerRequirementSha256 === null ||
         !await verifyMacosCodeSnapshot(builds[0].bytes, runnerRequirementSha256)) {
       throw new MacosLifecycleRunnerPackageError('runner_code_snapshot_failed');
     }
+    if (launcherRequirementSha256 === null ||
+        !await verifyMacosCodeSnapshot(builds[0].launcherBytes, launcherRequirementSha256)) {
+      throw new MacosLifecycleRunnerPackageError('launcher_code_snapshot_failed');
+    }
     const binding = lifecyclePackage.artifact_bindings;
     const requirementBytes = Buffer.from(binding.designated_requirement_sha256, 'hex');
     const embeddedFailure = await embeddedSectionFailure(builds[0].path, builds[0].bytes, {
-      helper: artifacts.binary, plist: artifacts.plist, requirement: requirementBytes,
+      __bwhelper: artifacts.binary, __bwplist: artifacts.plist, __bwreq: requirementBytes,
     });
     if (embeddedFailure !== null) {
       throw new MacosLifecycleRunnerPackageError(`embedded_section_${embeddedFailure}`);
+    }
+    const launcherEmbeddedFailure = await embeddedSectionFailure(
+      builds[0].launcherPath, builds[0].launcherBytes, {
+        __bwlhsh: Buffer.from(binding.binary_sha256, 'hex'),
+        __bwlpsh: Buffer.from(binding.plist_sha256, 'hex'),
+        __bwlreq: requirementBytes,
+        __bwlrun: Buffer.from(runnerSha256, 'hex'),
+      });
+    if (launcherEmbeddedFailure !== null) {
+      throw new MacosLifecycleRunnerPackageError(`launcher_binding_section_${launcherEmbeddedFailure}`);
     }
     if (!containsBytes(builds[0].bytes, Buffer.from(binding.binary_sha256, 'ascii')) ||
         !containsBytes(builds[0].bytes, Buffer.from(binding.plist_sha256, 'ascii')) ||
@@ -114,13 +143,21 @@ export async function buildMacosLifecycleRunnerPackage() {
         byte_length: builds[0].bytes.length,
         designated_requirement_sha256: runnerRequirementSha256,
       },
+      launcher_bindings: {
+        sha256: launcherSha256,
+        byte_length: builds[0].launcherBytes.length,
+        designated_requirement_sha256: launcherRequirementSha256,
+      },
       lifecycle_bindings: lifecyclePackage.artifact_bindings,
       lifecycle_package: lifecyclePackage,
       source_snapshot_bound: false,
       stable_source_files_verified: true,
       embedded_artifacts_verified: true,
       same_host_reproducible_runner_verified: true,
+      same_host_reproducible_launcher_verified: true,
       runner_code_snapshot_verified: true,
+      launcher_code_snapshot_verified: true,
+      launcher_lifecycle_bindings_embedded: true,
       ambient_execution_rejected: true,
       private_temp_cleanup_required: true,
       mutation_authorized: false,
@@ -130,6 +167,7 @@ export async function buildMacosLifecycleRunnerPackage() {
     VALID_PACKAGES.add(value);
     PACKAGE_BYTES.set(value, {
       runner: Buffer.from(builds[0].bytes),
+      launcher: Buffer.from(builds[0].launcherBytes),
       helper: Buffer.from(artifacts.binary),
       plist: Buffer.from(artifacts.plist),
     });
@@ -159,7 +197,8 @@ export function copyMacosLifecycleRunnerPackageArtifacts(value) {
   const bytes = PACKAGE_BYTES.get(value);
   if (bytes === undefined) throw new MacosLifecycleRunnerPackageError('invalid_package');
   return Object.freeze({
-    runner: Buffer.from(bytes.runner), helper: Buffer.from(bytes.helper), plist: Buffer.from(bytes.plist),
+    launcher: Buffer.from(bytes.launcher), runner: Buffer.from(bytes.runner),
+    helper: Buffer.from(bytes.helper), plist: Buffer.from(bytes.plist),
   });
 }
 
@@ -202,7 +241,7 @@ async function readSourceSnapshots() {
   }
 }
 
-async function buildOne(tempBase, snapshots, generatedHeader) {
+async function buildOne(tempBase, snapshots, generatedHeader, lifecycleBindings) {
   let root;
   try { root = await fs.mkdtemp(path.join(tempBase, PREFIX)); } catch {
     throw new MacosLifecycleRunnerPackageError('build_root_create_failed');
@@ -223,7 +262,7 @@ async function buildOne(tempBase, snapshots, generatedHeader) {
     await executeSilent('/usr/bin/clang', [
       '-std=c17', '-Wall', '-Wextra', '-Werror', '-Wno-deprecated-declarations', '-O2',
       '-fno-ident', '-Wl,-no_adhoc_codesign', `-DBW_RUNNER_ARTIFACT_HEADER=\"${HEADER}\"`,
-      '-I', root, ...C_SOURCES.map((name) => path.join(root, name)), '-lbsm', '-o', runnerPath,
+      '-I', root, ...RUNNER_C_SOURCES.map((name) => path.join(root, name)), '-lbsm', '-o', runnerPath,
     ], 30000);
     await executeSilent('/usr/bin/codesign', [
       '--force', '--sign', '-', '--identifier', RUNNER_IDENTIFIER,
@@ -238,7 +277,38 @@ async function buildOne(tempBase, snapshots, generatedHeader) {
     const bytes = await stableOutput(runnerPath);
     await requireAmbientRejection(runnerPath);
     await requireUnelevatedModeRejection(runnerPath);
-    return { root, targets, path: runnerPath, bytes, requirement: requirement.stdout };
+    const launcherHeader = Buffer.from(buildLauncherBindingHeader(
+      lifecycleBindings, sha256(bytes)), 'utf8');
+    const launcherHeaderPath = path.join(root, LAUNCHER_HEADER);
+    await publish(launcherHeaderPath, launcherHeader, 0o400);
+    targets.push(launcherHeaderPath);
+    const launcherPath = path.join(root, LAUNCHER);
+    targets.push(launcherPath);
+    await executeSilent('/usr/bin/clang', [
+      '-std=c17', '-Wall', '-Wextra', '-Werror', '-Wno-deprecated-declarations', '-O2', '-fno-ident',
+      '-Wl,-no_adhoc_codesign', `-DBW_LAUNCHER_BINDING_HEADER=\"${LAUNCHER_HEADER}\"`,
+      '-I', root, ...LAUNCHER_C_SOURCES.map((name) => path.join(root, name)),
+      '-o', launcherPath,
+    ], 30000);
+    await executeSilent('/usr/bin/codesign', [
+      '--force', '--sign', '-', '--identifier', LAUNCHER_IDENTIFIER,
+      '--timestamp=none', '--options', 'runtime', '--', launcherPath,
+    ], 15000);
+    await executeSilent('/usr/bin/codesign', [
+      '--verify', '--strict', '--verbose=0', '--', launcherPath,
+    ], 5000);
+    const launcherRequirement = await execute(
+      '/usr/bin/codesign', ['-d', '-r-', '--', launcherPath], 5000);
+    if (launcherRequirement.stderr !== `Executable=${launcherPath}\n` ||
+        digestDesignatedRequirementStdout(launcherRequirement.stdout) === null) {
+      throw new MacosLifecycleRunnerPackageError('invalid_launcher_requirement_output');
+    }
+    const launcherBytes = await stableOutput(launcherPath);
+    await requireAmbientRejection(launcherPath);
+    return {
+      root, targets, path: runnerPath, bytes, requirement: requirement.stdout,
+      launcherPath, launcherBytes, launcherRequirement: launcherRequirement.stdout,
+    };
   } catch (error) {
     let failed = false;
     for (const target of targets.reverse()) {
@@ -268,6 +338,26 @@ function buildArtifactHeader(helper, plist, bindings) {
     `#define BW_RUNNER_REQUIREMENT_SHA256_HEX "${bindings.designated_requirement_sha256}"\n` +
     `__attribute__((used, section("__DATA_CONST,__bwreq")))\n` +
     `static const unsigned char BW_RUNNER_REQUIREMENT_SHA256[BW_APPROVAL_DIGEST_BYTES] = {${byteList(requirement)}};\n` +
+    `#endif\n`;
+}
+
+function buildLauncherBindingHeader(bindings, runnerSha256) {
+  const helper = Buffer.from(bindings.binary_sha256, 'hex');
+  const plist = Buffer.from(bindings.plist_sha256, 'hex');
+  const requirement = Buffer.from(bindings.designated_requirement_sha256, 'hex');
+  const runner = Buffer.from(runnerSha256, 'hex');
+  if ([helper, plist, requirement, runner].some((value) => value.length !== 32)) {
+    throw new MacosLifecycleRunnerPackageError('invalid_launcher_bindings');
+  }
+  return `#ifndef BW_GENERATED_LAUNCHER_BINDINGS_H\n#define BW_GENERATED_LAUNCHER_BINDINGS_H\n` +
+    `__attribute__((used, section("__DATA_CONST,__bwlhsh")))\n` +
+    `static const unsigned char BW_LAUNCHER_HELPER_SHA256[BW_APPROVAL_DIGEST_BYTES] = {${byteList(helper)}};\n` +
+    `__attribute__((used, section("__DATA_CONST,__bwlpsh")))\n` +
+    `static const unsigned char BW_LAUNCHER_PLIST_SHA256[BW_APPROVAL_DIGEST_BYTES] = {${byteList(plist)}};\n` +
+    `__attribute__((used, section("__DATA_CONST,__bwlreq")))\n` +
+    `static const unsigned char BW_LAUNCHER_REQUIREMENT_SHA256[BW_APPROVAL_DIGEST_BYTES] = {${byteList(requirement)}};\n` +
+    `__attribute__((used, section("__DATA_CONST,__bwlrun")))\n` +
+    `static const unsigned char BW_LAUNCHER_RUNNER_SHA256[BW_APPROVAL_DIGEST_BYTES] = {${byteList(runner)}};\n` +
     `#endif\n`;
 }
 
@@ -380,7 +470,7 @@ async function embeddedSectionFailure(runnerPath, runnerBytes, expected) {
   if (result.stderr !== '') return 'tool_output';
   const sections = parseSections(result.stdout);
   for (const [name, wanted] of Object.entries(expected)) {
-    const section = sections.get(`__bw${name === 'requirement' ? 'req' : name}`);
+    const section = sections.get(name);
     if (section === undefined || !['__DATA', '__DATA_CONST'].includes(section.segment) ||
         section.size !== wanted.length ||
         section.offset < 0 || section.offset + section.size > runnerBytes.length ||
