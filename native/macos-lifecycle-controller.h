@@ -8,6 +8,11 @@
 #include <stdbool.h>
 #include <stddef.h>
 
+typedef bool (*bw_owned_artifact_binder)(
+    void *context,
+    const bw_owned_file *binary,
+    const bw_owned_file *plist);
+
 typedef struct {
   int binary_parent_fd;
   int plist_parent_fd;
@@ -21,6 +26,8 @@ typedef struct {
   bw_account_record account_candidate;
   bw_launchd_ops launchd_ops;
   bw_launchd_job_record job_candidate;
+  bw_owned_artifact_binder bind_owned_artifacts;
+  void *artifact_binding_context;
 } bw_lifecycle_request;
 
 typedef struct {

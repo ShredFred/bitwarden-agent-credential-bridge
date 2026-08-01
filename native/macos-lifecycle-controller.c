@@ -46,7 +46,8 @@ static bool valid_request(const bw_lifecycle_request *request) {
       digest_matches(request->binary_bytes, request->binary_length,
           request->job_candidate.binary_sha256) &&
       digest_matches(request->plist_bytes, request->plist_length,
-          request->job_candidate.plist_sha256);
+          request->job_candidate.plist_sha256) && request->bind_owned_artifacts != NULL &&
+      request->artifact_binding_context != NULL;
 }
 
 static bool file_cleanup(bw_owned_file *owned) {
@@ -95,6 +96,10 @@ bw_lifecycle_report bw_run_lifecycle(const bw_lifecycle_request *request) {
       request->plist_length, 0644, request->file_owner, request->file_group, &plist);
   report.plist_published_and_verified = plist_result == BW_FILE_OK;
   if (!report.plist_published_and_verified) goto cleanup;
+
+  if (!request->bind_owned_artifacts(request->artifact_binding_context, &binary, &plist)) {
+    goto cleanup;
+  }
 
   bw_job_result bootstrap_result = bw_bootstrap_owned_launchd_job(&request->launchd_ops, &job);
   report.job_bootstrapped_and_verified = bootstrap_result == BW_JOB_OK;

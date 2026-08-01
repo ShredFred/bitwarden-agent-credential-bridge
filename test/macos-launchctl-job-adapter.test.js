@@ -55,6 +55,7 @@ describe('native macOS fixed launchctl job adapter', () => {
         clean_lifecycle: true,
         malformed_collision: true,
         duplicate_pid_rejected: true,
+        prebootstrap_drift_blocked: true,
       });
     } finally {
       await fs.rm(root, { recursive: true, force: true });

@@ -22,9 +22,16 @@ typedef struct {
   bool job_bootout_called;
   bw_job_result activation_result;
   bool replace_plist_on_denial;
+  bool binding_fails;
   int plist_parent_fd;
   bw_launchd_job_record job;
 } fake_host;
+
+static bool bind_artifacts(void *raw, const bw_owned_file *binary, const bw_owned_file *plist) {
+  fake_host *host = raw;
+  return host != NULL && !host->binding_fails && binary != NULL && plist != NULL &&
+      binary->created && plist->created;
+}
 
 static bw_directory_probe account_name(void *raw, const char *name) {
   fake_host *host = raw;
@@ -180,6 +187,8 @@ static bw_lifecycle_request request(fake_host *host, int binary_parent, int plis
       .stop_process = process_stop, .bootout = job_bootout,
     },
     .job_candidate = job_candidate(),
+    .bind_owned_artifacts = bind_artifacts,
+    .artifact_binding_context = host,
   };
   host->plist_parent_fd = plist_parent;
   return value;
@@ -244,6 +253,14 @@ int main(int argc, char **argv) {
       activation_ambiguous.job_bootout_called && !activation_ambiguous.account_present &&
       path_absent(binary_parent, binary_name) && path_absent(plist_parent, plist_name);
 
+  fake_host binding_failure = {.activation_result = BW_JOB_OK, .binding_fails = true};
+  bw_lifecycle_request binding_request = request(&binding_failure, binary_parent, plist_parent);
+  bw_lifecycle_report binding_report = bw_run_lifecycle(&binding_request);
+  bool binding_failure_no_job_mutation = binding_report.preflight_complete &&
+      !binding_report.job_bootstrapped_and_verified && !binding_failure.job_bootstrap_called &&
+      binding_report.cleanup_complete && !binding_failure.account_present &&
+      path_absent(binary_parent, binary_name) && path_absent(plist_parent, plist_name);
+
   fake_host replacement = {
     .activation_result = BW_JOB_OK, .replace_plist_on_denial = true,
   };
@@ -260,11 +277,13 @@ int main(int argc, char **argv) {
   bool fixture_cleanup = close(plist_parent) == 0 && close(binary_parent) == 0 && rmdir(root) == 0;
   if (!(clean_complete && collision_no_mutation && account_ambiguity_preserved &&
       ambiguous_create_reported &&
-      ambiguous_activation_cleaned && foreign_plist_preserved && fixture_cleanup)) return 1;
+      ambiguous_activation_cleaned && binding_failure_no_job_mutation &&
+      foreign_plist_preserved && fixture_cleanup)) return 1;
   printf("{\"schema_version\":1,\"clean_complete\":true,"
       "\"collision_no_mutation\":true,\"account_ambiguity_preserved\":true,"
       "\"ambiguous_create_reported\":true,"
-      "\"ambiguous_activation_cleaned\":true,\"foreign_plist_preserved\":true,"
+      "\"ambiguous_activation_cleaned\":true,\"binding_failure_no_job_mutation\":true,"
+      "\"foreign_plist_preserved\":true,"
       "\"fixture_cleanup\":true}\n");
   return 0;
 }

@@ -13,6 +13,7 @@ typedef struct {
   bool malformed_print;
   bool duplicate_pid;
   bool denial;
+  bool artifacts_valid;
   int mutations;
 } fake_launchd;
 
@@ -105,7 +106,8 @@ static bool denial(void *context, const bw_launchd_job_record *identity) {
 static bool artifacts(void *context, const bw_launchd_job_record *identity) {
   fake_launchd *fake = context;
   return fake != NULL && strcmp(identity->program,
-      "/Library/PrivilegedHelperTools/" LABEL) == 0 && identity->demand_activation_only;
+      "/Library/PrivilegedHelperTools/" LABEL) == 0 && identity->demand_activation_only &&
+      fake->artifacts_valid;
 }
 
 static bw_launchd_job_record expected_record(void) {
@@ -123,14 +125,14 @@ static bw_launchd_job_record expected_record(void) {
 int main(int argc, char **argv) {
   if (argc != 2 || strcmp(argv[1], "--self-test") != 0) return 64;
   bw_launchd_job_record expected = expected_record();
-  fake_launchd clean = {.denial = true};
+  fake_launchd clean = {.denial = true, .artifacts_valid = true};
   ACTIVE = &clean;
   bw_launchctl_job_adapter adapter;
   bw_launchd_ops ops;
   bw_owned_launchd_job owned;
   bw_init_owned_launchd_job(&owned);
   bool initialized = bw_init_launchctl_job_ops(
-      &adapter, fake_run, mach_presence, denial, artifacts, &clean, &expected, &ops);
+      &adapter, fake_run, mach_presence, denial, artifacts, &clean, &clean, &expected, &ops);
   bool clean_lifecycle = initialized &&
       bw_prepare_owned_launchd_job(&ops, &expected, &owned) == BW_JOB_OK &&
       bw_bootstrap_owned_launchd_job(&ops, &owned) == BW_JOB_OK &&
@@ -139,25 +141,36 @@ int main(int argc, char **argv) {
       bw_cleanup_owned_launchd_job(&ops, &owned) == BW_JOB_OK &&
       !clean.loaded && !clean.running && clean.mutations == 4;
 
-  fake_launchd foreign = {.loaded = true, .malformed_print = true};
+  fake_launchd foreign = {.loaded = true, .malformed_print = true, .artifacts_valid = true};
   ACTIVE = &foreign;
   bw_init_owned_launchd_job(&owned);
   bool malformed_collision = bw_init_launchctl_job_ops(
-      &adapter, fake_run, mach_presence, denial, artifacts, &foreign, &expected, &ops) &&
+      &adapter, fake_run, mach_presence, denial, artifacts, &foreign, &foreign, &expected, &ops) &&
       bw_prepare_owned_launchd_job(&ops, &expected, &owned) == BW_JOB_ERROR &&
       foreign.mutations == 0;
 
-  fake_launchd duplicate = {.loaded = true, .running = true, .duplicate_pid = true};
+  fake_launchd duplicate = {
+    .loaded = true, .running = true, .duplicate_pid = true, .artifacts_valid = true,
+  };
   ACTIVE = &duplicate;
   bool duplicate_pid_rejected = bw_init_launchctl_job_ops(
-      &adapter, fake_run, mach_presence, denial, artifacts, &duplicate, &expected, &ops) &&
+      &adapter, fake_run, mach_presence, denial, artifacts, &duplicate, &duplicate, &expected, &ops) &&
       !ops.verify_process(ops.context, &expected) && duplicate.mutations == 0;
 
-  bool all = clean_lifecycle && malformed_collision && duplicate_pid_rejected;
+  fake_launchd drift = {0};
+  ACTIVE = &drift;
+  bool prebootstrap_drift_blocked = bw_init_launchctl_job_ops(
+      &adapter, fake_run, mach_presence, denial, artifacts, &drift, &drift, &expected, &ops) &&
+      ops.bootstrap(ops.context, &expected) == BW_JOB_AMBIGUOUS && drift.mutations == 0 &&
+      !drift.loaded;
+
+  bool all = clean_lifecycle && malformed_collision && duplicate_pid_rejected &&
+      prebootstrap_drift_blocked;
   (void)printf(
       "{\"schema_version\":1,\"clean_lifecycle\":%s,\"malformed_collision\":%s,"
-      "\"duplicate_pid_rejected\":%s}\n",
+      "\"duplicate_pid_rejected\":%s,\"prebootstrap_drift_blocked\":%s}\n",
       clean_lifecycle ? "true" : "false", malformed_collision ? "true" : "false",
-      duplicate_pid_rejected ? "true" : "false");
+      duplicate_pid_rejected ? "true" : "false",
+      prebootstrap_drift_blocked ? "true" : "false");
   return all ? 0 : 1;
 }

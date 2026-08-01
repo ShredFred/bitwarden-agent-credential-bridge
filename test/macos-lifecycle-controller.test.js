@@ -71,6 +71,7 @@ describe('native macOS composite lifecycle controller', () => {
         account_ambiguity_preserved: true,
         ambiguous_create_reported: true,
         ambiguous_activation_cleaned: true,
+        binding_failure_no_job_mutation: true,
         foreign_plist_preserved: true,
         fixture_cleanup: true,
       });

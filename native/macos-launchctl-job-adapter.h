@@ -14,6 +14,7 @@ typedef struct {
   bw_mach_denial_probe denial;
   bw_job_artifact_probe artifacts;
   void *probe_context;
+  void *artifact_context;
   bw_launchd_job_record expected;
 } bw_launchctl_job_adapter;
 
@@ -24,6 +25,7 @@ bool bw_init_launchctl_job_ops(
     bw_mach_denial_probe denial,
     bw_job_artifact_probe artifacts,
     void *probe_context,
+    void *artifact_context,
     const bw_launchd_job_record *expected,
     bw_launchd_ops *ops);
 

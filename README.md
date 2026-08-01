@@ -428,6 +428,10 @@ AGENTS.md                           experiment rules for agents
   parsing, digest/policy revalidation, and separate mandatory Mach presence and
   denial probes. Mutation tests remain fake-only; a read-only Apple-job print
   confirms the current host output grammar without touching the bridge job.
+- Phase 5h.34 wires the native adapters into the controller and binds every job
+  mutation to retained binary/plist identities. Production wiring accepts only
+  the exact two `/Library` parent directories; a compile-time-only test
+  constructor exercises clean and replacement-fault lifecycles in private temp.
 - No browser/website automation, query, cookie, form, process-env,
   SSH, database, RDP, or desktop credential injection.
 - Not a substitute for vault, OS keychain, or production broker hardening.

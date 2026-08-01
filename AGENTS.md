@@ -989,3 +989,25 @@ lifecycle plus malformed identity rejection. A real read-only print of an
 unrelated Apple job may validate output grammar, but this phase must not load,
 start, signal, or remove the bridge job; perform Mach IPC; elevate; access
 credentials; or grant live approval.
+
+## Phase 5h.34 scope
+
+Phase 5h.34 may wire the fixed dscl and launchctl adapters into the composite
+controller and bind the controller's run-owned binary/plist retained descriptors
+to every launchd identity check. Both files must publish and verify before a
+one-shot binder succeeds; bootstrap must not run after binder failure. Bootstrap,
+activation, loaded-job reads, stop, and bootout must each reverify the retained
+file identities, bytes, ownership, modes, and expected job tuple as applicable.
+
+Production initialization must prove the retained parent descriptors resolve
+exactly to `/Library/PrivilegedHelperTools` and `/Library/LaunchDaemons`, and
+repeat that proof during artifact checks so launchctl's fixed plist path cannot
+diverge from the verified file. Temporary-path end-to-end tests may use only the
+compile-time `BW_NATIVE_WIRING_TESTING` constructor, which must not exist in a
+normal build. Artifact byte buffers must remain immutable for the complete run.
+
+Tests must prove a clean fake-system lifecycle, binder-failure cleanup with no
+job mutation, production rejection of temp parents, pre-bootstrap artifact-drift
+blocking, and foreign plist preservation after denial-time replacement. This
+phase exposes no executable CLI or approval bypass and performs no real dscl,
+launchctl mutation, system write, Mach IPC, elevation, or credential access.

@@ -171,7 +171,7 @@ static bool print_job(
   char *args[] = {LAUNCHCTL, "print", SERVICE_TARGET, NULL};
   bw_command_output output;
   return adapter->artifacts != NULL &&
-      adapter->artifacts(adapter->probe_context, expected) &&
+      adapter->artifacts(adapter->artifact_context, expected) &&
       run_launchctl(adapter, args, &output) == BW_COMMAND_OK &&
       parsed_loaded_job(&output, expected, require_running);
 }
@@ -203,6 +203,8 @@ static bw_launchd_probe probe_mach_service(void *context, const char *name) {
 static bw_job_result bootstrap(void *context, const bw_launchd_job_record *record) {
   bw_launchctl_job_adapter *adapter = context;
   if (adapter == NULL || !same_record(record, &adapter->expected)) return BW_JOB_ERROR;
+  if (adapter->artifacts == NULL ||
+      !adapter->artifacts(adapter->artifact_context, record)) return BW_JOB_AMBIGUOUS;
   char *args[] = {LAUNCHCTL, "bootstrap", "system", PLIST_PATH, NULL};
   bw_command_output output;
   if (run_launchctl(adapter, args, &output) != BW_COMMAND_OK || !clean_exit(&output, 0) ||
@@ -221,6 +223,8 @@ static bool read_job(void *context, const char *label, bw_launchd_job_record *re
 static bw_job_result activate(void *context, const bw_launchd_job_record *record) {
   bw_launchctl_job_adapter *adapter = context;
   if (adapter == NULL || !same_record(record, &adapter->expected)) return BW_JOB_ERROR;
+  if (adapter->artifacts == NULL ||
+      !adapter->artifacts(adapter->artifact_context, record)) return BW_JOB_AMBIGUOUS;
   char *args[] = {LAUNCHCTL, "kickstart", SERVICE_TARGET, NULL};
   bw_command_output output;
   if (run_launchctl(adapter, args, &output) != BW_COMMAND_OK || !clean_exit(&output, 0) ||
@@ -269,14 +273,15 @@ bool bw_init_launchctl_job_ops(
     bw_mach_denial_probe denial,
     bw_job_artifact_probe artifacts,
     void *probe_context,
+    void *artifact_context,
     const bw_launchd_job_record *expected,
     bw_launchd_ops *ops) {
   if (adapter == NULL || runner == NULL || mach_presence == NULL || denial == NULL ||
-      artifacts == NULL ||
+      artifacts == NULL || artifact_context == NULL ||
       !exact_record(expected) || ops == NULL) return false;
   *adapter = (bw_launchctl_job_adapter){
     .run = runner, .mach_presence = mach_presence, .denial = denial, .artifacts = artifacts,
-    .probe_context = probe_context, .expected = *expected,
+    .probe_context = probe_context, .artifact_context = artifact_context, .expected = *expected,
   };
   *ops = (bw_launchd_ops){
     .context = adapter, .probe_label = probe_label, .probe_mach_service = probe_mach_service,
