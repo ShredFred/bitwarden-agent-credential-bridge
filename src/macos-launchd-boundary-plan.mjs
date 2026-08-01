@@ -25,6 +25,7 @@ export function buildMacosLaunchdBoundaryPlan(input) {
     throw new MacosLaunchdBoundaryPlanError('unsupported_runtime_profile');
   }
   if (!isDigest(value.binarySha256) || !isDigest(value.designatedRequirementSha256) ||
+      !isDigest(value.plistSha256) ||
       !Number.isSafeInteger(value.binaryByteLength) || value.binaryByteLength < 1 ||
       value.binaryByteLength > MAX_BINARY_BYTES) {
     throw new MacosLaunchdBoundaryPlanError('invalid_binary_binding');
@@ -69,6 +70,7 @@ export function buildMacosLaunchdBoundaryPlan(input) {
     },
     daemon: {
       plist_label: SERVICE_LABEL,
+      sha256: value.plistSha256,
       system_domain_required: true,
       root_owned_required: true,
       caller_write_denied_required: true,
@@ -127,7 +129,8 @@ export function isMacosLaunchdBoundaryPlan(value) {
 
 function exactInput(value) {
   const fields = new Set([
-    'platform', 'serviceManager', 'binarySha256', 'binaryByteLength', 'designatedRequirementSha256',
+    'platform', 'serviceManager', 'binarySha256', 'binaryByteLength',
+    'designatedRequirementSha256', 'plistSha256',
   ]);
   if (value === null || typeof value !== 'object' || Array.isArray(value) ||
       utilTypes.isProxy(value) || Object.getPrototypeOf(value) !== Object.prototype) {

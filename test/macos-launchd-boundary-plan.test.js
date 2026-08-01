@@ -13,6 +13,7 @@ function valid(overrides = {}) {
     binarySha256: 'a'.repeat(64),
     binaryByteLength: 4096,
     designatedRequirementSha256: 'b'.repeat(64),
+    plistSha256: 'c'.repeat(64),
     ...overrides,
   };
 }
@@ -49,10 +50,12 @@ describe('macOS launchd distinct-writer boundary plan', () => {
       binarySha256: 'c'.repeat(64),
       binaryByteLength: 64 * 1024 * 1024,
       designatedRequirementSha256: 'd'.repeat(64),
+      plistSha256: 'e'.repeat(64),
     }));
     assert.equal(plan.binary.sha256, 'c'.repeat(64));
     assert.equal(plan.binary.byte_length, 64 * 1024 * 1024);
     assert.equal(plan.binary.designated_requirement_sha256, 'd'.repeat(64));
+    assert.equal(plan.daemon.sha256, 'e'.repeat(64));
     assert.equal(plan.binary.installed_code_requirement_reverified_required, true);
   });
 
@@ -63,6 +66,7 @@ describe('macOS launchd distinct-writer boundary plan', () => {
       valid({ serviceManager: 'launchd-gui' }),
       valid({ binarySha256: 'A'.repeat(64) }),
       valid({ designatedRequirementSha256: 'b'.repeat(63) }),
+      valid({ plistSha256: 'C'.repeat(64) }),
       valid({ binaryByteLength: 0 }),
       valid({ binaryByteLength: 64 * 1024 * 1024 + 1 }),
     ]) {

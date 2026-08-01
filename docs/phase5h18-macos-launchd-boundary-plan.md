@@ -13,9 +13,9 @@ caller. A LaunchAgent, GUI-domain helper, same-EUID process, App Sandbox,
 Hardened Runtime, or a different signing identity alone cannot satisfy the
 distinct-principal requirement.
 
-The reviewed helper is bound by exact binary SHA-256, byte length, and the
-SHA-256 of its reviewed designated code requirement. The future installed
-binary, code requirement, daemon definition, parent chains, loaded daemon
+The reviewed helper is bound by exact binary SHA-256, byte length, the SHA-256
+of its reviewed designated code requirement, and the exact LaunchDaemon plist
+SHA-256. The future installed binary, code requirement, daemon definition, parent chains, loaded daemon
 identity, and target access must all be reverified by trusted native collectors.
 
 ## XPC caller binding

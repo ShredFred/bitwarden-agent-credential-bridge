@@ -32,6 +32,7 @@ From the repository root:
 node --version
 npm test
 npm run test:phase5h18
+npm run test:phase5h19
 npm run start:demo
 npm run preflight:bootstrap
 npm run preflight:onecli
@@ -83,8 +84,16 @@ defines the fixed system-domain launchd/Mach-service, distinct-EUID, binary, and
 designated-code-requirement contract, and Phase 5h.4 explicitly binds the XPC
 peer audit token to the authorizing caller. Both remain pure and non-executable.
 
+Phase 5h.19 now runs that read-only native preflight and returns the canonical
+all-false absent snapshot on an uninstalled Mac. It compares any future fixed
+helper's binary and designated requirement to the branded plan internally while
+returning booleans only and remaining non-authorizing. Because Apple's path-based
+codesign interface cannot prove it inspected the already-open binary descriptor,
+the path-snapshot comparison is separate and the verified-requirement plus full
+snapshot bits remain structurally false pending an fd-/Mach-O-bound reader.
+
 There is still no live XPC/Mach service, installed distinct writer, Keychain
 integration, production installer, or real Bitwarden/OneCLI credential handoff
-on macOS. The next macOS milestone should be a read-only native preflight that
-can report fixed value-free booleans only; it must precede any lifecycle or
-denial-session mutation.
+on macOS. The next macOS milestone must remain non-mutating: a denial-only XPC
+session design that binds the live peer/helper audit tokens, PID generations,
+loaded launchd identity, and plan-pinned code requirement before any request.

@@ -133,6 +133,7 @@ npm run test:phase5h8
 npm run test:phase5h9
 npm run test:phase5h10
 npm run test:phase5h18
+npm run test:phase5h19
 node src/run-demo.js
 ```
 
@@ -268,6 +269,7 @@ docs/phase5h12-explicit-pipe-dacl.md fixed protected native pipe DACL proof
 docs/phase5h13-server-identity-verifier.md pre-request SCM/PID/token verifier
 docs/phase5h17-linux-systemd-boundary-plan.md pure fixed systemd system-service contract
 docs/phase5h18-macos-launchd-boundary-plan.md pure fixed launchd system-helper contract
+docs/phase5h19-macos-launchd-boundary-preflight.md read-only fixed macOS host inspection
 test/*.test.js                      functional + exposure tests
 AGENTS.md                           experiment rules for agents
 ```
@@ -347,6 +349,13 @@ AGENTS.md                           experiment rules for agents
   audit token to match the authorizing caller. It performs no host inspection,
   signing, launchd/XPC I/O, elevation, account/daemon creation, Keychain access,
   or mutation and remains ineligible for installation.
+- Phase 5h.19 performs a real read-only inspection of the fixed macOS helper
+  artifacts, account, binary digest, and designated code requirement while
+  returning booleans only. The current expected result is the canonical absent
+  snapshot. Path-based codesign comparison is reported separately while the
+  verified requirement and aggregate snapshot are forced false until a future
+  fd-bound native reader exists. The result is non-authorizing and ineligible
+  for installation or XPC use.
 - No browser/website automation, query, cookie, form, process-env,
   SSH, database, RDP, or desktop credential injection.
 - Not a substitute for vault, OS keychain, or production broker hardening.

@@ -610,3 +610,37 @@ report mutation unauthorized, live test not executed, and install gate
 ineligible. No host inspection, signing, launchd/XPC/Security-framework I/O,
 account or daemon creation, elevation, filesystem/ACL mutation, Keychain/vault
 access, network access, Bitwarden pairing, or credential use is permitted.
+
+## Phase 5h.19 scope
+
+Phase 5h.19 may add only a read-only macOS host preflight for the fixed branded
+Phase 5h.18 launchd system-helper plan. The public API accepts no caller-selected
+path, label, account, command, tool, environment, timeout, or collector facts.
+Only the plan-bound binary digest/length, designated-code-requirement digest,
+and exact LaunchDaemon plist digest
+may cross into a repo-owned probe whose service label, Mach service, static
+account, LaunchDaemon plist, helper binary, and absolute tool paths are fixed.
+
+The probe may use local `lstat`, `open(O_NOFOLLOW)`, file hashing, `plutil`,
+`dscl`, and `codesign --verify`/`codesign -d -r-` against those fixed artifacts.
+It must bound time/output, use a minimal environment, open the plist and binary
+with required `O_NOFOLLOW`, bind plist parsing to the inherited read-only handle,
+reject extended ACLs conservatively, verify complete plist and binary chains
+without following symlinks, compare the exact designated-
+requirement stdout bytes to the pinned digest internally, and suppress all raw
+paths, UIDs, account/plist/signing data, tool output, and native errors.
+
+Reports contain an exact boolean-only schema. The parent recomputes aggregate
+state, rejects impossible partial claims, and always requires
+`authorization_ready=false`. Because path-based `codesign` cannot bind its
+measurement to the already-open binary descriptor, this phase may report a
+separate path-snapshot match but must force `designated_requirement_verified=false`
+and therefore `snapshot_matches_plan=false`; a later fd-/Mach-O-bound native
+reader is required to lift that gate. An absent fixed plist returns the canonical all-
+false report without running other tools. Individual matching evidence remains
+advisory and must not become Phase 5h.4 XPC authorization evidence.
+
+No launchd/account/signing mutation, installation, elevation, chmod/chown,
+filesystem write, XPC/Security-framework operation, Keychain/vault access,
+network access, Bitwarden pairing, OneCLI deployment, manifest execution, or
+credential use is permitted.
