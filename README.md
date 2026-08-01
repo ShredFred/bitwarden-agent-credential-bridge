@@ -275,6 +275,7 @@ docs/phase5h19-macos-launchd-boundary-preflight.md read-only fixed macOS host in
 docs/phase5h20-macos-code-snapshot-verification.md fd-content-bound Apple code verification
 docs/phase5h21-macos-mach-denial-session.md real same-EUID Mach audit-trailer denial
 docs/phase5h22-macos-launchd-lifecycle-gate.md pure distinct-EUID lifecycle gate
+docs/phase5h23-macos-launchd-lifecycle-evidence.md value-free lifecycle transcript grammar
 test/*.test.js                      functional + exposure tests
 AGENTS.md                           experiment rules for agents
 ```
@@ -376,6 +377,11 @@ AGENTS.md                           experiment rules for agents
   and designated-requirement values; encodes collision-safe soft ownership and
   ordered cleanup; accepts no approval or host-selected values; performs no
   mutation; and keeps installation and authorization ineligible.
+- Phase 5h.23 validates only the structure of a future value-free lifecycle
+  transcript. It derives soft account/job and retained-FD file ownership,
+  distinguishes proven no-effect from ambiguous mutation failures, enforces
+  ownership-consistent cleanup and final absence, and still returns no trusted,
+  live, authorizing, or installation-eligible evidence.
 - No browser/website automation, query, cookie, form, process-env,
   SSH, database, RDP, or desktop credential injection.
 - Not a substitute for vault, OS keychain, or production broker hardening.

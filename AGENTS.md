@@ -732,3 +732,31 @@ failures while preserving manual-recovery evidence. This phase performs no
 host inspection, elevation, account/file/job mutation, Mach I/O, Keychain/vault
 access, credential operation, or live test, and must keep every authorization
 and installation eligibility claim false.
+
+## Phase 5h.23 scope
+
+Phase 5h.23 may add only a pure value-free transcript state machine over the
+branded in-process Phase 5h.22 gate. The input is limited to an exact bounded
+plain-object transcript containing a fixed terminal outcome and ordered events
+with only fixed step/status strings. It must reject proxies, accessors, custom
+prototypes, holes, extras, invented or reordered steps, forged gates, and any
+status that is invalid for its step.
+
+State-changing account, file-create, bootstrap, and demand-activation steps
+must distinguish a verified effect, a proven no-effect failure, and an
+effect-ambiguous failure. The evaluator must derive account, binary, plist,
+launchd-job, and process ownership from prior events rather than accept caller-
+asserted ownership. Account and job identity-verification failure is ambiguous,
+not owned. Retained-descriptor file creation success remains run-owned. An
+ambiguous account or job must use `skipped_ownership_ambiguous`, never a
+destructive cleanup status; a final read-only aggregate absence proof may resolve
+the debris question without retroactively authorizing destruction.
+
+Every mutation failure must carry the full ordered cleanup transcript, cleanup
+must continue after individual failure, and the final aggregate absence event
+must be last. Returned facts are structural claims only and must never include
+events, values, paths, account/UID/GUID/audit-token data, commands, errors, or
+native output. Collector trust, live verification, authorization readiness, and
+installation eligibility remain false. This phase performs no collection,
+elevation, launchd/OpenDirectory/file/Mach mutation, credential access, or live
+test.

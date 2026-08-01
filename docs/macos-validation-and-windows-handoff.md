@@ -36,6 +36,7 @@ npm run test:phase5h19
 npm run test:phase5h20
 npm run test:phase5h21
 npm run test:phase5h22
+npm run test:phase5h23
 npm run start:demo
 npm run preflight:bootstrap
 npm run preflight:onecli
@@ -110,9 +111,16 @@ launchd cleanup use deliberately softer run-create/bootstrap identity evidence.
 Collisions and ambiguous outcomes are never adopted or deleted. The gate accepts
 no approval and performs no host mutation or live test.
 
+Phase 5h.23 adds the strict value-free grammar for that future collector. It
+derives ownership from the ordered transcript, distinguishes failed mutations
+that provably made no change from ambiguous outcomes, forbids destructive
+cleanup of ambiguous account/job identities, and requires the aggregate
+read-only absence check last. Even a complete synthetic denial transcript is
+explicitly untrusted and cannot authorize installation or credential work.
+
 There is still no live production Mach service, installed distinct writer, Keychain
 integration, production installer, or real Bitwarden/OneCLI credential handoff
 on macOS. The next macOS milestone must be an explicitly approved disposable
-LaunchDaemon lifecycle collector that binds the fixed system service, distinct helper EUID,
+native LaunchDaemon lifecycle collector that binds the fixed system service, distinct helper EUID,
 connected helper audit trailer, loaded launchd identity, and plan-pinned code
 requirement. It must still deny and must not execute a manifest or access credentials.
