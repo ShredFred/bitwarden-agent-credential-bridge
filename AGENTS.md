@@ -967,3 +967,25 @@ invoke delete. The outer account ownership state machine still performs its own
 fresh verification and post-delete three-namespace absence proof. Tests use an
 in-process fake command runner only; they must not invoke real dscl, create an
 account, elevate, touch system paths, access credentials, or grant approval.
+
+## Phase 5h.33 scope
+
+Phase 5h.33 may add the fixed native launchctl job adapter over the Phase 5h.31
+runner. Commands are limited to the exact system-domain helper target and fixed
+plist: print, bootstrap, kickstart, SIGTERM kill, and bootout. Successful
+mutations require exit zero and completely silent output; every other outcome
+is ambiguous unless a future macOS-version-pinned rule proves no effect.
+
+Loaded-job parsing must require exactly one canonical header, program, and user
+line. Running-process evidence additionally requires exactly one running-state
+line and one bounded PID line. Duplicate or conflicting keys fail closed. Every
+loaded-job read and pre-stop/pre-bootout check must also pass an injected
+artifact/policy verifier bound to the expected binary/plist digests. Mach-name
+presence and denial evidence remain separate mandatory injected probes; the
+adapter must not infer them from weak launchctl text.
+
+Tests use only fake command and probe callbacks and must prove the full owned-job
+lifecycle plus malformed identity rejection. A real read-only print of an
+unrelated Apple job may validate output grammar, but this phase must not load,
+start, signal, or remove the bridge job; perform Mach IPC; elevate; access
+credentials; or grant live approval.

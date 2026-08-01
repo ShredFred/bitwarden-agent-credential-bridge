@@ -424,6 +424,10 @@ AGENTS.md                           experiment rules for agents
   It strictly parses directory results, treats partial creation as ambiguous,
   and rebinds the full live identity immediately before deletion. Its tests use
   only a fake runner and do not modify the host directory service.
+- Phase 5h.33 adds fixed system-domain `launchctl` operations with unique-key
+  parsing, digest/policy revalidation, and separate mandatory Mach presence and
+  denial probes. Mutation tests remain fake-only; a read-only Apple-job print
+  confirms the current host output grammar without touching the bridge job.
 - No browser/website automation, query, cookie, form, process-env,
   SSH, database, RDP, or desktop credential injection.
 - Not a substitute for vault, OS keychain, or production broker hardening.
