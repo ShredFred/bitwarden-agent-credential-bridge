@@ -864,3 +864,27 @@ refusal, foreign-file preservation, and exact fixture cleanup.
 This component must contain no system paths, account or launchd operations,
 elevation, network, credential, Keychain/vault, manifest execution, approval,
 or install surface. It is reusable implementation work, not live evidence.
+
+## Phase 5h.28 scope
+
+Phase 5h.28 may add only the native account soft-ownership state machine and a
+fake directory adapter. Preparation must prove the candidate short name,
+UniqueID, and GeneratedUID absent and snapshot the exact full record. Create
+success remains provisional until immediate re-read verifies name, UniqueID,
+GeneratedUID, non-login shell, and `/var/empty` home.
+
+The ownership object must require explicit initialization. Preparation must
+refuse to overwrite prepared, created, or ambiguous state; create must re-probe
+all three namespaces after the full-record read; and successful delete must
+clear preparation so any later create requires a fresh absence proof.
+
+Deletion is eligible only for this run's created and fully verified identity,
+after a fresh full-tuple re-read. The deletion adapter must receive the complete
+identity rather than a bare name. Any collision, probe error, create ambiguity,
+or identity drift must prevent deletion. Successful deletion must be followed
+by absence checks for all three namespaces.
+
+Tests must cover clean lifecycle, preexisting collision, post-create drift, and
+pre-delete identity replacement with proof that delete was never invoked for a
+foreign identity. This phase must not invoke OpenDirectory/dscl, mutate a real
+account, elevate, touch launchd or system paths, or access credentials.

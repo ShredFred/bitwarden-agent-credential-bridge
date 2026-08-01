@@ -280,6 +280,7 @@ docs/phase5h24-native-macos-launchd-helper.md compiled denial-only launchd helpe
 docs/phase5h25-signed-macos-lifecycle-package.md real signed helper/plist bindings, non-installing
 docs/phase5h26-macos-lifecycle-read-only-dry-run.md no-input read-only lifecycle preflight
 docs/phase5h27-macos-retained-file-ownership.md native retained-FD publication/cleanup core
+docs/phase5h28-macos-account-soft-ownership.md native full-tuple account ownership core
 test/*.test.js                      functional + exposure tests
 AGENTS.md                           experiment rules for agents
 ```
@@ -404,6 +405,9 @@ AGENTS.md                           experiment rules for agents
 - Phase 5h.27 implements and fixture-tests the native retained-FD ownership core
   needed for system binary/plist publication and cleanup. Exclusive collisions
   are preserved, and a replaced path is never adopted or deleted.
+- Phase 5h.28 implements and fault-tests full-tuple macOS account ownership.
+  Name, UniqueID, GeneratedUID, shell, and home must survive immediate and
+  pre-delete re-verification; identity drift can never authorize deletion.
 - No browser/website automation, query, cookie, form, process-env,
   SSH, database, RDP, or desktop credential injection.
 - Not a substitute for vault, OS keychain, or production broker hardening.
