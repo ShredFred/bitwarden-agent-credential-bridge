@@ -19,15 +19,14 @@ describe('fixed macOS sudo lifecycle launcher', () => {
     const header = await fs.readFile(path.join(NATIVE, 'macos-sudo-lifecycle-launcher.h'), 'utf8');
     assert.match(source, /#define SUDO_PATH "\/usr\/bin\/sudo"/);
     assert.match(source, /#define RUNNER_PATH "\/Library\/PrivilegedHelperTools\//);
-    assert.match(source, /\(char \*\)SUDO_PATH, "-k", "--", \(char \*\)RUNNER_PATH/);
+    assert.match(source, /\(char \*\)SUDO_PATH, "-k", "--", \(char \*\)PROVISIONER_PATH/);
     assert.match(source, /POSIX_SPAWN_CLOEXEC_DEFAULT \| POSIX_SPAWN_SETPGROUP/);
     assert.match(source, /bw_fixed_executable_is_secure\(SUDO_PATH\)/);
-    assert.match(source, /bw_fixed_executable_is_secure\(RUNNER_PATH\)/);
+    assert.match(source, /bw_fixed_executable_is_secure\(PROVISIONER_PATH\)/);
     assert.match(source, /controlling_tty_available\(\)/);
     assert.match(source, /pthread_create/);
     assert.match(source, /pthread_join/);
-    assert.match(source, /exact_runner_process/);
-    assert.match(source, /stop_exact_runner\(approval_context\.runner_pid\)/);
+    assert.match(source, /runner_collision_detected/);
     assert.match(source, /#define CHILD_TIMEOUT_MS 130000/);
     assert.match(source, /bw_answer_lifecycle_approval_challenge/);
     assert.match(source, /kill\(-child, SIGKILL\)/);
@@ -71,6 +70,7 @@ describe('fixed macOS sudo lifecycle launcher', () => {
         child_exited_cleanly: true,
         denial_verified: true,
         cleanup_complete: true,
+        branch_selection_verified: true,
       });
       const fixture = await fs.readFile(
         path.join(NATIVE, 'macos-sudo-lifecycle-launcher-self-test.c'), 'utf8');

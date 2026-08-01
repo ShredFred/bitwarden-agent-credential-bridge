@@ -1,4 +1,5 @@
 #include "macos-lifecycle-approval.h"
+#include "macos-elevation-identity.h"
 
 #include <errno.h>
 #include <fcntl.h>
@@ -18,7 +19,6 @@
 
 #define RECEIPT_MAGIC UINT64_C(0x4257415050523031)
 #define RECEIPT_VERSION 1U
-#define SUDO_PATH "/usr/bin/sudo"
 #define RECEIPT_IO_TIMEOUT_MS 5000
 #define CHALLENGE_WAIT_TIMEOUT_MS 120000
 #define NONCE_CACHE_CAPACITY 64
@@ -98,25 +98,6 @@ static bool connected_unix_socket(int fd, uid_t expected_peer) {
       getpeereid(fd, &peer_uid, &peer_gid) == 0 &&
       peer_uid == expected_peer;
 }
-
-#if !defined(BW_LIFECYCLE_APPROVAL_TESTING)
-static bool stable_sudo_parent(void) {
-  pid_t parent = getppid();
-  struct proc_bsdinfo before;
-  struct proc_bsdinfo after;
-  char path[PROC_PIDPATHINFO_MAXSIZE];
-  memset(&before, 0, sizeof(before));
-  memset(&after, 0, sizeof(after));
-  memset(path, 0, sizeof(path));
-  int first = proc_pidinfo(parent, PROC_PIDTBSDINFO, 0, &before, sizeof(before));
-  int path_length = proc_pidpath(parent, path, sizeof(path));
-  int second = proc_pidinfo(parent, PROC_PIDTBSDINFO, 0, &after, sizeof(after));
-  return parent > 1 && first == (int)sizeof(before) && second == (int)sizeof(after) &&
-      path_length == (int)strlen(SUDO_PATH) && memcmp(path, SUDO_PATH, strlen(SUDO_PATH)) == 0 &&
-      before.pbi_uid == 0 && before.pbi_start_tvsec == after.pbi_start_tvsec &&
-      before.pbi_start_tvusec == after.pbi_start_tvusec && before.pbi_pid == after.pbi_pid;
-}
-#endif
 
 static bool wait_readable(int fd, uint64_t deadline_ns) {
   for (;;) {
@@ -217,7 +198,7 @@ bool bw_receive_and_consume_lifecycle_approval(
     const bw_lifecycle_approval_bindings *expected) {
   if (expected == NULL) return false;
 #if !defined(BW_LIFECYCLE_APPROVAL_TESTING)
-  if (getuid() == 0 || geteuid() != 0 || !stable_sudo_parent()) return false;
+  if (getuid() == 0 || geteuid() != 0 || !bw_stable_sudo_or_provisioner_parent()) return false;
 #endif
   uid_t real_uid = getuid();
   if (!connected_unix_socket(connected_socket_fd, real_uid)) return false;
@@ -245,7 +226,7 @@ bool bw_receive_and_consume_lifecycle_approval(
       !nonce_nonzero(receipt.nonce) || !equal_bindings(&receipt.bindings, expected) ||
       !remember_nonce_once(receipt.nonce)
 #if !defined(BW_LIFECYCLE_APPROVAL_TESTING)
-      || !stable_sudo_parent()
+      || !bw_stable_sudo_or_provisioner_parent()
 #endif
       ) return false;
   memset(&challenge, 0, sizeof(challenge));

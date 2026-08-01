@@ -19,8 +19,8 @@ describe('native macOS lifecycle approval boundary', () => {
     const header = await fs.readFile(path.join(NATIVE, 'macos-lifecycle-approval.h'), 'utf8');
     const wiring = await fs.readFile(path.join(NATIVE, 'macos-native-lifecycle-wiring.c'), 'utf8');
     assert.match(source, /getuid\(\) == 0 \|\| geteuid\(\) != 0/);
-    assert.match(source, /stable_sudo_parent\(\)/);
-    assert.match(source, /strcmp|memcmp/);
+    assert.match(source, /bw_stable_sudo_or_provisioner_parent\(\)/);
+    assert.match(source, /equal_bytes/);
     assert.match(source, /getpeereid/);
     assert.match(source, /receipt\.runner_pid != getpid\(\)/);
     assert.match(source, /BW_APPROVAL_MAX_LIFETIME_SECONDS/);

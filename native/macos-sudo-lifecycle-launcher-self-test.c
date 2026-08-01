@@ -29,12 +29,19 @@ int main(int argc, char **argv) {
   bw_set_lifecycle_approval_nonce_for_test(0xC1);
   bw_sudo_lifecycle_result result = bw_run_sudo_lifecycle_fixture(self, &bindings);
   bool all = result.child_started && result.challenge_answered && result.child_exited_cleanly &&
-      result.denial_verified && result.cleanup_complete;
+      result.child_reported_denial && result.child_reported_cleanup &&
+      bw_lifecycle_launcher_branch_fixture(true, true, true) == 1 &&
+      bw_lifecycle_launcher_branch_fixture(false, true, true) == 2 &&
+      bw_lifecycle_launcher_branch_fixture(true, true, false) == 3 &&
+      bw_lifecycle_launcher_branch_fixture(false, false, false) == 4;
   (void)printf(
       "{\"schema_version\":1,\"child_started\":%s,\"challenge_answered\":%s,"
-      "\"child_exited_cleanly\":%s,\"denial_verified\":%s,\"cleanup_complete\":%s}\n",
+      "\"child_exited_cleanly\":%s,\"denial_verified\":%s,\"cleanup_complete\":%s,"
+      "\"branch_selection_verified\":%s}\n",
       result.child_started ? "true" : "false", result.challenge_answered ? "true" : "false",
-      result.child_exited_cleanly ? "true" : "false", result.denial_verified ? "true" : "false",
-      result.cleanup_complete ? "true" : "false");
+      result.child_exited_cleanly ? "true" : "false",
+      result.child_reported_denial ? "true" : "false",
+      result.child_reported_cleanup ? "true" : "false",
+      all ? "true" : "false");
   return all ? 0 : 1;
 }

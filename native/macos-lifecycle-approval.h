@@ -18,9 +18,10 @@ typedef struct {
 /*
  * Consume one exact, short-lived receipt from a connected AF_UNIX socket.
  * Production additionally requires a non-root real UID, root effective UID,
- * and a stable root-owned /usr/bin/sudo parent. The socket peer must be the
- * real UID and the receipt must name this process. No argv/env/path approval
- * input is accepted.
+ * and either a stable root-owned /usr/bin/sudo parent or the exact fixed
+ * root-owned provisioner with /usr/bin/sudo as its stable parent. The socket
+ * peer must be the real UID and the receipt must name this process. No
+ * argv/env/path approval input is accepted.
  */
 bool bw_receive_and_consume_lifecycle_approval(
     int connected_socket_fd,

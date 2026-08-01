@@ -26,9 +26,12 @@ describe('signed macOS lifecycle runner package', () => {
     assert.equal(Object.isFrozen(value), true);
     assert.equal(value.same_host_reproducible_runner_verified, true);
     assert.equal(value.same_host_reproducible_launcher_verified, true);
+    assert.equal(value.same_host_reproducible_provisioner_verified, true);
     assert.equal(value.runner_code_snapshot_verified, true);
     assert.equal(value.launcher_code_snapshot_verified, true);
+    assert.equal(value.provisioner_code_snapshot_verified, true);
     assert.equal(value.launcher_lifecycle_bindings_embedded, true);
+    assert.equal(value.provisioner_runner_embedded, true);
     assert.equal(value.embedded_artifacts_verified, true);
     assert.equal(value.source_snapshot_bound, false);
     assert.equal(value.stable_source_files_verified, true);
@@ -37,6 +40,9 @@ describe('signed macOS lifecycle runner package', () => {
     assert.equal(value.launcher_bindings.byte_length, artifacts.launcher.length);
     assert.equal(createHash('sha256').update(artifacts.launcher).digest('hex'),
       value.launcher_bindings.sha256);
+    assert.equal(value.provisioner_bindings.byte_length, artifacts.provisioner.length);
+    assert.equal(createHash('sha256').update(artifacts.provisioner).digest('hex'),
+      value.provisioner_bindings.sha256);
     assert.equal(createHash('sha256').update(artifacts.helper).digest('hex'),
       value.lifecycle_bindings.binary_sha256);
     assert.equal(createHash('sha256').update(artifacts.plist).digest('hex'),
@@ -53,10 +59,14 @@ describe('signed macOS lifecycle runner package', () => {
     const first = copyMacosLifecycleRunnerPackageArtifacts(value);
     const original = first.runner[0];
     const originalLauncher = first.launcher[0];
+    const originalProvisioner = first.provisioner[0];
     first.runner[0] ^= 0xff;
     first.launcher[0] ^= 0xff;
+    first.provisioner[0] ^= 0xff;
     assert.equal(copyMacosLifecycleRunnerPackageArtifacts(value).runner[0], original);
     assert.equal(copyMacosLifecycleRunnerPackageArtifacts(value).launcher[0], originalLauncher);
+    assert.equal(copyMacosLifecycleRunnerPackageArtifacts(value).provisioner[0],
+      originalProvisioner);
     for (const invalid of [structuredClone(value), { ...value }, {}, null]) {
       assert.throws(() => copyMacosLifecycleRunnerPackageArtifacts(invalid),
         (error) => error instanceof MacosLifecycleRunnerPackageError &&

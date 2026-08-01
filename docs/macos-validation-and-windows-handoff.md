@@ -155,3 +155,19 @@ Windows Cursor should run `npm run test:phase5h40` as a portability slice. The
 native macOS fixtures will skip where appropriate, while all source-contract
 checks must pass. This phase performed no sudo invocation or `/Library` mutation;
 those remain an explicit operator-approved live gate.
+
+Phase 5h.41 removes the persistent-runner assumption. The launcher now accepts
+only an absent runner path and a digest-matched fixed root-owned provisioner.
+That provisioner embeds the exact package runner, publishes it exclusively,
+executes it through a sanitized retained descriptor, bounds and reaps it, and
+performs identity-bound cleanup. A foreign/stale runner is an explicit collision,
+never a replace/delete opportunity. Approval permits only direct sudo ancestry
+or the exact provisioner with sudo as its parent. See
+`docs/phase5h41-macos-lifecycle-provision-composition.md` and run
+`npm run test:phase5h41` on both platforms.
+
+The one-time provisioner installation remains deliberately outside this slice:
+there is no safe cold-start sudo target in a user-writable path under the stated
+same-user threat model. Windows Cursor must not reinterpret the packaged
+provisioner bytes as installation authorization, and must keep all Windows live
+service tests non-elevated/disposable until their separate gate is approved.

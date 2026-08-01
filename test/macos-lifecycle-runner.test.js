@@ -17,7 +17,8 @@ const SOURCES = [
   'macos-fixed-command-runner.c', 'macos-retained-file-ops.c', 'macos-account-ownership.c',
   'macos-launchd-job-ownership.c', 'macos-dscl-directory-adapter.c',
   'macos-launchctl-job-adapter.c', 'macos-lifecycle-controller.c',
-  'macos-lifecycle-approval.c', 'macos-native-lifecycle-wiring.c',
+  'macos-lifecycle-approval.c', 'macos-elevation-identity.c',
+  'macos-native-lifecycle-wiring.c',
   'macos-launchctl-mach-presence.c', 'macos-mach-service-probes.c',
   'macos-fixed-system-probes.c', 'macos-lifecycle-runner.c',
 ].map((name) => path.join(NATIVE, name));

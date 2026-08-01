@@ -5,7 +5,6 @@
 #include <CommonCrypto/CommonDigest.h>
 #include <errno.h>
 #include <fcntl.h>
-#include <libproc.h>
 #include <poll.h>
 #include <pthread.h>
 #include <signal.h>
@@ -13,16 +12,16 @@
 #include <stdint.h>
 #include <string.h>
 #include <sys/socket.h>
-#include <sys/proc_info.h>
+#include <sys/stat.h>
 #include <sys/wait.h>
 #include <time.h>
 #include <unistd.h>
 
 #define SUDO_PATH "/usr/bin/sudo"
 #define RUNNER_PATH "/Library/PrivilegedHelperTools/de.frederikstadler.bitwarden-agent-credential-bridge.lifecycle-runner"
+#define PROVISIONER_PATH "/Library/PrivilegedHelperTools/de.frederikstadler.bitwarden-agent-credential-bridge.lifecycle-provisioner"
 #define OUTPUT_CAPACITY 4096
 #define CHILD_TIMEOUT_MS 130000
-#define RUNNER_STOP_TIMEOUT_MS 5000
 
 #if !defined(BW_SUDO_LAUNCHER_TESTING)
 #if !defined(BW_LAUNCHER_BINDING_HEADER)
@@ -37,6 +36,22 @@ static const char SUCCESS_OUTPUT[] =
 static char *const FIXED_ENV[] = {
   "PATH=/usr/bin:/bin:/usr/sbin:/sbin", "LANG=C", "LC_ALL=C", NULL,
 };
+
+typedef enum {
+  BW_LAUNCHER_PROVISION_BRANCH = 1,
+  BW_LAUNCHER_RUNNER_COLLISION = 2,
+  BW_LAUNCHER_PROVISIONER_UNAVAILABLE = 3,
+  BW_LAUNCHER_RUNNER_STATE_UNKNOWN = 4,
+} bw_launcher_branch;
+
+static bw_launcher_branch select_branch(
+    bool runner_absent, bool runner_state_known, bool provisioner_ready) {
+  if (!runner_state_known) return BW_LAUNCHER_RUNNER_STATE_UNKNOWN;
+  if (!runner_absent) return BW_LAUNCHER_RUNNER_COLLISION;
+  return provisioner_ready
+      ? BW_LAUNCHER_PROVISION_BRANCH
+      : BW_LAUNCHER_PROVISIONER_UNAVAILABLE;
+}
 
 static uint64_t monotonic_ms(void) {
   struct timespec value;
@@ -91,13 +106,15 @@ static bool same_file(const struct stat *left, const struct stat *right) {
       left->st_ctimespec.tv_nsec == right->st_ctimespec.tv_nsec;
 }
 
-static bool runner_matches_package(void) {
+static bool fixed_path_matches_digest(
+    const char *path, const unsigned char expected[CC_SHA256_DIGEST_LENGTH]) {
   struct stat path_before;
   struct stat fd_before;
   struct stat fd_after;
   struct stat path_after;
-  if (lstat(RUNNER_PATH, &path_before) != 0 || S_ISLNK(path_before.st_mode)) return false;
-  int fd = open(RUNNER_PATH, O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
+  if (path == NULL || expected == NULL || lstat(path, &path_before) != 0 ||
+      S_ISLNK(path_before.st_mode)) return false;
+  int fd = open(path, O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
   if (fd < 0 || fstat(fd, &fd_before) != 0 || !same_file(&path_before, &fd_before) ||
       fd_before.st_size < 1 || fd_before.st_size > (off_t)(8U * 1024U * 1024U)) {
     if (fd >= 0) (void)close(fd);
@@ -114,61 +131,19 @@ static bool runner_matches_package(void) {
     else if (errno != EINTR) valid = false;
   }
   valid = valid && CC_SHA256_Final(actual, &digest) == 1 &&
-      fstat(fd, &fd_after) == 0 && lstat(RUNNER_PATH, &path_after) == 0 &&
+      fstat(fd, &fd_after) == 0 && lstat(path, &path_after) == 0 &&
       same_file(&fd_before, &fd_after) && same_file(&fd_after, &path_after) &&
-      memcmp(actual, BW_LAUNCHER_RUNNER_SHA256, sizeof(actual)) == 0;
+      memcmp(actual, expected, sizeof(actual)) == 0;
   memset(&digest, 0, sizeof(digest));
   memset(actual, 0, sizeof(actual));
   memset(chunk, 0, sizeof(chunk));
   (void)close(fd);
   return valid;
 }
-#else
-static bool runner_matches_package(void) { return true; }
 #endif
 
 #if !defined(BW_SUDO_LAUNCHER_TESTING)
-static bool exact_runner_process(pid_t pid, struct proc_bsdinfo *snapshot) {
-  if (pid <= 1 || snapshot == NULL) return false;
-  struct proc_bsdinfo before;
-  struct proc_bsdinfo after;
-  char path[PROC_PIDPATHINFO_MAXSIZE];
-  memset(&before, 0, sizeof(before));
-  memset(&after, 0, sizeof(after));
-  memset(path, 0, sizeof(path));
-  int first = proc_pidinfo(pid, PROC_PIDTBSDINFO, 0, &before, sizeof(before));
-  int path_length = proc_pidpath(pid, path, sizeof(path));
-  int second = proc_pidinfo(pid, PROC_PIDTBSDINFO, 0, &after, sizeof(after));
-  if (first != (int)sizeof(before) || second != (int)sizeof(after) ||
-      path_length != (int)strlen(RUNNER_PATH) ||
-      memcmp(path, RUNNER_PATH, strlen(RUNNER_PATH)) != 0 || before.pbi_uid != 0 ||
-      before.pbi_start_tvsec != after.pbi_start_tvsec ||
-      before.pbi_start_tvusec != after.pbi_start_tvusec || before.pbi_pid != after.pbi_pid) {
-    return false;
-  }
-  *snapshot = after;
-  return true;
-}
 #endif
-
-static void stop_exact_runner(pid_t pid) {
-#if defined(BW_SUDO_LAUNCHER_TESTING)
-  (void)pid;
-#else
-  struct proc_bsdinfo identity;
-  if (!exact_runner_process(pid, &identity)) return;
-  if (kill(pid, SIGKILL) != 0 && errno != ESRCH) return;
-  uint64_t started = monotonic_ms();
-  if (started == 0) return;
-  while (monotonic_ms() - started < RUNNER_STOP_TIMEOUT_MS) {
-    struct proc_bsdinfo current;
-    if (!exact_runner_process(pid, &current) ||
-        current.pbi_start_tvsec != identity.pbi_start_tvsec ||
-        current.pbi_start_tvusec != identity.pbi_start_tvusec) return;
-    (void)usleep(10000);
-  }
-#endif
-}
 
 static bool drain(int fd, char *bytes, size_t *length, bool *open) {
   char chunk[512];
@@ -233,8 +208,7 @@ static bw_sudo_lifecycle_result launch(
   bw_sudo_lifecycle_result result = {0};
   if (approved == NULL || executable == NULL || arguments == NULL) return result;
   if (production && (!controlling_tty_available() ||
-      !bw_fixed_executable_is_secure(SUDO_PATH) ||
-      !bw_fixed_executable_is_secure(RUNNER_PATH) || !runner_matches_package())) return result;
+      !bw_fixed_executable_is_secure(SUDO_PATH))) return result;
 
   int approval[2] = {-1, -1};
   int output[2] = {-1, -1};
@@ -287,12 +261,11 @@ static bw_sudo_lifecycle_result launch(
   result.challenge_answered = approval_thread_joined && approval_context.answered;
   close_fd(&approval[0]);
   if (!result.child_exited_cleanly || !result.challenge_answered) goto terminate;
-  result.denial_verified = true;
-  result.cleanup_complete = true;
+  result.child_reported_denial = true;
+  result.child_reported_cleanup = true;
   goto done;
 
 terminate:
-  stop_exact_runner(approval_context.runner_pid);
   if (child > 0) {
     if (kill(-child, SIGKILL) != 0 && errno != ESRCH) (void)kill(child, SIGKILL);
     while (waitpid(child, NULL, 0) < 0 && errno == EINTR) {}
@@ -316,17 +289,39 @@ bw_sudo_lifecycle_result bw_run_fixed_sudo_lifecycle(void) {
   memcpy(approved.binary_sha256, BW_LAUNCHER_HELPER_SHA256, BW_APPROVAL_DIGEST_BYTES);
   memcpy(approved.plist_sha256, BW_LAUNCHER_PLIST_SHA256, BW_APPROVAL_DIGEST_BYTES);
   memcpy(approved.requirement_sha256, BW_LAUNCHER_REQUIREMENT_SHA256, BW_APPROVAL_DIGEST_BYTES);
-  char *const arguments[] = {
-    (char *)SUDO_PATH, "-k", "--", (char *)RUNNER_PATH,
-    "--approved-denial-lifecycle", NULL,
-  };
-  bw_sudo_lifecycle_result result = launch(SUDO_PATH, arguments, true, &approved);
+  struct stat runner_state;
+  int runner_status = lstat(RUNNER_PATH, &runner_state);
+  bool runner_absent = runner_status != 0 && errno == ENOENT;
+  bool runner_state_known = runner_status == 0 || runner_absent;
+  bool provision = runner_absent && bw_fixed_executable_is_secure(PROVISIONER_PATH) &&
+      fixed_path_matches_digest(PROVISIONER_PATH, BW_LAUNCHER_PROVISIONER_SHA256);
+  bw_launcher_branch branch = select_branch(runner_absent, runner_state_known, provision);
+  bw_sudo_lifecycle_result result = {0};
+  if (branch == BW_LAUNCHER_PROVISION_BRANCH) {
+    char *const arguments[] = {
+      (char *)SUDO_PATH, "-k", "--", (char *)PROVISIONER_PATH,
+      "--provision-run-cleanup-approved-denial-lifecycle", NULL,
+    };
+    result = launch(SUDO_PATH, arguments, true, &approved);
+    result.provisioner_selected = true;
+  } else if (branch == BW_LAUNCHER_RUNNER_COLLISION) {
+    result.runner_collision_detected = true;
+  } else if (branch == BW_LAUNCHER_PROVISIONER_UNAVAILABLE) {
+    result.provisioner_unavailable = true;
+  } else if (branch == BW_LAUNCHER_RUNNER_STATE_UNKNOWN) {
+    result.runner_state_unknown = true;
+  }
   memset(&approved, 0, sizeof(approved));
   return result;
 #endif
 }
 
 #if defined(BW_SUDO_LAUNCHER_TESTING)
+int bw_lifecycle_launcher_branch_fixture(
+    bool runner_absent, bool runner_state_known, bool provisioner_ready) {
+  return (int)select_branch(runner_absent, runner_state_known, provisioner_ready);
+}
+
 bw_sudo_lifecycle_result bw_run_sudo_lifecycle_fixture(
     const char *fixture_executable,
     const bw_lifecycle_approval_bindings *approved) {

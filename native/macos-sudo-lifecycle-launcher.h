@@ -9,8 +9,12 @@ typedef struct {
   bool child_started;
   bool challenge_answered;
   bool child_exited_cleanly;
-  bool denial_verified;
-  bool cleanup_complete;
+  bool child_reported_denial;
+  bool child_reported_cleanup;
+  bool provisioner_selected;
+  bool runner_collision_detected;
+  bool provisioner_unavailable;
+  bool runner_state_unknown;
 } bw_sudo_lifecycle_result;
 
 /*
@@ -20,6 +24,8 @@ typedef struct {
 bw_sudo_lifecycle_result bw_run_fixed_sudo_lifecycle(void);
 
 #if defined(BW_SUDO_LAUNCHER_TESTING)
+int bw_lifecycle_launcher_branch_fixture(
+    bool runner_absent, bool runner_state_known, bool provisioner_ready);
 bw_sudo_lifecycle_result bw_run_sudo_lifecycle_fixture(
     const char *fixture_executable,
     const bw_lifecycle_approval_bindings *approved);

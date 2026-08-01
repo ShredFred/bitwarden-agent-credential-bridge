@@ -19,6 +19,7 @@ describe('retained-FD macOS runner provisioning transaction', () => {
     assert.match(source, /#define RUNNER_NAME "de\.frederikstadler\./);
     assert.match(source, /bw_publish_owned_file/);
     assert.match(source, /bw_verify_owned_file/);
+    assert.match(source, /acl_get_fd_np\(parent_fd, ACL_TYPE_EXTENDED\)/);
     assert.match(source, /execute_retained_fd\(request, runner\.file_fd\)/);
     assert.match(source, /execve\(descriptor_path, arguments, environment\)/);
     assert.match(source, /bw_unlink_owned_file\(&runner\)/);

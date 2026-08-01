@@ -27,6 +27,8 @@ int main(int argc, char **argv) {
       strcmp(argv[1], MODE) != 0) return 64;
   bw_sudo_lifecycle_result result = bw_run_fixed_sudo_lifecycle();
   if (!result.child_started || !result.challenge_answered || !result.child_exited_cleanly ||
-      !result.denial_verified || !result.cleanup_complete) return 1;
+      !result.child_reported_denial || !result.child_reported_cleanup ||
+      !result.provisioner_selected || result.runner_collision_detected ||
+      result.provisioner_unavailable || result.runner_state_unknown) return 1;
   return write_success() ? 0 : 1;
 }
