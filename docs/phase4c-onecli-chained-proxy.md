@@ -27,11 +27,24 @@ The broker rebuilds the gateway request headers, strips caller
 `Proxy-Authorization`, `Authorization`, cookies, hop-by-hop, connection-named,
 forwarding, API-key, upgrade, and duplicate headers, and adds one fixed gateway
 authorization value. Request/response bodies, handshake time, idle time,
-connections, headers, and per-direction tunnel bytes are bounded. Errors and
-logs are value-free or redacted across raw, Basic-payload, URL-encoded, and
-base64url variants.
+connections, headers, per-direction tunnel bytes, and absolute tunnel lifetime
+are bounded. Errors and logs are value-free or redacted across the explicitly
+tested raw, Basic-payload, URL-encoded, Base64, Base64url, and hexadecimal
+variants. This is a bounded known-encoding check, not a claim to recognize every
+possible reversible transform.
 
 Tests use only generated sentinels, an ephemeral fake loopback gateway, and a
 TLS-free opaque echo tunnel. This phase does not start Docker or OneCLI, pair
 Bitwarden, install a CA, read a vault, create a real agent token, or prove
 OneCLI/Bitwarden behavior. Run `npm run test:phase4c`.
+
+The runtime entrypoint `scripts/run-onecli-proxy.mjs` accepts no arguments and
+reads no environment values or files. A trusted parent supplies exact framed
+token and policy bytes on inherited IPC descriptors 3 and 4. Descriptor 5 is a
+parent lease: EOF, data, or error closes the broker, preventing an orphaned
+listener. All three descriptors must be distinct FIFO/pipe endpoints or local
+socketpair endpoints; Node implements extra child-process pipes as Unix
+socketpairs on macOS. Regular files, devices, directories, duplicate
+descriptors, malformed/oversized/trailing frames, invalid encodings, and
+timeouts fail silently with a nonzero exit. Successful stdout contains only one
+value-free ready record; shutdown failures remain silent and nonzero.

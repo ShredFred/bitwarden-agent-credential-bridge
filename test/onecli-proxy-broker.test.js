@@ -133,6 +133,7 @@ describe('OneCLI chained proxy broker', () => {
       (value) => value,
       (value) => Buffer.from(`${value}:`).toString('base64'),
       (value) => Buffer.from(value).toString('base64'),
+      (value) => Buffer.from(value).toString('hex'),
     ]) {
       const token = `agent-${randomBytes(24).toString('base64url')}`;
       const authorization = `Basic ${Buffer.from(`${token}:`).toString('base64')}`;

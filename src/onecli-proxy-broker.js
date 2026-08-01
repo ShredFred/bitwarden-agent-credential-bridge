@@ -12,6 +12,7 @@ export const MAX_TUNNEL_BYTES_PER_DIRECTION = 8 * 1024 * 1024;
 export const MAX_CONCURRENT_PROXY_CLIENTS = 16;
 export const PROXY_HANDSHAKE_TIMEOUT_MS = 10_000;
 export const PROXY_IDLE_TIMEOUT_MS = 120_000;
+export const MAX_TUNNEL_LIFETIME_MS = 10 * 60_000;
 
 const BLOCKED_REQUEST_HEADERS = new Set([
   'connection', 'cookie', 'expect', 'host', 'http2-settings', 'keep-alive',
@@ -36,6 +37,8 @@ export class OneCliProxyBrokerError extends Error {
 }
 
 export async function startOneCliProxyBroker(options) {
+  const abortSignal = options?.signal;
+  if (abortSignal?.aborted) throw new OneCliProxyBrokerError('startup_aborted');
   let policy;
   try { policy = validatePolicy(options?.policy); } catch {
     throw new OneCliProxyBrokerError('invalid_policy');
@@ -55,14 +58,23 @@ export async function startOneCliProxyBroker(options) {
   const bind = parseLoopbackHttpUrl(policy.bind, 'policy.bind');
   const gateway = parseLoopbackHttpUrl(policy.gateway, 'policy.gateway');
   const clients = new Set();
+  const sockets = new Set();
 
   const server = http.createServer((req, res) => {
+    if (abortSignal?.aborted) {
+      denyRequest(req, res, 503, 'proxy_stopping');
+      return;
+    }
     if (!admitClient(req.socket, clients, res)) return;
     void handleAbsoluteRequest(req, res, {
       policy, gateway, proxyAuthorization, sensitive, log,
     }).finally(() => clients.delete(req.socket));
   });
   server.on('connect', (req, client, head) => {
+    if (abortSignal?.aborted) {
+      client.destroy();
+      return;
+    }
     if (!admitClient(client, clients)) {
       writeSocketError(client, 503, 'proxy_busy');
       return;
@@ -72,6 +84,15 @@ export async function startOneCliProxyBroker(options) {
     }).finally(() => clients.delete(client));
   });
   server.on('clientError', (_error, socket) => writeSocketError(socket, 400, 'bad_request'));
+  server.maxConnections = MAX_CONCURRENT_PROXY_CLIENTS;
+  server.on('connection', (socket) => {
+    if (abortSignal?.aborted || sockets.size >= MAX_CONCURRENT_PROXY_CLIENTS) {
+      socket.destroy();
+      return;
+    }
+    sockets.add(socket);
+    socket.once('close', () => sockets.delete(socket));
+  });
   server.requestTimeout = PROXY_HANDSHAKE_TIMEOUT_MS;
   server.headersTimeout = PROXY_HANDSHAKE_TIMEOUT_MS;
   server.maxHeadersCount = 64;
@@ -83,9 +104,13 @@ export async function startOneCliProxyBroker(options) {
       resolve();
     });
   });
+  if (abortSignal?.aborted) {
+    await closeProxyServer(server, clients, sockets);
+    throw new OneCliProxyBrokerError('startup_aborted');
+  }
   const address = server.address();
   if (address === null || typeof address === 'string') {
-    await closeProxyServer(server, clients);
+    await closeProxyServer(server, clients, sockets);
     throw new OneCliProxyBrokerError('bind_failed');
   }
   const proxyUrl = `http://${bind.hostname}:${address.port}`;
@@ -96,7 +121,7 @@ export async function startOneCliProxyBroker(options) {
     port: address.port,
     proxyUrl,
     logs,
-    close: () => closeProxyServer(server, clients),
+    close: () => closeProxyServer(server, clients, sockets),
   });
 }
 
@@ -168,6 +193,11 @@ async function handleConnect(req, client, clientHead, ctx) {
   client.once('error', destroyTunnel);
   upstream.once('error', destroyTunnel);
   upstream.setTimeout(PROXY_IDLE_TIMEOUT_MS, () => upstream.destroy());
+  const lifetime = setTimeout(() => {
+    client.destroy();
+    upstream.destroy();
+  }, MAX_TUNNEL_LIFETIME_MS);
+  lifetime.unref();
   client.write('HTTP/1.1 200 Connection Established\r\n\r\n');
   if (outcome.upstreamHead?.length > 0) client.write(outcome.upstreamHead);
   if (clientHead.length > 0) upstream.write(clientHead);
@@ -181,9 +211,13 @@ async function handleConnect(req, client, clientHead, ctx) {
   upstreamLimit.once('error', () => { client.destroy(); upstream.destroy(); });
   client.pipe(clientLimit).pipe(upstream);
   upstream.pipe(upstreamLimit).pipe(client);
-  await Promise.race([closed(client), closed(upstream)]);
-  client.destroy();
-  upstream.destroy();
+  try {
+    await Promise.race([closed(client), closed(upstream)]);
+  } finally {
+    clearTimeout(lifetime);
+    client.destroy();
+    upstream.destroy();
+  }
 }
 
 async function handleAbsoluteRequest(req, res, ctx) {
@@ -383,9 +417,10 @@ function sensitiveVariants(token, authorization) {
   const encoded = encodeURIComponent(token);
   const encodedPayload = encodeURIComponent(payload);
   const tokenBase64 = Buffer.from(token, 'ascii').toString('base64');
+  const tokenHex = Buffer.from(token, 'ascii').toString('hex');
   return new Set([token, `${token}:`, payload, authorization,
     payload.toLowerCase(), payload.toUpperCase(), authorization.toLowerCase(),
-    authorization.toUpperCase(), tokenBase64, encoded,
+    authorization.toUpperCase(), tokenBase64, tokenHex, tokenHex.toUpperCase(), encoded,
     encoded.replace(/%[0-9A-F]{2}/g, (value) => value.toLowerCase()), encodedPayload,
     encodedPayload.replace(/%[0-9A-F]{2}/g, (value) => value.toLowerCase()),
     Buffer.from(token).toString('base64url')]);
@@ -433,8 +468,10 @@ function closed(socket) {
     else socket.once('close', resolve);
   });
 }
-async function closeProxyServer(server, clients) {
+async function closeProxyServer(server, clients, sockets) {
   for (const socket of clients) socket.destroy();
+  for (const socket of sockets) socket.destroy();
+  server.closeAllConnections?.();
   if (!server.listening) return;
   await new Promise((resolve, reject) => server.close((error) =>
     error ? reject(error) : resolve()));
