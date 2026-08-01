@@ -416,6 +416,10 @@ AGENTS.md                           experiment rules for agents
 - Phase 5h.30 composes file, account, and launchd ownership into the exact
   preflight→mutation→denial→reverse-finally lifecycle. Cross-layer faults prove
   cleanup continuation and preservation of replaced foreign objects.
+- Phase 5h.31 provides the shell-free, fixed-environment native command runner
+  needed by future macOS system adapters. It closes inherited descriptors,
+  bounds output and time, and always kills/reaps failed or runaway children;
+  tests use harmless system commands only and perform no privileged mutation.
 - No browser/website automation, query, cookie, form, process-env,
   SSH, database, RDP, or desktop credential injection.
 - Not a substitute for vault, OS keychain, or production broker hardening.

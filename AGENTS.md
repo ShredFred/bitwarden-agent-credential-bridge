@@ -934,3 +934,20 @@ mutation, ambiguous account create, ambiguous activation cleanup, and file path
 replacement during the job/denial phase with foreign preservation plus cleanup
 of remaining run-owned objects. This phase contains no real OpenDirectory,
 launchctl, Mach, elevation, approval, network, or credential adapter.
+
+## Phase 5h.31 scope
+
+Phase 5h.31 may add only a native fixed-command subprocess runner for later
+OpenDirectory and launchctl adapters. It must execute an absolute, root-owned,
+non-group/world-writable regular executable directly with `posix_spawn`, never
+through a shell or PATH lookup. The argument vector, timeout, environment, and
+output bound must be explicit and bounded; stdin is `/dev/null`; unrelated file
+descriptors are closed; timeout, I/O error, and output overflow kill and reap the
+child before returning.
+
+The runner reports nonzero exits rather than treating them as transport errors.
+Its self-test may invoke only harmless macOS system tools (`true`, `false`,
+`printf`, `sleep`, and `yes`) and must prove capture, nonzero status, timeout,
+output-flood termination, and relative-path rejection. This phase must not invoke
+dscl or launchctl, elevate, create/delete accounts, write system paths, perform
+Mach IPC, access credentials, or grant installation approval.
