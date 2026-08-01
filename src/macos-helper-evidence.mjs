@@ -5,8 +5,9 @@ const EVIDENCE_FIELDS = new Set([
   'schema_version',
   'transport_kind',
   'mach_service_bound',
-  'xpc_peer_connection_verified',
+  'mach_peer_exchange_verified',
   'peer_audit_token_verified',
+  'peer_audit_token_matches_caller_audit_token',
   'peer_pid_verified',
   'peer_pidversion_verified',
   'helper_pid_verified',
@@ -54,7 +55,7 @@ export class MacosHelperEvidenceError extends Error {
 /** Compile trusted macOS audit-token/code/access facts without returning values. */
 export function evaluateMacosHelperPeerEvidence(raw) {
   const facts = exactPlainObject(raw, EVIDENCE_FIELDS);
-  if (facts.schema_version !== 1 || facts.transport_kind !== 'macos_xpc_mach_service' ||
+  if (facts.schema_version !== 1 || facts.transport_kind !== 'macos_mach_message_service' ||
       BOOLEAN_FIELDS.some((field) => typeof facts[field] !== 'boolean') ||
       !isDigest(facts.caller_euid_sha256) || !isDigest(facts.helper_euid_sha256)) {
     throw new MacosHelperEvidenceError();
@@ -64,7 +65,9 @@ export function evaluateMacosHelperPeerEvidence(raw) {
     Buffer.from(facts.caller_euid_sha256, 'hex'),
     Buffer.from(facts.helper_euid_sha256, 'hex'),
   );
-  const identityVerified = facts.caller_audit_token_verified && facts.helper_audit_token_verified &&
+  const identityVerified = facts.peer_audit_token_verified &&
+    facts.caller_audit_token_verified && facts.helper_audit_token_verified &&
+    facts.peer_audit_token_matches_caller_audit_token &&
     facts.caller_euid_verified && facts.helper_euid_verified &&
     facts.audit_token_euid_matches_caller_euid && facts.audit_token_euid_matches_helper_euid &&
     facts.helper_code_identity_verified &&
@@ -73,8 +76,9 @@ export function evaluateMacosHelperPeerEvidence(raw) {
     facts.access_checks_verified && facts.all_targets_checked;
 
   return Object.freeze({
-    local_transport: facts.mach_service_bound && facts.xpc_peer_connection_verified &&
-      facts.peer_audit_token_verified && facts.peer_pid_verified && facts.peer_pidversion_verified &&
+    local_transport: facts.mach_service_bound && facts.mach_peer_exchange_verified &&
+      facts.peer_audit_token_verified && facts.peer_audit_token_matches_caller_audit_token &&
+      facts.peer_pid_verified && facts.peer_pidversion_verified &&
       facts.helper_pid_verified && facts.helper_pidversion_verified,
     identity_verified: identityVerified,
     different_principal: identityVerified && !sameEuid,

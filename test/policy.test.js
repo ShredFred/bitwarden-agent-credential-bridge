@@ -27,6 +27,12 @@ const sampleV3PolicyPath = path.join(
   'policies',
   'sample-fake-basic-service.json',
 );
+const sampleV4PolicyPath = path.join(
+  path.dirname(fileURLToPath(import.meta.url)),
+  '..',
+  'policies',
+  'sample-fake-onecli-proxy.json',
+);
 
 function validPolicy(overrides = {}) {
   return {
@@ -68,6 +74,22 @@ function validV3Policy(overrides = {}) {
     path: '/v1/resource',
     username_value: '{{username}}',
     password_value: '{{password}}',
+    ...overrides,
+  };
+}
+
+function validV4Policy(overrides = {}) {
+  return {
+    version: 4,
+    service: 'fake-onecli-gateway-chain',
+    credential_class: 'onecli_proxy',
+    bind: 'http://127.0.0.1:0',
+    gateway: 'http://127.0.0.1:10255',
+    target_host: 'fake-target.test',
+    target_port: 443,
+    method: 'GET',
+    path: '/v1/resource',
+    agent_token: '{{credential}}',
     ...overrides,
   };
 }
@@ -117,6 +139,26 @@ describe('policy validation', () => {
   it('accepts the strict version-3 HTTP Basic sample', async () => {
     const policy = await loadPolicy(sampleV3PolicyPath);
     assert.deepEqual(policy, validV3Policy());
+  });
+
+  it('accepts the strict version-4 OneCLI proxy sample', async () => {
+    const policy = await loadPolicy(sampleV4PolicyPath);
+    assert.deepEqual(policy, validV4Policy());
+  });
+
+  it('rejects unsafe version-4 gateways, targets, ports, and token fields', () => {
+    for (const policy of [
+      validV4Policy({ gateway: 'http://example.com:10255' }),
+      validV4Policy({ gateway: 'http://127.0.0.1:0' }),
+      validV4Policy({ target_host: '127.0.0.1' }),
+      validV4Policy({ target_host: 'FAKE-target.test' }),
+      validV4Policy({ target_host: '*.test' }),
+      validV4Policy({ target_host: 'fake-target.test.' }),
+      validV4Policy({ target_host: 'xn--example.test' }),
+      validV4Policy({ target_port: 80 }),
+      validV4Policy({ agent_token: 'literal-token' }),
+      validV4Policy({ extra: true }),
+    ]) assert.throws(() => validatePolicy(policy), PolicyValidationError);
   });
 
   it('rejects uppercase and syntactically invalid API-key header names', () => {
@@ -251,6 +293,10 @@ describe('policy validation', () => {
     assert.throws(
       () => validatePolicy(validV3Policy({ credential_class: 'http_bearer' })),
       /version 3 requires credential_class "http_basic"/,
+    );
+    assert.throws(
+      () => validatePolicy(validV4Policy({ credential_class: 'http_bearer' })),
+      /version 4 requires credential_class "onecli_proxy"/,
     );
   });
 

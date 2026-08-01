@@ -36,5 +36,5 @@ interfere. It never calls the disposable manifest executor.
 
 The next native phases must add platform transports and live identity
 collection: Windows named pipes and token inspection, Linux AF_UNIX/SO_PEERCRED,
-and macOS XPC/audit tokens. A successful authorization/apply path still requires
+and macOS Mach-message audit tokens. A successful authorization/apply path still requires
 an explicitly approved disposable second-principal live gate.

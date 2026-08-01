@@ -25,7 +25,7 @@ explicit failure, not a degraded mode. Responses contain a fixed code, request
 id, action count, and rollback state only; they contain no paths, identities, OS
 errors, or exception text.
 
-5h.1 performs no I/O. Windows named-pipe/token handling, macOS XPC/audit-token or
+5h.1 performs no I/O. Windows named-pipe/token handling, macOS Mach/audit-token or
 sandbox handling, Linux Unix-socket peer credentials/user namespaces, inherited
 handle transfer, helper launch, and real execution remain unimplemented. Real
 user roots, persistent services, Bitwarden, OneCLI, network access, and real

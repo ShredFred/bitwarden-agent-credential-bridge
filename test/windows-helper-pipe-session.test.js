@@ -150,6 +150,27 @@ describe('Windows native helper named-pipe session', () => {
     }
   });
 
+  it('rejects a valid Windows session on non-Windows only after safe input validation', {
+    skip: process.platform === 'win32',
+  }, async () => {
+    const value = await fixture();
+    try {
+      await assert.rejects(
+        verifyWindowsHelperPipeSamePrincipal({
+          workspace: value.workspace,
+          requestBytes: value.request.bytes,
+          manifest: value.manifest,
+          launcherBytes: value.launcherBytes,
+          launcherSha256: value.launcherSha256,
+          launcherByteLength: value.launcherByteLength,
+        }),
+        (error) => error instanceof WindowsHelperPipeSessionError && error.code === 'unsupported_platform',
+      );
+    } finally {
+      await cleanup(value.workspace);
+    }
+  });
+
   it('rejects an upgrade manifest in the native first-install probe', {
     skip: process.platform !== 'win32',
   }, async () => {

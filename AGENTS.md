@@ -256,9 +256,12 @@ mutation, manifest execution, real-root access, or Bitwarden connection.
 ## Phase 5h.4 scope
 
 Phase 5h.4 may add only a pure macOS peer-evidence evaluator over trusted,
-injected XPC and audit-token collector facts. It must require a bound Mach
-service, verified XPC peer and caller/helper process generations, verified
-audit tokens and effective UIDs, a pinned helper code requirement, unequal
+injected Mach-message and audit-token collector facts. It must require a bound
+launchd Mach service, verified request/reply peers and caller/helper process
+generations, verified audit tokens and effective UIDs, an exact match between
+the accepted request-sender audit token and the independently verified
+authorizing caller audit token, a
+pinned helper code requirement, unequal
 effective-UID digests, and complete symlink-safe effective-access checks over
 every bound target.
 
@@ -267,7 +270,7 @@ audit sessions, and sandbox write restrictions are defense-in-depth signals
 only. They must never establish a distinct principal when effective-UID
 digests are equal. Returned evidence contains only the five shared booleans;
 raw UIDs, audit tokens, PIDs, pidversions, code identities, paths, entitlements,
-ACLs, and errors must not escape. This phase performs no XPC/Mach or Security
+ACLs, and errors must not escape. This phase performs no Mach or Security
 framework I/O, helper launch, authorization-service changes, permission
 mutation, manifest execution, real-root access, or Bitwarden connection.
 
@@ -287,7 +290,7 @@ value-free; stderr, timeout, excess output, non-zero exit, malformed UTF-8, and
 any mismatch fail closed. This phase does not prove a different principal or
 local authenticated IPC, inspect tokens/UIDs/audit tokens, execute a manifest,
 touch normal user roots, access Bitwarden, or claim protection from a malicious
-same-user process. Named-pipe/XPC/AF_UNIX identity collection and any successful
+same-user process. Named-pipe/Mach-message/AF_UNIX identity collection and any successful
 authorization remain later live-gated work.
 
 ## Phase 5h.6 scope
@@ -583,3 +586,474 @@ creation, elevation, file/ACL mutation, socket I/O, helper launch, manifest
 execution, network/vault access, or Bitwarden connection is permitted. Those
 require later Linux-specific preflight, lifecycle, trusted-collector, and explicit
 operator-approval phases.
+
+## Phase 5h.18 scope
+
+Phase 5h.18 may add only a pure macOS boundary plan for the launchd system
+domain and tighten the existing pure macOS evidence contract. It fixes one
+LaunchDaemon label, Mach service, and static hidden passwordless non-login helper
+account with a stable effective UID distinct from the caller. LaunchAgents,
+GUI-domain services, same-EUID helpers, App Sandbox, Hardened Runtime, signing
+identity differences, and audit-session differences must not establish a
+distinct writer.
+
+The plan must bind the reviewed binary digest/length and the digest of one
+reviewed designated code requirement. Future trusted collectors must reverify
+the installed binary, code requirement, daemon definition, loaded identity,
+complete parent chains, Mach request/reply peer/helper PID and pidversion, and
+symlink-safe effective access over every manifest target. The accepted request-
+sender audit token
+must match the independently verified authorizing caller audit token; unrelated
+peer and caller facts must fail both transport and identity closed. Ordinary
+user-home targets are forbidden for the production writer boundary.
+
+The plan is value-free, non-executable, and in-process branded. It must always
+report mutation unauthorized, live test not executed, and install gate
+ineligible. No host inspection, signing, launchd/Mach/Security-framework I/O,
+account or daemon creation, elevation, filesystem/ACL mutation, Keychain/vault
+access, network access, Bitwarden pairing, or credential use is permitted.
+
+## Phase 5h.19 scope
+
+Phase 5h.19 may add only a read-only macOS host preflight for the fixed branded
+Phase 5h.18 launchd system-helper plan. The public API accepts no caller-selected
+path, label, account, command, tool, environment, timeout, or collector facts.
+Only the plan-bound binary digest/length, designated-code-requirement digest,
+and exact LaunchDaemon plist digest
+may cross into a repo-owned probe whose service label, Mach service, static
+account, LaunchDaemon plist, helper binary, and absolute tool paths are fixed.
+
+The probe may use local `lstat`, `open(O_NOFOLLOW)`, file hashing, `plutil`,
+`dscl`, and `codesign --verify`/`codesign -d -r-` against those fixed artifacts.
+It must bound time/output, use a minimal environment, open the plist and binary
+with required `O_NOFOLLOW`, bind plist parsing to the inherited read-only handle,
+reject extended ACLs conservatively, verify complete plist and binary chains
+without following symlinks, compare the exact designated-
+requirement stdout bytes to the pinned digest internally, and suppress all raw
+paths, UIDs, account/plist/signing data, tool output, and native errors.
+
+Reports contain an exact boolean-only schema. The parent recomputes aggregate
+state, rejects impossible partial claims, and always requires
+`authorization_ready=false`. Because path-based `codesign` cannot bind its
+measurement to the already-open binary descriptor, this phase may report a
+separate path-snapshot match. The original Phase 5h.19 implementation must force
+`designated_requirement_verified=false` and therefore
+`snapshot_matches_plan=false`; Phase 5h.20 may lift those static bits only through
+its content-bound private-snapshot verifier. An absent fixed plist returns the canonical all-
+false report without running other tools. Individual matching evidence remains
+advisory and must not become Phase 5h.4 live Mach authorization evidence.
+
+No launchd/account/signing mutation, installation, elevation, chmod/chown,
+filesystem write, Mach/Security-framework operation, Keychain/vault access,
+network access, Bitwarden pairing, OneCLI deployment, manifest execution, or
+credential use is permitted.
+
+## Phase 5h.20 scope
+
+Phase 5h.20 may lift only the Phase 5h.19 designated-requirement verification
+bit by measuring an exclusive byte-identical private snapshot copied from the
+already-open `O_NOFOLLOW` helper descriptor. The snapshot must live directly
+beneath the canonical OS temporary directory in a fresh `mkdtemp` root owned by
+the current EUID with mode `0700`; its one fixed-name file must be created with
+`O_CREAT|O_EXCL|O_NOFOLLOW`, mode `0600`, written completely, synced, and
+verified byte-for-byte before Apple `codesign` inspects only that snapshot path.
+
+The verifier must require Apple strict signature validation, the exact pinned
+designated-requirement stdout digest, stable snapshot handle/path identity and
+content across inspection, and stable original installed handle identity/content
+after inspection. Exact snapshot unlink and directory removal are mandatory on
+both success and failure; cleanup failure fails the probe. No caller-selected
+path, temp base, filename, command, tool, environment, or output may enter this
+operation. `/dev/fd`, `F_GETPATH`, path-only installed-binary checks, and direct
+requirements-blob parsing must not establish verification.
+
+The report remains boolean-only. The parent may accept
+`designated_requirement_verified=true` and a recomputed matching snapshot, but
+must still require `authorization_ready=false`. This preflight remains advisory:
+it does not prove the loaded launchd job, live helper process, distinct EUID, Mach
+peer audit token/PID generation, or target access. The only new write authority
+is the fixed private temporary snapshot and its exact cleanup. No write under
+`/Library` or user home, launchd/account mutation, elevation, Mach operation,
+Keychain/vault access, network access, Bitwarden pairing, OneCLI deployment,
+manifest execution, credential use, or authorization is permitted.
+
+## Phase 5h.21 scope
+
+Phase 5h.21 may add only a console denial harness for the public raw Mach
+request/reply transport that a future launchd `MachServices` helper will use.
+The native probe must use fixed-size non-complex messages, fixed message IDs,
+one generated non-secret nonce, send-once reply rights, bounded send/receive
+timeouts, and `MACH_RCV_TRAILER_AUDIT` on both request and reply. Audit tokens,
+not message-body identity claims, must bind PID, pidversion, EUID, and the exact
+spawned caller/expected helper process generations.
+
+The console rendezvous may use only a fresh random ephemeral bootstrap name and
+must never register, check in, or look up the fixed production Mach service.
+It must report `mach_service_bound=false`,
+`launchd_system_service_verified=false`,
+`helper_code_requirement_satisfied=false`, `manifest_request_sent=false`,
+`authorization_denied=true`, and `install_gate_eligible=false`. Equal EUIDs are
+the expected denial result and must be recomputed from canonical `euid:<decimal>`
+SHA-256 digests by the parent. Raw audit tokens, port names, bootstrap names,
+PIDs, pidversions, UIDs, native errors, and tool output must never escape.
+
+The Node runner may compile only the fixed repo-owned C source with fixed
+absolute tooling into a fresh private canonical-temp directory, execute it with
+no arguments and a minimal environment, bound output/time, and require exact
+cleanup. It accepts no caller input. Public SDK APIs only are permitted;
+`NSXPCConnection.auditToken`, private libxpc audit-token getters, `task_for_pid`,
+and PID-only identity claims are forbidden. This phase must not install or load
+a LaunchDaemon, create an account, elevate, use the production service name,
+verify the production code requirement, pass a launcher/manifest, mutate target
+permissions, execute a manifest, access Keychain/vault/network/Bitwarden, use a
+real credential, or become authorization evidence.
+
+## Phase 5h.22 scope
+
+Phase 5h.22 may add only a pure, branded, non-executable lifecycle gate for a
+future explicitly approved macOS distinct-EUID LaunchDaemon denial test. It
+accepts only the in-process branded Phase 5h.18 boundary plan and binds the
+reviewed binary SHA-256 and length, designated-requirement SHA-256, and plist
+SHA-256. It accepts no approval, commands, paths, account names, UIDs, GUIDs,
+audit tokens, native output, or other host-selected values.
+
+The gate must freeze the exact preflight, exclusive create/reverify, system
+bootstrap, demand-activation, denial, and always-cleanup order. File ownership
+must remain bound to retained parent/file descriptors. Account ownership is
+only soft evidence from this run's successful create plus its recorded
+GeneratedUID/UniqueID, and launchd ownership is only soft evidence from this
+run's successful bootstrap plus the reverified loaded identity and bootstrap
+epoch. Pre-existing objects, collisions, uncertain outcomes, or identity drift
+must never be adopted or removed.
+
+Cleanup must proceed process stop, bootout, plist unlink, binary unlink,
+account deletion, then final absence verification, continuing after individual
+failures while preserving manual-recovery evidence. This phase performs no
+host inspection, elevation, account/file/job mutation, Mach I/O, Keychain/vault
+access, credential operation, or live test, and must keep every authorization
+and installation eligibility claim false.
+
+## Phase 5h.23 scope
+
+Phase 5h.23 may add only a pure value-free transcript state machine over the
+branded in-process Phase 5h.22 gate. The input is limited to an exact bounded
+plain-object transcript containing a fixed terminal outcome and ordered events
+with only fixed step/status strings. It must reject proxies, accessors, custom
+prototypes, holes, extras, invented or reordered steps, forged gates, and any
+status that is invalid for its step.
+
+State-changing account, file-create, bootstrap, and demand-activation steps
+must distinguish a verified effect, a proven no-effect failure, and an
+effect-ambiguous failure. The evaluator must derive account, binary, plist,
+launchd-job, and process ownership from prior events rather than accept caller-
+asserted ownership. Account and job identity-verification failure is ambiguous,
+not owned. Retained-descriptor file creation success remains run-owned. An
+ambiguous account or job must use `skipped_ownership_ambiguous`, never a
+destructive cleanup status; a final read-only aggregate absence proof may resolve
+the debris question without retroactively authorizing destruction.
+
+Every mutation failure must carry the full ordered cleanup transcript, cleanup
+must continue after individual failure, and the final aggregate absence event
+must be last. Returned facts are structural claims only and must never include
+events, values, paths, account/UID/GUID/audit-token data, commands, errors, or
+native output. Collector trust, live verification, authorization readiness, and
+installation eligibility remain false. This phase performs no collection,
+elevation, launchd/OpenDirectory/file/Mach mutation, credential access, or live
+test.
+
+A `dry_run_complete` terminal outcome is permitted only for an exact complete
+pre-mutation prefix with no mutation or cleanup events. It is structural and
+untrusted, and must keep every live, mutation, authorization, and installation
+claim false. A future read-only collector must fail closed rather than infer
+that the fixed Mach service is unbound from label absence alone.
+
+## Phase 5h.24 scope
+
+Phase 5h.24 may add a native macOS denial-only helper scaffold with exactly two
+fixed modes. Its no-argument service mode must first verify that its effective
+UID belongs to the fixed hidden non-login helper account, then check in only to
+the fixed production launchd Mach service. It may receive one exact bounded,
+non-complex nonce probe with a kernel audit trailer and send only one send-once
+denial reply. It must never authorize, execute a manifest, access credentials,
+Keychain, vault, network or filesystem targets, launch a process, register or
+look up another service, accept caller-selected service/account/protocol values,
+or emit service-mode output.
+
+The fixed internal self-test may report compile-time booleans only. The Node
+runner accepts no input, reads the repo-owned C source through one retained
+no-follow descriptor, creates two exclusive read-only source snapshots in
+separate private canonical-temp roots, builds both with fixed Apple tooling and
+flags, requires same-host digest equality, runs the fixed self-test, proves the
+no-argument binary is silently rejected outside the fixed account/launchd
+context, and performs exact cleanup. It must not install, sign, elevate, create
+an account, write under `/Library`, invoke launchctl/OpenDirectory, access the
+production Mach service, or leave build artifacts.
+
+Same-host reproducibility and a compiled check-in path are not live launchd,
+distinct-EUID, loaded-code, collector-trust, authorization, or installation
+evidence. Every such flag remains false. The first real lifecycle still requires
+a separately reviewed collector and explicit current operator approval naming
+the exact disposable system test.
+
+## Phase 5h.25 scope
+
+Phase 5h.25 may build only an in-memory, branded, non-installing lifecycle
+package from the fixed Phase 5h.24 source and exact fixed LaunchDaemon plist. It
+accepts no caller input. The builder must read one stable no-follow source
+snapshot, publish identical exclusive read-only source/plist snapshots into two
+private canonical-temp roots, compile with fixed Apple tooling, explicitly
+ad-hoc sign with the fixed identifier and Hardened Runtime, verify the signature,
+parse only the exact standard or Apple ad-hoc designated-requirement record,
+reverify the read binary bytes through the Phase 5h.20 FD-content snapshot path,
+require same-host byte/requirement reproducibility, validate the plist with
+`plutil` plus the pure fixed rules, run only the fixed self-test and ambient
+service rejection, then perform exact cleanup.
+
+The resulting real binary SHA-256/length, designated-requirement SHA-256, and
+plist SHA-256 must feed a branded Phase 5h.18 plan and Phase 5h.22 gate. Artifact
+bytes remain in a private WeakMap and may be retrieved only as fresh copies from
+the branded package; bytes are data and never approval or mutation authority.
+Clones, spreads, and forged packages must be rejected.
+
+This phase must not elevate, create/delete an account, write under `/Library`,
+invoke launchctl/OpenDirectory, contact the production Mach service, install or
+load a daemon, sign with a private identity, access credentials/Keychain/vault/
+network, or persist build/package bytes. Ad-hoc signing is only a local reviewed-
+artifact mechanism, not distribution trust. Mutation, collector trust, live
+verification, authorization, and installation eligibility remain false.
+
+## Phase 5h.26 scope
+
+Phase 5h.26 may add only a no-input, ordinary-user, read-only lifecycle dry-run
+collector. It must first build and reverify the branded Phase 5h.25 package,
+then evaluate all seven Phase 5h.22 pre-mutation checks through fixed bounded
+argument-array tooling. The child schema contains booleans only and must never
+emit selected UIDs/GeneratedUIDs, paths, labels, account names, commands, native
+errors, tool output, or package bytes.
+
+Label absence must use the fixed system-domain service target. Mach-service
+absence must use a bounded non-activating system-domain snapshot; a label miss
+alone is insufficient, and Mach lookup APIs that can demand-activate a service
+are forbidden. Directory chains must be symlink-free, root-owned, not group or
+world writable, and caller-nonwritable. Every collision, output drift, timeout,
+truncation, incoherent result, or unsupported platform fails closed.
+
+The probe may use only read-only OpenDirectory searches, lstat/access checks,
+and launchctl print. It must not elevate, create/delete accounts, write under
+`/Library`, bootstrap/bootout/kickstart, perform Mach IPC, access credentials,
+Keychain, vault, network, or return approval. Completion is point-in-time,
+structural, and untrusted; all mutation, live, authorization, collector-trust,
+and install flags remain false. A future executor must repeat the checks just
+before mutation and still requires explicit current operator approval.
+
+## Phase 5h.27 scope
+
+Phase 5h.27 may add only the native retained-FD file ownership primitive needed
+by the later single-process lifecycle controller. Publication must use a caller-
+retained directory descriptor plus `openat` with exclusive create and no-follow;
+all write, owner, mode, content, and identity verification must use retained
+descriptors. Cleanup may use `unlinkat` only after the retained descriptor,
+current no-follow directory entry, and recorded device/inode still match.
+
+A collision is a proven no-effect result. Any post-create failure or identity
+drift is ambiguous. A replaced entry is foreign and must be preserved, never
+adopted or deleted. The self-test may mutate only its own private canonical-temp
+fixture and must prove collision preservation, normal cleanup, replacement
+refusal, foreign-file preservation, and exact fixture cleanup.
+
+This component must contain no system paths, account or launchd operations,
+elevation, network, credential, Keychain/vault, manifest execution, approval,
+or install surface. It is reusable implementation work, not live evidence.
+
+## Phase 5h.28 scope
+
+Phase 5h.28 may add only the native account soft-ownership state machine and a
+fake directory adapter. Preparation must prove the candidate short name,
+UniqueID, and GeneratedUID absent and snapshot the exact full record. Create
+success remains provisional until immediate re-read verifies name, UniqueID,
+GeneratedUID, non-login shell, and `/var/empty` home.
+
+The ownership object must require explicit initialization. Preparation must
+refuse to overwrite prepared, created, or ambiguous state; create must re-probe
+all three namespaces after the full-record read; and successful delete must
+clear preparation so any later create requires a fresh absence proof.
+
+Deletion is eligible only for this run's created and fully verified identity,
+after a fresh full-tuple re-read. The deletion adapter must receive the complete
+identity rather than a bare name. Any collision, probe error, create ambiguity,
+or identity drift must prevent deletion. Successful deletion must be followed
+by absence checks for all three namespaces.
+
+Tests must cover clean lifecycle, preexisting collision, post-create drift, and
+pre-delete identity replacement with proof that delete was never invoked for a
+foreign identity. This phase must not invoke OpenDirectory/dscl, mutate a real
+account, elevate, touch launchd or system paths, or access credentials.
+
+## Phase 5h.29 scope
+
+Phase 5h.29 may add only the native launchd-job soft-ownership state machine and
+a fake adapter. Preparation requires the fixed label and Mach name absent and
+snapshots the exact program, account, Mach service, binary/plist bindings, and
+demand-only policy. Bootstrap success is provisional until immediate loaded-job
+read plus label/Mach presence re-verification matches the full snapshot.
+
+Activation and denial must freshly reverify job identity. An ambiguous
+activation records that a process may exist and therefore requires stop cleanup.
+Denial requires separately verified process identity. Cleanup must freshly
+verify the job, attempt job-scoped stop after any activation attempt, reverify
+again, perform full-identity conditional bootout, and prove label plus Mach name
+absent. Stop failure must not prevent bootout while identity remains intact.
+
+Bootstrap ambiguity, identity drift, pre-cleanup swap, or adapter-local bootout
+race must never authorize destructive action against a foreign job. Tests must
+cover each case plus clean denial/cleanup and continued cleanup after stop
+failure. This phase performs no real launchctl, Mach, process, account, file, or
+system mutation and grants no approval.
+
+Every bootstrap or activation result other than proven no-effect must be tracked
+as attempted. An unverified bootstrap may perform absence-only cleanup proof but
+must never bootout; presence remains ambiguous. Any non-no-effect activation
+must require stop cleanup. Failed fresh identity verification must invalidate
+the corresponding verified state rather than leave stale ownership flags true.
+
+## Phase 5h.30 scope
+
+Phase 5h.30 may compose the Phase 5h.27–29 primitives into one native controller
+using fake account and launchd adapters plus private-temp retained file parents.
+All absence and artifact-binding checks must finish before the first mutation.
+Mutation order is account, binary, plist, job bootstrap, activation, denial.
+
+After any first mutation, finally cleanup must always proceed job stop/bootout,
+plist unlink, binary unlink, account delete, then aggregate absence, continuing
+after every individual cleanup failure. Each primitive's ownership rules remain
+authoritative; the controller must never reacquire or delete a foreign object.
+Any unresolved or ambiguous object requires manual recovery.
+
+Tests must cross layer boundaries: clean denial/cleanup, collision abort before
+mutation, ambiguous account create, ambiguous activation cleanup, and file path
+replacement during the job/denial phase with foreign preservation plus cleanup
+of remaining run-owned objects. This phase contains no real OpenDirectory,
+launchctl, Mach, elevation, approval, network, or credential adapter.
+
+## Phase 5h.31 scope
+
+Phase 5h.31 may add only a native fixed-command subprocess runner for later
+OpenDirectory and launchctl adapters. It must execute an absolute, root-owned,
+non-group/world-writable regular executable directly with `posix_spawn`, never
+through a shell or PATH lookup. The argument vector, timeout, environment, and
+output bound must be explicit and bounded; stdin is `/dev/null`; unrelated file
+descriptors are closed; timeout, I/O error, and output overflow kill and reap the
+child before returning.
+
+The runner reports nonzero exits rather than treating them as transport errors.
+Its self-test may invoke only harmless macOS system tools (`true`, `false`,
+`printf`, `sleep`, and `yes`) and must prove capture, nonzero status, timeout,
+output-flood termination, and relative-path rejection. This phase must not invoke
+dscl or launchctl, elevate, create/delete accounts, write system paths, perform
+Mach IPC, access credentials, or grant installation approval.
+
+## Phase 5h.32 scope
+
+Phase 5h.32 may add the fixed native `dscl` directory adapter over the Phase
+5h.31 runner. It accepts only `_bwagentbridge`, a system-range UniqueID, the
+canonical generated UUID, `/usr/bin/false`, and `/var/empty`. Searches, reads,
+property creation, and deletion use fixed argument arrays and bounded, silent,
+strictly parsed output. Every partial create or uncertain mutation is ambiguous,
+never no-effect.
+
+Deletion must re-read and compare the complete live identity immediately before
+the fixed-path delete. A mismatch or unreadable record is ambiguous and must not
+invoke delete. The outer account ownership state machine still performs its own
+fresh verification and post-delete three-namespace absence proof. Tests use an
+in-process fake command runner only; they must not invoke real dscl, create an
+account, elevate, touch system paths, access credentials, or grant approval.
+
+## Phase 5h.33 scope
+
+Phase 5h.33 may add the fixed native launchctl job adapter over the Phase 5h.31
+runner. Commands are limited to the exact system-domain helper target and fixed
+plist: print, bootstrap, kickstart, SIGTERM kill, and bootout. Successful
+mutations require exit zero and completely silent output; every other outcome
+is ambiguous unless a future macOS-version-pinned rule proves no effect.
+
+Loaded-job parsing must require exactly one canonical header, program, and user
+line. Running-process evidence additionally requires exactly one running-state
+line and one bounded PID line. Duplicate or conflicting keys fail closed. Every
+loaded-job read and pre-stop/pre-bootout check must also pass an injected
+artifact/policy verifier bound to the expected binary/plist digests. Mach-name
+presence and denial evidence remain separate mandatory injected probes; the
+adapter must not infer them from weak launchctl text.
+
+Tests use only fake command and probe callbacks and must prove the full owned-job
+lifecycle plus malformed identity rejection. A real read-only print of an
+unrelated Apple job may validate output grammar, but this phase must not load,
+start, signal, or remove the bridge job; perform Mach IPC; elevate; access
+credentials; or grant live approval.
+
+## Phase 5h.34 scope
+
+Phase 5h.34 may wire the fixed dscl and launchctl adapters into the composite
+controller and bind the controller's run-owned binary/plist retained descriptors
+to every launchd identity check. Both files must publish and verify before a
+one-shot binder succeeds; bootstrap must not run after binder failure. Bootstrap,
+activation, loaded-job reads, stop, and bootout must each reverify the retained
+file identities, bytes, ownership, modes, and expected job tuple as applicable.
+
+Production initialization must prove the retained parent descriptors resolve
+exactly to `/Library/PrivilegedHelperTools` and `/Library/LaunchDaemons`, and
+repeat that proof during artifact checks so launchctl's fixed plist path cannot
+diverge from the verified file. Temporary-path end-to-end tests may use only the
+compile-time `BW_NATIVE_WIRING_TESTING` constructor, which must not exist in a
+normal build. Artifact byte buffers must remain immutable for the complete run.
+
+Tests must prove a clean fake-system lifecycle, binder-failure cleanup with no
+job mutation, production rejection of temp parents, pre-bootstrap artifact-drift
+blocking, and foreign plist preservation after denial-time replacement. This
+phase exposes no executable CLI or approval bypass and performs no real dscl,
+launchctl mutation, system write, Mach IPC, elevation, or credential access.
+
+## Phase 5h.35 scope
+
+Phase 5h.35 may add the production client side of the fixed Mach denial protocol
+and propagate the freshly parsed launchctl helper PID into that probe. The
+launchctl adapter must refresh the running PID inside denial, not trust an older
+cached value. The client may look up the fixed Mach service only after owned-job
+activation and process verification, so the lookup is not an absence probe and
+cannot unexpectedly activate during preflight.
+
+The reply must be a bounded non-complex fixed-size message with the exact ID,
+version, kind, denial value, ports, and random nonce. Its kernel audit trailer
+must match the immediately refreshed helper PID, fixed UID 499, and carry a
+positive PID generation. Public `proc_pidinfo`/`proc_pidpath` snapshots before
+and after the exchange must retain the same PID, EUID, start timestamp, and exact
+fixed helper path, preventing PID reuse or executable replacement across the
+exchange. Invalid received messages must be destroyed before rights are released.
+
+Private-bootstrap tests may expose an alternate service name only under
+`BW_MACH_PROBE_TESTING`; they must prove a valid exchange and behavioral rejection
+of a wrong expected PID. Production code must require the initialized probe
+context, fixed service/identity, distinct current/helper EUIDs, and the exact
+account record. This phase still performs no production service lookup, account
+or launchd mutation, system write, elevation, credential, Keychain, vault, or
+network access.
+
+## Phase 5h.36 scope
+
+Phase 5h.36 may add the production non-activating Mach-name presence callback.
+It must execute only fixed `/bin/launchctl print system` with the hardened
+absolute-executable, fixed-environment, closed-FD, process-group, timeout, and
+kill/reap rules. It must stream and validate at most 8 MiB rather than buffer an
+unbounded domain snapshot; any stderr, invalid byte, long line, truncation,
+nonzero exit, timeout, or missing final newline is a probe error.
+
+Presence requires the exact trimmed launchctl endpoint-entry line
+`"de.frederikstadler.bitwarden-agent-credential-bridge.helper" = {`. Bare name
+occurrences in paths, labels, prefixes, or suffixes must not match. The collector
+must not call bootstrap lookup/check-in because those APIs can activate a
+demand-only service. A fixed probe bundle may combine this callback with the
+Phase 5h.35 denial callback for native lifecycle wiring.
+
+Tests may parse synthetic snapshots and perform the real read-only system-domain
+print, whose expected current result is fixed-name absence. They must not invoke
+bootstrap, kickstart, kill, bootout, Mach lookup, account or system mutation,
+elevation, credentials, Keychain, vault, or network access.

@@ -48,5 +48,5 @@ a stable failure, and the manifest executor is never invoked.
 A later explicitly approved disposable test must provision or use a real second
 principal, establish target ACLs that deny the caller and allow only the helper,
 combine the native session with the inherited launcher handle, and clean up the
-identity/service. Linux AF_UNIX/SO_PEERCRED and macOS XPC/audit-token collectors
+identity/service. Linux AF_UNIX/SO_PEERCRED and macOS Mach/audit-token collectors
 also remain unimplemented.

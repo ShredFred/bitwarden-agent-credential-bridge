@@ -4,7 +4,8 @@ Sample-only security experiment. Phase 1 tests a **credential-bridge contract**.
 Phase 2 adds an offline, non-mutating OneCLI readiness audit. Phase 3 adds
 offline supply-chain evidence and a not-run disposable live-test design. Phase
 4a adds a fake-only, policy-pinned HTTP API-key header contract. Phase 4b adds
-a fake-only HTTP Basic contract. Phase 5a adds a pure cross-platform bootstrap
+a fake-only HTTP Basic contract. Phase 4c adds a local OneCLI chained-proxy
+token-placement contract with fake gateway tests. Phase 5a adds a pure cross-platform bootstrap
 plan. None of these phases access a real vault or test Bitwarden product
 security or OneCLI production security.
 
@@ -63,6 +64,25 @@ It does not retrieve credentials from Bitwarden, operate a browser, or provide
 a production authentication proxy. See
 [`docs/phase4b-http-basic.md`](docs/phase4b-http-basic.md).
 
+## What Phase 4c covers
+
+- A strict version-4 `onecli_proxy` policy pinning one loopback OneCLI gateway
+  and one lowercase DNS destination on port 443.
+- A foreground chained proxy that accepts HTTP absolute-form and HTTPS
+  `CONNECT`, strips caller proxy/auth material, and sends exactly one generated
+  OneCLI `Proxy-Authorization` value only to the gateway leg.
+- Bounded headers, bodies, handshakes, idle time, connections, and tunnel bytes,
+  plus fake-gateway functional and agent-token exposure tests.
+- A fixed-entrypoint same-user supervisor that transfers token/policy over
+  inherited IPC only, owns the parent lease, validates one loopback ready
+  record, invalidates dead children, and performs bounded shutdown.
+- An explicit HTTPS limitation: after CONNECT, this bridge sees opaque bytes
+  and can enforce destination authority only, not method/path/content policy.
+
+Phase 4c does not start OneCLI, pair Bitwarden, install a gateway CA, provide a
+signed package identity, or handle target credentials. See
+[`docs/phase4c-onecli-chained-proxy.md`](docs/phase4c-onecli-chained-proxy.md).
+
 ## What Phase 2 covers
 
 - An upstream lock for OneCLI release `1.45.0`, its reviewed source commit, and
@@ -117,6 +137,7 @@ approved disposable test passes and its evidence is reviewed. See
 npm test
 npm run test:phase4a
 npm run test:phase4b
+npm run test:phase4c
 npm run test:phase5a
 npm run test:phase5b
 npm run test:phase5c
@@ -132,8 +153,16 @@ npm run test:phase5h7
 npm run test:phase5h8
 npm run test:phase5h9
 npm run test:phase5h10
+npm run test:phase5h18
+npm run test:phase5h19
+npm run test:phase5h20
+npm run test:phase5h21
 node src/run-demo.js
 ```
+
+For the latest macOS verification evidence and the exact Windows/Cursor
+continuation checklist, see
+[`docs/macos-validation-and-windows-handoff.md`](docs/macos-validation-and-windows-handoff.md).
 
 `run-demo.js` generates a cryptographically random fake sentinel, starts the fake API and foreground broker, calls through the broker bind URL, and prints only caller-visible status/body. It exits non-zero if the sentinel leaks into those surfaces or broker logs.
 
@@ -251,7 +280,7 @@ docs/phase5g-disposable-executor.md    real install/upgrade/rollback in temp onl
 docs/phase5h-helper-protocol.md         pure separate-writer helper wire contract
 docs/phase5h2-windows-helper-evidence.md pure Windows token/ACL evidence compiler
 docs/phase5h3-linux-helper-evidence.md   pure Linux host-UID/peercred evidence compiler
-docs/phase5h4-macos-helper-evidence.md   pure macOS XPC/audit-token evidence compiler
+docs/phase5h4-macos-helper-evidence.md   pure macOS Mach/audit-token evidence compiler
 docs/phase5h5-inherited-launcher-transfer.md real disposable inherited-handle check
 docs/phase5h6-windows-helper-pipe-session.md real local pipe/token denial check
 docs/phase5h7-windows-native-denial-session.md combined pipe/handle/AccessCheck denial
@@ -262,6 +291,19 @@ docs/phase5h11-native-pipe-denial.md native local pipe/token denial probe
 docs/phase5h12-explicit-pipe-dacl.md fixed protected native pipe DACL proof
 docs/phase5h13-server-identity-verifier.md pre-request SCM/PID/token verifier
 docs/phase5h17-linux-systemd-boundary-plan.md pure fixed systemd system-service contract
+docs/phase5h18-macos-launchd-boundary-plan.md pure fixed launchd system-helper contract
+docs/phase5h19-macos-launchd-boundary-preflight.md read-only fixed macOS host inspection
+docs/phase5h20-macos-code-snapshot-verification.md fd-content-bound Apple code verification
+docs/phase5h21-macos-mach-denial-session.md real same-EUID Mach audit-trailer denial
+docs/phase5h22-macos-launchd-lifecycle-gate.md pure distinct-EUID lifecycle gate
+docs/phase5h23-macos-launchd-lifecycle-evidence.md value-free lifecycle transcript grammar
+docs/phase5h24-native-macos-launchd-helper.md compiled denial-only launchd helper scaffold
+docs/phase5h25-signed-macos-lifecycle-package.md real signed helper/plist bindings, non-installing
+docs/phase5h26-macos-lifecycle-read-only-dry-run.md no-input read-only lifecycle preflight
+docs/phase5h27-macos-retained-file-ownership.md native retained-FD publication/cleanup core
+docs/phase5h28-macos-account-soft-ownership.md native full-tuple account ownership core
+docs/phase5h29-macos-launchd-job-soft-ownership.md native full-identity launchd ownership core
+docs/phase5h30-macos-composite-lifecycle-controller.md cross-layer native finally-cleanup controller
 test/*.test.js                      functional + exposure tests
 AGENTS.md                           experiment rules for agents
 ```
@@ -335,6 +377,91 @@ AGENTS.md                           experiment rules for agents
   root-owned nonwritable artifacts, a filesystem AF_UNIX endpoint, and explicit
   sandbox requirements. It performs no host inspection, elevation, account/unit
   creation, socket I/O, or mutation and remains ineligible for installation.
+- Phase 5h.18 fixes the future macOS writer to the launchd system domain, a
+  static hidden non-login helper account, a fixed Mach service, and pinned
+  binary/designated-requirement digests. It also requires the accepted Mach request
+  audit token to match the authorizing caller. It performs no host inspection,
+  signing, launchd/Mach I/O, elevation, account/daemon creation, Keychain access,
+  or mutation and remains ineligible for installation.
+- Phase 5h.19 performs a real read-only inspection of the fixed macOS helper
+  artifacts, account, binary digest, and designated code requirement while
+  returning booleans only. The current expected result is the canonical absent
+  snapshot. Its path-based codesign comparison is reported separately and, by
+  itself, cannot establish verified code or an aggregate match. The result is
+  non-authorizing and ineligible for installation or Mach-service use.
+- Phase 5h.20 binds Apple signature and designated-requirement verification to
+  an exclusive byte-identical private snapshot copied from the already-open
+  helper descriptor. A matching static snapshot can now be represented, while
+  authorization remains forced false until a live launchd/Mach identity collector
+  exists. The only write is the private temporary measurement file plus mandatory
+  exact cleanup; it never touches `/Library`, user home, Keychain, or Bitwarden.
+- Phase 5h.21 runs a real cross-process raw-Mach nonce exchange and binds both
+  request and reply senders through kernel `MACH_RCV_TRAILER_AUDIT` tokens,
+  including PID generations and EUID digests. It honestly reports a same-EUID
+  denial, never claims the production launchd service or code requirement, sends
+  no manifest request, and remains ineligible for installation or authorization.
+- Phase 5h.22 freezes the future explicitly approved distinct-EUID LaunchDaemon
+  denial lifecycle as a pure branded gate. It binds the reviewed binary, plist,
+  and designated-requirement values; encodes collision-safe soft ownership and
+  ordered cleanup; accepts no approval or host-selected values; performs no
+  mutation; and keeps installation and authorization ineligible.
+- Phase 5h.23 validates only the structure of a future value-free lifecycle
+  transcript. It derives soft account/job and retained-FD file ownership,
+  distinguishes proven no-effect from ambiguous mutation failures, enforces
+  ownership-consistent cleanup and final absence, supports an untrusted
+  pre-mutation-only `dry_run_complete` outcome, and still returns no trusted,
+  live, authorizing, or installation-eligible evidence.
+- Phase 5h.24 compiles the real no-argument launchd/MachServices denial-only
+  entrypoint. It verifies the fixed non-login account before check-in, accepts
+  only one bounded audit-trailer nonce probe, and can only reply denied. Its
+  runner performs two source-snapshot-bound private-temp builds, fixed self-test,
+  ambient no-arg rejection, and exact cleanup; nothing is installed or trusted.
+- Phase 5h.25 produces the real local signed helper/plist package entirely in
+  private temporary roots. It verifies same-host reproducibility, exact ad-hoc
+  designated requirement, FD-content code identity, and plist rules; it binds
+  the resulting digests into branded plans/gates without installation while
+  keeping all mutation and authorization flags false.
+- Phase 5h.26 runs the complete seven-step pre-mutation lifecycle dry run on
+  macOS. It emits only bounded value-free facts, uses a non-activating system
+  launchd-domain snapshot for Mach-name absence, performs no system mutation,
+  and remains explicitly untrusted and ineligible for installation.
+- Phase 5h.27 implements and fixture-tests the native retained-FD ownership core
+  needed for system binary/plist publication and cleanup. Exclusive collisions
+  are preserved, and a replaced path is never adopted or deleted.
+- Phase 5h.28 implements and fault-tests full-tuple macOS account ownership.
+  Name, UniqueID, GeneratedUID, shell, and home must survive immediate and
+  pre-delete re-verification; identity drift can never authorize deletion.
+- Phase 5h.29 implements full-identity launchd job ownership, process-bound
+  denial gating, and ordered stop/bootout/absence cleanup. Ambiguous activation
+  is cleaned, while foreign job replacement is preserved.
+- Phase 5h.30 composes file, account, and launchd ownership into the exact
+  preflight→mutation→denial→reverse-finally lifecycle. Cross-layer faults prove
+  cleanup continuation and preservation of replaced foreign objects.
+- Phase 5h.31 provides the shell-free, fixed-environment native command runner
+  needed by future macOS system adapters. It closes inherited descriptors,
+  bounds output and time, and always kills/reaps failed or runaway children;
+  tests use harmless system commands only and perform no privileged mutation.
+- Phase 5h.32 adds the exact `_bwagentbridge` `dscl` adapter over that runner.
+  It strictly parses directory results, treats partial creation as ambiguous,
+  and rebinds the full live identity immediately before deletion. Its tests use
+  only a fake runner and do not modify the host directory service.
+- Phase 5h.33 adds fixed system-domain `launchctl` operations with unique-key
+  parsing, digest/policy revalidation, and separate mandatory Mach presence and
+  denial probes. Mutation tests remain fake-only; a read-only Apple-job print
+  confirms the current host output grammar without touching the bridge job.
+- Phase 5h.34 wires the native adapters into the controller and binds every job
+  mutation to retained binary/plist identities. Production wiring accepts only
+  the exact two `/Library` parent directories; a compile-time-only test
+  constructor exercises clean and replacement-fault lifecycles in private temp.
+- Phase 5h.35 implements the production Mach denial client. A freshly parsed
+  launchctl PID is bound to the reply's kernel audit trailer, while before/after
+  process snapshots preserve EUID, start time, and exact helper path. Private
+  Mach tests prove valid denial and reject a wrong PID without using the fixed
+  production service.
+- Phase 5h.36 adds the non-activating Mach-name presence collector. It streams a
+  bounded `launchctl print system`, matches only the exact endpoint-entry line,
+  rejects path/name substrings, and shares the hardened executable validator.
+  The live read-only result on this Mac is fixed-name absent.
 - No browser/website automation, query, cookie, form, process-env,
   SSH, database, RDP, or desktop credential injection.
 - Not a substitute for vault, OS keychain, or production broker hardening.

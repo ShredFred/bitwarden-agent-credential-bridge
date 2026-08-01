@@ -1,4 +1,5 @@
 import path from 'node:path';
+import { types as utilTypes } from 'node:util';
 import { canonicalJson, verifyManifestConfirmation } from './apply-manifest.mjs';
 
 const MAX_REQUEST_BYTES = 64 * 1024;
@@ -186,6 +187,7 @@ function validateRequest(raw) {
 
 function exactPlainObject(value, fields) {
   if (value === null || typeof value !== 'object' || Array.isArray(value) ||
+      utilTypes.isProxy(value) ||
       Object.getPrototypeOf(value) !== Object.prototype) {
     throw new HelperProtocolError('invalid_request');
   }
@@ -193,15 +195,20 @@ function exactPlainObject(value, fields) {
   if (keys.length !== fields.size || keys.some((key) => typeof key !== 'string' || !fields.has(key))) {
     throw new HelperProtocolError('invalid_request');
   }
+  const snapshot = {};
   for (const key of keys) {
     const descriptor = Object.getOwnPropertyDescriptor(value, key);
     if (descriptor === undefined || !('value' in descriptor)) throw new HelperProtocolError('invalid_request');
+    Object.defineProperty(snapshot, key, {
+      value: descriptor.value, enumerable: true, writable: false, configurable: false,
+    });
   }
-  return value;
+  return Object.freeze(snapshot);
 }
 
 function dataProperty(value, key) {
   if (value === null || typeof value !== 'object' || Array.isArray(value) ||
+      utilTypes.isProxy(value) ||
       Object.getPrototypeOf(value) !== Object.prototype) {
     throw new HelperProtocolError('invalid_request');
   }

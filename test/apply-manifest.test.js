@@ -129,6 +129,23 @@ describe('pure apply/rollback manifest', () => {
     const mac = buildApplyManifest({ ...base, platform: 'darwin', homedir: '/Users/fake' });
     assert.match(win.payload.paths.launcher, /bw-agent-bridge\.cmd$/);
     assert.match(mac.payload.paths.launcher, /bw-agent-bridge$/);
+    assert.equal(mac.payload.paths.config_dir, mac.payload.paths.install_root);
+    assert.equal(
+      mac.payload.forward.filter((entry) => entry.kind === 'create_directory_exclusive' && entry.target === mac.payload.paths.install_root).length,
+      1,
+    );
     assert.ok(win.payload.forward.every((entry) => entry.permission === undefined || entry.permission === 'current_user_system_admin_write'));
+  });
+
+  it('rejects contradictory observed state for the shared macOS application root', () => {
+    assert.throws(
+      () => buildApplyManifest({
+        ...base,
+        platform: 'darwin',
+        homedir: '/Users/fake',
+        observed: { ...absent, install_root: 'secure_directory' },
+      }),
+      (error) => error instanceof ApplyManifestError && error.code === 'incoherent_observed_state',
+    );
   });
 });

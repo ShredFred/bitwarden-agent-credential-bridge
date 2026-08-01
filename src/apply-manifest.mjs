@@ -44,6 +44,7 @@ export function buildApplyManifest(input) {
     launcher: roots.launcherPath,
   };
   validatePaths(input.platform, paths);
+  validateSharedPathState(paths, observed);
 
   const seed = sha256(Buffer.from(canonicalJson({
     schema_version: 1,
@@ -78,7 +79,7 @@ export function buildApplyManifest(input) {
       expected_sha256: EMPTY_CONFIG_SHA256,
     }));
   }
-  if (observed.install_root === 'absent') {
+  if (observed.install_root === 'absent' && paths.install_root !== paths.config_dir) {
     add(forward, 'create_directory_exclusive', paths.install_root, { permission });
     rollback.unshift(action('remove_directory_if_empty', paths.install_root));
   }
@@ -238,6 +239,12 @@ function validatePaths(platform, paths) {
   assertDescendant(pathApi, paths.install_root, paths.bin_dir);
   assertDescendant(pathApi, paths.install_root, paths.launcher);
   assertDescendant(pathApi, paths.bin_dir, paths.launcher);
+}
+
+function validateSharedPathState(paths, observed) {
+  if (paths.config_dir === paths.install_root && observed.config_dir !== observed.install_root) {
+    throw new ApplyManifestError('incoherent_observed_state');
+  }
 }
 
 function assertDescendant(pathApi, parent, child) {

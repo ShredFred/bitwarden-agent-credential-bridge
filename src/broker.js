@@ -219,6 +219,12 @@ export async function startBroker(options) {
       { code: 'unsupported_credential_class' },
     );
   }
+  if (suppliedClass === 'onecli_proxy') {
+    throw new BrokerError(
+      'onecli_proxy requires the dedicated chained proxy broker',
+      { code: 'wrong_broker' },
+    );
+  }
 
   let policy;
   try {

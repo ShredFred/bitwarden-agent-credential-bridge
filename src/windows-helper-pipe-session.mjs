@@ -38,7 +38,6 @@ export class WindowsHelperPipeSessionError extends Error {
  * Same-user first-install execution must end in same_principal_rejected and never applies.
  */
 export async function verifyWindowsHelperPipeSamePrincipal(input, options = {}) {
-  if (process.platform !== 'win32') throw new WindowsHelperPipeSessionError('unsupported_platform');
   const values = exactInput(input);
   await verifyDisposableWorkspace(values.workspace);
   const launcherDigest = createHash('sha256').update(values.launcherBytes).digest('hex');
@@ -46,6 +45,7 @@ export async function verifyWindowsHelperPipeSamePrincipal(input, options = {}) 
     throw new WindowsHelperPipeSessionError('request_binding_mismatch');
   }
   verifyRequestBinding(values);
+  if (process.platform !== 'win32') throw new WindowsHelperPipeSessionError('unsupported_platform');
   const timeoutMs = options.timeoutMs ?? 10000;
   if (!Number.isInteger(timeoutMs) || timeoutMs < 1000 || timeoutMs > 30000) {
     throw new WindowsHelperPipeSessionError('invalid_timeout');

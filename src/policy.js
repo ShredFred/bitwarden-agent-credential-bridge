@@ -1,4 +1,5 @@
 import { readFile } from 'node:fs/promises';
+import { isIP } from 'node:net';
 import {
   CREDENTIAL_PLACEHOLDER,
   PASSWORD_PLACEHOLDER,
@@ -39,6 +40,19 @@ const VERSION_3_POLICY_FIELDS = new Set([
   'username_value',
   'password_value',
 ]);
+const VERSION_4_POLICY_FIELDS = new Set([
+  'version',
+  'service',
+  'credential_class',
+  'bind',
+  'gateway',
+  'target_host',
+  'target_port',
+  'method',
+  'path',
+  'agent_token',
+]);
+const DNS_HOSTNAME = /^(?=.{1,253}$)[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)*$/;
 const FORBIDDEN_API_KEY_HEADER_NAMES = new Set([
   'authorization',
   'connection',
@@ -88,7 +102,9 @@ const MAX_API_KEY_HEADER_NAME_LENGTH = 128;
 
 /** @typedef {PolicyBase & {version: 3, credential_class: 'http_basic', username_value: string, password_value: string}} BasicPolicy */
 
-/** @typedef {BearerPolicy | ApiKeyHeaderPolicy | BasicPolicy} Policy */
+/** @typedef {{version: 4, service: string, credential_class: 'onecli_proxy', bind: string, gateway: string, target_host: string, target_port: 443, method: string, path: string, agent_token: string}} OneCliProxyPolicy */
+
+/** @typedef {BearerPolicy | ApiKeyHeaderPolicy | BasicPolicy | OneCliProxyPolicy} Policy */
 
 /**
  * Validate a declarative policy object. Unsupported credential classes fail closed.
@@ -103,8 +119,8 @@ export function validatePolicy(raw) {
   /** @type {Record<string, unknown>} */
   const obj = /** @type {Record<string, unknown>} */ (raw);
 
-  if (obj.version !== 1 && obj.version !== 2 && obj.version !== 3) {
-    throw new PolicyValidationError('policy.version must be 1, 2, or 3');
+  if (obj.version !== 1 && obj.version !== 2 && obj.version !== 3 && obj.version !== 4) {
+    throw new PolicyValidationError('policy.version must be 1, 2, 3, or 4');
   }
 
   const allowedFields =
@@ -112,7 +128,9 @@ export function validatePolicy(raw) {
       ? VERSION_1_POLICY_FIELDS
       : obj.version === 2
         ? VERSION_2_POLICY_FIELDS
-        : VERSION_3_POLICY_FIELDS;
+        : obj.version === 3
+          ? VERSION_3_POLICY_FIELDS
+          : VERSION_4_POLICY_FIELDS;
   validateExactFields(
     obj,
     allowedFields,
@@ -143,7 +161,9 @@ export function validatePolicy(raw) {
       ? 'http_bearer'
       : obj.version === 2
         ? 'http_api_key_header'
-        : 'http_basic';
+        : obj.version === 3
+          ? 'http_basic'
+          : 'onecli_proxy';
   if (obj.credential_class !== expectedClass) {
     throw new PolicyValidationError(
       `policy.version ${obj.version} requires credential_class "${expectedClass}"`,
@@ -151,7 +171,9 @@ export function validatePolicy(raw) {
   }
 
   const bind = parseLoopbackHttpUrl(obj.bind, 'policy.bind');
-  const upstream = parseLoopbackHttpUrl(obj.upstream, 'policy.upstream');
+  const upstream = obj.version === 4
+    ? null
+    : parseLoopbackHttpUrl(obj.upstream, 'policy.upstream');
 
   if (typeof obj.method !== 'string' || !HTTP_METHODS.has(obj.method)) {
     throw new PolicyValidationError(
@@ -178,9 +200,40 @@ export function validatePolicy(raw) {
   const common = {
     service: obj.service,
     bind: bind.href.replace(/\/$/, ''),
-    upstream: upstream.href.replace(/\/$/, ''),
     method: obj.method,
     path: obj.path,
+  };
+
+  if (obj.version === 4) {
+    const gateway = parseLoopbackHttpUrl(obj.gateway, 'policy.gateway');
+    if (Number(gateway.port) === 0) {
+      throw new PolicyValidationError('policy.gateway port must be non-zero');
+    }
+    if (typeof obj.target_host !== 'string' || !DNS_HOSTNAME.test(obj.target_host) ||
+        isIP(obj.target_host) !== 0 ||
+        obj.target_host.startsWith('xn--') || obj.target_host.includes('.xn--')) {
+      throw new PolicyValidationError(
+        'policy.target_host must be an exact lowercase ASCII DNS hostname without IP, IDNA, wildcard, or trailing dot syntax',
+      );
+    }
+    if (obj.target_port !== 443) {
+      throw new PolicyValidationError('policy.target_port must be exactly 443');
+    }
+    validateCredentialPlaceholder(obj.agent_token, 'policy.agent_token');
+    return {
+      version: 4,
+      ...common,
+      credential_class: 'onecli_proxy',
+      gateway: gateway.href.replace(/\/$/, ''),
+      target_host: obj.target_host,
+      target_port: 443,
+      agent_token: CREDENTIAL_PLACEHOLDER,
+    };
+  }
+
+  const commonWithUpstream = {
+    ...common,
+    upstream: /** @type {URL} */ (upstream).href.replace(/\/$/, ''),
   };
 
   if (obj.version === 1) {
@@ -190,7 +243,7 @@ export function validatePolicy(raw) {
     validateCredentialPlaceholder(obj.authorization, 'policy.authorization');
     return {
       version: 1,
-      ...common,
+      ...commonWithUpstream,
       credential_class: 'http_bearer',
       authorization: CREDENTIAL_PLACEHOLDER,
     };
@@ -204,7 +257,7 @@ export function validatePolicy(raw) {
     validateCredentialPlaceholder(obj.header_value, 'policy.header_value');
     return {
       version: 2,
-      ...common,
+      ...commonWithUpstream,
       credential_class: 'http_api_key_header',
       header_name: /** @type {string} */ (obj.header_name),
       header_value: CREDENTIAL_PLACEHOLDER,
@@ -223,7 +276,7 @@ export function validatePolicy(raw) {
   );
   return {
     version: 3,
-    ...common,
+    ...commonWithUpstream,
     credential_class: 'http_basic',
     username_value: USERNAME_PLACEHOLDER,
     password_value: PASSWORD_PLACEHOLDER,
@@ -281,6 +334,15 @@ export function withBind(policy, bindUrl) {
     ...policy,
     bind: bind.href.replace(/\/$/, ''),
   });
+}
+
+/** Return a validated v4 policy with a concrete loopback gateway origin. */
+export function withGateway(policy, gatewayUrl) {
+  if (policy?.version !== 4) {
+    throw new PolicyValidationError('withGateway requires a version-4 policy');
+  }
+  const gateway = parseLoopbackHttpUrl(gatewayUrl, 'gateway');
+  return validatePolicy({ ...policy, gateway: gateway.href.replace(/\/$/, '') });
 }
 
 /**
