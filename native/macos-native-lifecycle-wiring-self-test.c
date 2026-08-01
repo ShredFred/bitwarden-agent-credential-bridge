@@ -111,9 +111,11 @@ static bw_launchd_probe mach_presence(void *raw, const char *name) {
   return host->job_present ? BW_LAUNCHD_PRESENT : BW_LAUNCHD_ABSENT;
 }
 
-static bool denial(void *raw, const bw_launchd_job_record *identity) {
+static bool denial(
+    void *raw, const bw_launchd_job_record *identity, pid_t expected_helper_pid) {
   fake_system *host = raw;
-  if (host == NULL || !host->job_present || !host->running || strcmp(identity->label, LABEL) != 0) {
+  if (host == NULL || !host->job_present || !host->running || expected_helper_pid != 4242 ||
+      strcmp(identity->label, LABEL) != 0) {
     return false;
   }
   if (!host->replace_plist_on_denial) return true;

@@ -4,8 +4,11 @@
 #include "macos-fixed-command-runner.h"
 #include "macos-launchd-job-ownership.h"
 
+#include <sys/types.h>
+
 typedef bw_launchd_probe (*bw_mach_presence_probe)(void *context, const char *fixed_name);
-typedef bool (*bw_mach_denial_probe)(void *context, const bw_launchd_job_record *identity);
+typedef bool (*bw_mach_denial_probe)(
+    void *context, const bw_launchd_job_record *identity, pid_t expected_helper_pid);
 typedef bool (*bw_job_artifact_probe)(void *context, const bw_launchd_job_record *identity);
 
 typedef struct {
@@ -16,6 +19,7 @@ typedef struct {
   void *probe_context;
   void *artifact_context;
   bw_launchd_job_record expected;
+  pid_t verified_pid;
 } bw_launchctl_job_adapter;
 
 bool bw_init_launchctl_job_ops(

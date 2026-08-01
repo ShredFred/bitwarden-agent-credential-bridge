@@ -1011,3 +1011,28 @@ job mutation, production rejection of temp parents, pre-bootstrap artifact-drift
 blocking, and foreign plist preservation after denial-time replacement. This
 phase exposes no executable CLI or approval bypass and performs no real dscl,
 launchctl mutation, system write, Mach IPC, elevation, or credential access.
+
+## Phase 5h.35 scope
+
+Phase 5h.35 may add the production client side of the fixed Mach denial protocol
+and propagate the freshly parsed launchctl helper PID into that probe. The
+launchctl adapter must refresh the running PID inside denial, not trust an older
+cached value. The client may look up the fixed Mach service only after owned-job
+activation and process verification, so the lookup is not an absence probe and
+cannot unexpectedly activate during preflight.
+
+The reply must be a bounded non-complex fixed-size message with the exact ID,
+version, kind, denial value, ports, and random nonce. Its kernel audit trailer
+must match the immediately refreshed helper PID, fixed UID 499, and carry a
+positive PID generation. Public `proc_pidinfo`/`proc_pidpath` snapshots before
+and after the exchange must retain the same PID, EUID, start timestamp, and exact
+fixed helper path, preventing PID reuse or executable replacement across the
+exchange. Invalid received messages must be destroyed before rights are released.
+
+Private-bootstrap tests may expose an alternate service name only under
+`BW_MACH_PROBE_TESTING`; they must prove a valid exchange and behavioral rejection
+of a wrong expected PID. Production code must require the initialized probe
+context, fixed service/identity, distinct current/helper EUIDs, and the exact
+account record. This phase still performs no production service lookup, account
+or launchd mutation, system write, elevation, credential, Keychain, vault, or
+network access.

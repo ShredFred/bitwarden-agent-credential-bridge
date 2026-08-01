@@ -26,7 +26,7 @@ describe('native macOS fixed launchctl job adapter', () => {
     assert.match(source, /adapter->denial/);
     assert.match(source, /adapter->artifacts/);
     assert.match(source, /key_count == 1 && expected_count == 1/);
-    assert.match(source, /found_count == 1 && found_pid > 1/);
+    assert.match(source, /found_count != 1 \|\| found_pid <= 1/);
     for (const forbidden of [/system\(/, /popen\(/, /\/bin\/sh/, /sudo/, /dscl/]) {
       assert.equal(forbidden.test(source), false, forbidden);
     }

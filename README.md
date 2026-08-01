@@ -432,6 +432,11 @@ AGENTS.md                           experiment rules for agents
   mutation to retained binary/plist identities. Production wiring accepts only
   the exact two `/Library` parent directories; a compile-time-only test
   constructor exercises clean and replacement-fault lifecycles in private temp.
+- Phase 5h.35 implements the production Mach denial client. A freshly parsed
+  launchctl PID is bound to the reply's kernel audit trailer, while before/after
+  process snapshots preserve EUID, start time, and exact helper path. Private
+  Mach tests prove valid denial and reject a wrong PID without using the fixed
+  production service.
 - No browser/website automation, query, cookie, form, process-env,
   SSH, database, RDP, or desktop credential injection.
 - Not a substitute for vault, OS keychain, or production broker hardening.

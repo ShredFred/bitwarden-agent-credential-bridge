@@ -108,7 +108,7 @@ static bool unique_key_line(
   return key_count == 1 && expected_count == 1;
 }
 
-static bool unique_pid_line(const char *bytes, size_t length) {
+static bool unique_pid_line(const char *bytes, size_t length, unsigned long *observed) {
   static const char key[] = "pid = ";
   size_t found_count = 0;
   unsigned long found_pid = 0;
@@ -134,13 +134,18 @@ static bool unique_pid_line(const char *bytes, size_t length) {
     }
     start = end + 1;
   }
-  return found_count == 1 && found_pid > 1 && found_pid <= 99999999UL;
+  if (observed == NULL || found_count != 1 || found_pid <= 1 || found_pid > 99999999UL) {
+    return false;
+  }
+  *observed = found_pid;
+  return true;
 }
 
 static bool parsed_loaded_job(
     const bw_command_output *output,
     const bw_launchd_job_record *expected,
-    bool require_running) {
+    bool require_running,
+    pid_t *observed_pid) {
   if (!clean_exit(output, 0) || output->stderr_length != 0 ||
       !safe_output(output->stdout_bytes, output->stdout_length)) return false;
   char header[192];
@@ -156,24 +161,30 @@ static bool parsed_loaded_job(
       !unique_key_line(output->stdout_bytes, output->stdout_length, "username = ", username)) {
     return false;
   }
-  if (!require_running) return true;
+  if (!require_running) return observed_pid == NULL;
   if (!unique_key_line(
           output->stdout_bytes, output->stdout_length, "state = ", "state = running")) {
     return false;
   }
-  return unique_pid_line(output->stdout_bytes, output->stdout_length);
+  unsigned long pid = 0;
+  if (!unique_pid_line(output->stdout_bytes, output->stdout_length, &pid) || observed_pid == NULL) {
+    return false;
+  }
+  *observed_pid = (pid_t)pid;
+  return true;
 }
 
 static bool print_job(
     bw_launchctl_job_adapter *adapter,
     const bw_launchd_job_record *expected,
-    bool require_running) {
+    bool require_running,
+    pid_t *observed_pid) {
   char *args[] = {LAUNCHCTL, "print", SERVICE_TARGET, NULL};
   bw_command_output output;
   return adapter->artifacts != NULL &&
       adapter->artifacts(adapter->artifact_context, expected) &&
       run_launchctl(adapter, args, &output) == BW_COMMAND_OK &&
-      parsed_loaded_job(&output, expected, require_running);
+      parsed_loaded_job(&output, expected, require_running, observed_pid);
 }
 
 static bw_launchd_probe probe_label(void *context, const char *label) {
@@ -189,7 +200,7 @@ static bw_launchd_probe probe_label(void *context, const char *label) {
       memcmp(output.stderr_bytes, ABSENT_STDERR, output.stderr_length) == 0) {
     return BW_LAUNCHD_ABSENT;
   }
-  return parsed_loaded_job(&output, &adapter->expected, false)
+  return parsed_loaded_job(&output, &adapter->expected, false, NULL)
       ? BW_LAUNCHD_PRESENT : BW_LAUNCHD_PROBE_ERROR;
 }
 
@@ -215,7 +226,7 @@ static bw_job_result bootstrap(void *context, const bw_launchd_job_record *recor
 static bool read_job(void *context, const char *label, bw_launchd_job_record *record) {
   bw_launchctl_job_adapter *adapter = context;
   if (adapter == NULL || label == NULL || strcmp(label, LABEL) != 0 || record == NULL ||
-      !print_job(adapter, &adapter->expected, false)) return false;
+      !print_job(adapter, &adapter->expected, false, NULL)) return false;
   *record = adapter->expected;
   return true;
 }
@@ -234,20 +245,34 @@ static bw_job_result activate(void *context, const bw_launchd_job_record *record
 
 static bool verify_process(void *context, const bw_launchd_job_record *record) {
   bw_launchctl_job_adapter *adapter = context;
-  return adapter != NULL && same_record(record, &adapter->expected) &&
-      print_job(adapter, &adapter->expected, true);
+  if (adapter == NULL || !same_record(record, &adapter->expected)) return false;
+  pid_t observed = 0;
+  if (!print_job(adapter, &adapter->expected, true, &observed)) {
+    adapter->verified_pid = 0;
+    return false;
+  }
+  adapter->verified_pid = observed;
+  return true;
 }
 
 static bool exercise_denial(void *context, const bw_launchd_job_record *record) {
   bw_launchctl_job_adapter *adapter = context;
-  return adapter != NULL && same_record(record, &adapter->expected) && adapter->denial != NULL &&
-      adapter->denial(adapter->probe_context, record);
+  if (adapter == NULL || !same_record(record, &adapter->expected) || adapter->denial == NULL) {
+    return false;
+  }
+  pid_t observed = 0;
+  if (!print_job(adapter, &adapter->expected, true, &observed)) {
+    adapter->verified_pid = 0;
+    return false;
+  }
+  adapter->verified_pid = observed;
+  return adapter->denial(adapter->probe_context, record, observed);
 }
 
 static bw_job_result stop_process(void *context, const bw_launchd_job_record *record) {
   bw_launchctl_job_adapter *adapter = context;
   if (adapter == NULL || !same_record(record, &adapter->expected)) return BW_JOB_ERROR;
-  if (!print_job(adapter, &adapter->expected, false)) return BW_JOB_AMBIGUOUS;
+  if (!print_job(adapter, &adapter->expected, false, NULL)) return BW_JOB_AMBIGUOUS;
   char *args[] = {LAUNCHCTL, "kill", "SIGTERM", SERVICE_TARGET, NULL};
   bw_command_output output;
   if (run_launchctl(adapter, args, &output) != BW_COMMAND_OK || !clean_exit(&output, 0) ||
@@ -258,7 +283,7 @@ static bw_job_result stop_process(void *context, const bw_launchd_job_record *re
 static bw_job_result bootout(void *context, const bw_launchd_job_record *record) {
   bw_launchctl_job_adapter *adapter = context;
   if (adapter == NULL || !same_record(record, &adapter->expected)) return BW_JOB_ERROR;
-  if (!print_job(adapter, &adapter->expected, false)) return BW_JOB_AMBIGUOUS;
+  if (!print_job(adapter, &adapter->expected, false, NULL)) return BW_JOB_AMBIGUOUS;
   char *args[] = {LAUNCHCTL, "bootout", SERVICE_TARGET, NULL};
   bw_command_output output;
   if (run_launchctl(adapter, args, &output) != BW_COMMAND_OK || !clean_exit(&output, 0) ||

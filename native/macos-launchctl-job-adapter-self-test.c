@@ -97,10 +97,11 @@ static bw_launchd_probe mach_presence(void *context, const char *name) {
   return fake->loaded ? BW_LAUNCHD_PRESENT : BW_LAUNCHD_ABSENT;
 }
 
-static bool denial(void *context, const bw_launchd_job_record *identity) {
+static bool denial(
+    void *context, const bw_launchd_job_record *identity, pid_t expected_helper_pid) {
   fake_launchd *fake = context;
   return fake != NULL && fake->loaded && fake->running && fake->denial &&
-      strcmp(identity->label, LABEL) == 0;
+      strcmp(identity->label, LABEL) == 0 && expected_helper_pid == 4242;
 }
 
 static bool artifacts(void *context, const bw_launchd_job_record *identity) {
