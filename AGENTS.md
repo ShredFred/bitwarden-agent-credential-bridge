@@ -888,3 +888,30 @@ Tests must cover clean lifecycle, preexisting collision, post-create drift, and
 pre-delete identity replacement with proof that delete was never invoked for a
 foreign identity. This phase must not invoke OpenDirectory/dscl, mutate a real
 account, elevate, touch launchd or system paths, or access credentials.
+
+## Phase 5h.29 scope
+
+Phase 5h.29 may add only the native launchd-job soft-ownership state machine and
+a fake adapter. Preparation requires the fixed label and Mach name absent and
+snapshots the exact program, account, Mach service, binary/plist bindings, and
+demand-only policy. Bootstrap success is provisional until immediate loaded-job
+read plus label/Mach presence re-verification matches the full snapshot.
+
+Activation and denial must freshly reverify job identity. An ambiguous
+activation records that a process may exist and therefore requires stop cleanup.
+Denial requires separately verified process identity. Cleanup must freshly
+verify the job, attempt job-scoped stop after any activation attempt, reverify
+again, perform full-identity conditional bootout, and prove label plus Mach name
+absent. Stop failure must not prevent bootout while identity remains intact.
+
+Bootstrap ambiguity, identity drift, pre-cleanup swap, or adapter-local bootout
+race must never authorize destructive action against a foreign job. Tests must
+cover each case plus clean denial/cleanup and continued cleanup after stop
+failure. This phase performs no real launchctl, Mach, process, account, file, or
+system mutation and grants no approval.
+
+Every bootstrap or activation result other than proven no-effect must be tracked
+as attempted. An unverified bootstrap may perform absence-only cleanup proof but
+must never bootout; presence remains ambiguous. Any non-no-effect activation
+must require stop cleanup. Failed fresh identity verification must invalidate
+the corresponding verified state rather than leave stale ownership flags true.

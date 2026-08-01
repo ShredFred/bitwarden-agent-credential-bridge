@@ -281,6 +281,7 @@ docs/phase5h25-signed-macos-lifecycle-package.md real signed helper/plist bindin
 docs/phase5h26-macos-lifecycle-read-only-dry-run.md no-input read-only lifecycle preflight
 docs/phase5h27-macos-retained-file-ownership.md native retained-FD publication/cleanup core
 docs/phase5h28-macos-account-soft-ownership.md native full-tuple account ownership core
+docs/phase5h29-macos-launchd-job-soft-ownership.md native full-identity launchd ownership core
 test/*.test.js                      functional + exposure tests
 AGENTS.md                           experiment rules for agents
 ```
@@ -408,6 +409,9 @@ AGENTS.md                           experiment rules for agents
 - Phase 5h.28 implements and fault-tests full-tuple macOS account ownership.
   Name, UniqueID, GeneratedUID, shell, and home must survive immediate and
   pre-delete re-verification; identity drift can never authorize deletion.
+- Phase 5h.29 implements full-identity launchd job ownership, process-bound
+  denial gating, and ordered stop/bootout/absence cleanup. Ambiguous activation
+  is cleaned, while foreign job replacement is preserved.
 - No browser/website automation, query, cookie, form, process-env,
   SSH, database, RDP, or desktop credential injection.
 - Not a substitute for vault, OS keychain, or production broker hardening.
