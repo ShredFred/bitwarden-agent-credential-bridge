@@ -6,6 +6,31 @@ workspaces were used.
 
 ## Outcome
 
+### Current merge checkpoint (2026-08-01)
+
+Phase 4c now includes a tested fixed-entrypoint runtime supervisor in
+`src/onecli-proxy-runtime-supervisor.js`. It launches only the repo-owned
+`scripts/run-onecli-proxy.mjs`, inherits no caller environment or arguments,
+transfers generated fake token/policy frames over child descriptors 3 and 4,
+and holds descriptor 5 as the child-lifetime lease. It accepts exactly one
+bounded loopback ready record, probes the listener, invalidates the endpoint on
+child exit or output-protocol violation, and escalates a bounded shutdown.
+
+macOS verification at this checkpoint:
+
+- `npm run test:phase4c`: 41/41 passed;
+- complete serial repository suite with the dot reporter: exit code 0;
+- Cursor Composer 2.5 performed two read-only security reviews; all reported
+  High/Medium implementation findings were repaired before merge;
+- no sudo, launchd mutation, package installation, OneCLI pairing, Bitwarden
+  access, real token, or privileged filesystem write was performed.
+
+The supervisor remains a same-user development boundary, not a production
+trust anchor. Repo JavaScript and the Node executable are not yet bound to a
+signed reviewed package. Do not connect it to the existing macOS denial-only
+lifecycle provisioner; that would incorrectly widen the provisioner's fixed
+authority and token-handling surface.
+
 The foreground fake broker demo completes without returning its generated
 sentinel. The portable suite now also completes on macOS. Before the fix, five
 Phase 5g tests failed because the macOS layout intentionally uses one Application
@@ -72,10 +97,40 @@ read Keychain, access Bitwarden, or use network credentials.
    npm run test:phase5h16
    ```
 
+   Also run the new end-to-end supervisor slice first:
+
+   ```powershell
+   npm run test:phase4c
+   ```
+
+   This is the most important Windows continuation gate. Confirm that Node's
+   extra child `stdio: "pipe"` descriptors pass the FIFO/socket identity rules,
+   that the child reaches its ready record, that closing the lease exits code
+   0, and that the reported proxy port is closed afterward. If Windows `fstat`
+   classifies anonymous child pipes differently, add a narrowly win32-specific
+   descriptor rule backed by a native integration test; do not weaken the
+   POSIX FIFO/socket rule or accept regular files/devices.
+
 4. Record the Node, npm, PowerShell, Windows, and .NET versions with the result.
 5. Do not install the native service, elevate, pair Bitwarden, pull OneCLI
    images, or use a real secret unless a later phase explicitly authorizes that
    live gate.
+
+Recommended next development order on Windows:
+
+1. Prove `npm run test:phase4c` unchanged in a non-elevated shell and record
+   exact OS/Node/npm results in this document.
+2. Add Windows CI for Phase 4c and the existing Windows security/service
+   slices; keep real service installation disabled.
+3. Package-bind the fixed supervisor entrypoint, its imports, and Node runtime
+   before introducing any privileged launcher. The privileged component must
+   receive no caller-selected executable, argv, environment, policy path, or
+   token file.
+4. Only behind a separately approved disposable live gate, install/pin OneCLI,
+   create a disposable Bitwarden account/item, pair it, and test with a
+   generated short-lived agent token. Never use Frederik's real vault.
+5. Keep macOS signed/notarized package work deferred until quota/time permits;
+   the current macOS lifecycle code remains denial-only.
 
 Cursor should treat a Windows-only skip on macOS as expected, but any failure in
 a pure validator or disposable test as a portability regression. Keep fixes

@@ -48,3 +48,18 @@ socketpairs on macOS. Regular files, devices, directories, duplicate
 descriptors, malformed/oversized/trailing frames, invalid encodings, and
 timeouts fail silently with a nonzero exit. Successful stdout contains only one
 value-free ready record; shutdown failures remain silent and nonzero.
+
+`src/onecli-proxy-runtime-supervisor.js` is the same-user parent boundary for
+that entrypoint. Callers supply only an already validated version-4 policy and
+an in-memory token; they cannot select a program, argument, working directory,
+environment, or file descriptor. The supervisor starts the fixed repo-owned
+entrypoint with a minimal environment, writes the two bounded frames, retains
+the lease, accepts exactly one bounded loopback ready record, and treats any
+stderr or later stdout as a runtime violation. Closing the frozen handle ends
+the lease and escalates through bounded termination if the child does not exit.
+
+This supervisor is not yet a production package identity. A same-user process
+can modify repo-owned JavaScript before launch. The macOS integration must bind
+the supervisor, entrypoint, imports, and Node runtime to reviewed package bytes
+before a privileged helper may start it. The existing lifecycle provisioner
+remains denial-only and does not receive or process OneCLI agent tokens.

@@ -73,11 +73,14 @@ a production authentication proxy. See
   OneCLI `Proxy-Authorization` value only to the gateway leg.
 - Bounded headers, bodies, handshakes, idle time, connections, and tunnel bytes,
   plus fake-gateway functional and agent-token exposure tests.
+- A fixed-entrypoint same-user supervisor that transfers token/policy over
+  inherited IPC only, owns the parent lease, validates one loopback ready
+  record, invalidates dead children, and performs bounded shutdown.
 - An explicit HTTPS limitation: after CONNECT, this bridge sees opaque bytes
   and can enforce destination authority only, not method/path/content policy.
 
-Phase 4c does not start OneCLI, pair Bitwarden, install a gateway CA, or handle
-target credentials. See
+Phase 4c does not start OneCLI, pair Bitwarden, install a gateway CA, provide a
+signed package identity, or handle target credentials. See
 [`docs/phase4c-onecli-chained-proxy.md`](docs/phase4c-onecli-chained-proxy.md).
 
 ## What Phase 2 covers
