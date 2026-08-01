@@ -915,3 +915,22 @@ as attempted. An unverified bootstrap may perform absence-only cleanup proof but
 must never bootout; presence remains ambiguous. Any non-no-effect activation
 must require stop cleanup. Failed fresh identity verification must invalidate
 the corresponding verified state rather than leave stale ownership flags true.
+
+## Phase 5h.30 scope
+
+Phase 5h.30 may compose the Phase 5h.27–29 primitives into one native controller
+using fake account and launchd adapters plus private-temp retained file parents.
+All absence and artifact-binding checks must finish before the first mutation.
+Mutation order is account, binary, plist, job bootstrap, activation, denial.
+
+After any first mutation, finally cleanup must always proceed job stop/bootout,
+plist unlink, binary unlink, account delete, then aggregate absence, continuing
+after every individual cleanup failure. Each primitive's ownership rules remain
+authoritative; the controller must never reacquire or delete a foreign object.
+Any unresolved or ambiguous object requires manual recovery.
+
+Tests must cross layer boundaries: clean denial/cleanup, collision abort before
+mutation, ambiguous account create, ambiguous activation cleanup, and file path
+replacement during the job/denial phase with foreign preservation plus cleanup
+of remaining run-owned objects. This phase contains no real OpenDirectory,
+launchctl, Mach, elevation, approval, network, or credential adapter.

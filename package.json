@@ -47,6 +47,7 @@
     "test:phase5h27": "node --test test/macos-retained-file-ops.test.js",
     "test:phase5h28": "node --test test/macos-account-ownership.test.js",
     "test:phase5h29": "node --test test/macos-launchd-job-ownership.test.js",
+    "test:phase5h30": "node --test test/macos-lifecycle-controller.test.js",
     "test:phase2": "node --test test/onecli-audit.test.js test/onecli-artifacts.test.js test/onecli-preflight.test.js",
     "test:phase3": "node --test test/supply-chain-audit.test.js test/phase3-artifacts.test.js",
     "preflight:onecli": "node scripts/preflight-onecli.mjs",
