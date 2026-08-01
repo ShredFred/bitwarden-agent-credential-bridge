@@ -33,6 +33,7 @@ node --version
 npm test
 npm run test:phase5h18
 npm run test:phase5h19
+npm run test:phase5h20
 npm run start:demo
 npm run preflight:bootstrap
 npm run preflight:onecli
@@ -84,16 +85,19 @@ defines the fixed system-domain launchd/Mach-service, distinct-EUID, binary, and
 designated-code-requirement contract, and Phase 5h.4 explicitly binds the XPC
 peer audit token to the authorizing caller. Both remain pure and non-executable.
 
-Phase 5h.19 now runs that read-only native preflight and returns the canonical
+Phase 5h.19 runs that read-only native preflight and returns the canonical
 all-false absent snapshot on an uninstalled Mac. It compares any future fixed
 helper's binary and designated requirement to the branded plan internally while
-returning booleans only and remaining non-authorizing. Because Apple's path-based
-codesign interface cannot prove it inspected the already-open binary descriptor,
-the path-snapshot comparison is separate and the verified-requirement plus full
-snapshot bits remain structurally false pending an fd-/Mach-O-bound reader.
+returning booleans only and remaining non-authorizing. Phase 5h.20 closes the
+static-code path gap by copying the already-open bytes into an exclusive private
+temporary measurement object and running Apple verification only against that
+byte-identical snapshot. The live macOS test verifies `/bin/ls` through this route
+and proves exact cleanup. A fully matching static snapshot may now be reported,
+but `authorization_ready` remains structurally false.
 
 There is still no live XPC/Mach service, installed distinct writer, Keychain
 integration, production installer, or real Bitwarden/OneCLI credential handoff
-on macOS. The next macOS milestone must remain non-mutating: a denial-only XPC
-session design that binds the live peer/helper audit tokens, PID generations,
-loaded launchd identity, and plan-pinned code requirement before any request.
+on macOS. The next macOS milestone must be a denial-only XPC session design that
+binds the live peer/helper audit tokens, PID generations, loaded launchd identity,
+and plan-pinned code requirement before any request. It must not execute a
+manifest or access credentials.

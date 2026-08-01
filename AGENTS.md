@@ -644,3 +644,32 @@ No launchd/account/signing mutation, installation, elevation, chmod/chown,
 filesystem write, XPC/Security-framework operation, Keychain/vault access,
 network access, Bitwarden pairing, OneCLI deployment, manifest execution, or
 credential use is permitted.
+
+## Phase 5h.20 scope
+
+Phase 5h.20 may lift only the Phase 5h.19 designated-requirement verification
+bit by measuring an exclusive byte-identical private snapshot copied from the
+already-open `O_NOFOLLOW` helper descriptor. The snapshot must live directly
+beneath the canonical OS temporary directory in a fresh `mkdtemp` root owned by
+the current EUID with mode `0700`; its one fixed-name file must be created with
+`O_CREAT|O_EXCL|O_NOFOLLOW`, mode `0600`, written completely, synced, and
+verified byte-for-byte before Apple `codesign` inspects only that snapshot path.
+
+The verifier must require Apple strict signature validation, the exact pinned
+designated-requirement stdout digest, stable snapshot handle/path identity and
+content across inspection, and stable original installed handle identity/content
+after inspection. Exact snapshot unlink and directory removal are mandatory on
+both success and failure; cleanup failure fails the probe. No caller-selected
+path, temp base, filename, command, tool, environment, or output may enter this
+operation. `/dev/fd`, `F_GETPATH`, path-only installed-binary checks, and direct
+requirements-blob parsing must not establish verification.
+
+The report remains boolean-only. The parent may accept
+`designated_requirement_verified=true` and a recomputed matching snapshot, but
+must still require `authorization_ready=false`. This preflight remains advisory:
+it does not prove the loaded launchd job, live helper process, distinct EUID, XPC
+peer audit token/PID generation, or target access. The only new write authority
+is the fixed private temporary snapshot and its exact cleanup. No write under
+`/Library` or user home, launchd/account mutation, elevation, XPC operation,
+Keychain/vault access, network access, Bitwarden pairing, OneCLI deployment,
+manifest execution, credential use, or authorization is permitted.

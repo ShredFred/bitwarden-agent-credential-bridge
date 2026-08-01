@@ -39,10 +39,11 @@ const absent = Object.freeze({
 });
 
 describe('macOS launchd boundary read-only preflight', () => {
-  it('keeps fixed identities in the repo-owned probe and contains no mutation surface', async () => {
+  it('keeps fixed identities and limits mutation to the private code snapshot', async () => {
     const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
     const source = await fs.readFile(path.join(root, 'scripts', 'macos-launchd-boundary-probe.mjs'), 'utf8');
     const rules = await fs.readFile(path.join(root, 'src', 'macos-launchd-boundary-rules.mjs'), 'utf8');
+    const snapshot = await fs.readFile(path.join(root, 'src', 'macos-code-snapshot-verifier.mjs'), 'utf8');
     for (const required of [
       'de.frederikstadler.bitwarden-agent-credential-bridge.helper',
       "export const MACOS_HELPER_ACCOUNT = '_bwagentbridge'",
@@ -54,10 +55,21 @@ describe('macOS launchd boundary read-only preflight', () => {
       "'/usr/bin/dscl'",
       "'/usr/bin/codesign'",
     ]) assert.equal(source.includes(required), true, `missing fixed probe binding: ${required}`);
+    assert.match(source, /binding: false,\s+requirementPathSnapshot: false,\s+requirementVerified: false,/);
+    assert.match(source, /const requirementSnapshot = binding\s+\? await verifyMacosCodeSnapshot/);
     for (const forbidden of [
       'launchctl', 'security find-', 'security unlock-', 'chmod(', 'chown(',
       'writeFile(', 'appendFile(', 'mkdir(', 'unlink(', 'rename(', 'fetch(', 'http.request', 'https.request',
     ]) assert.equal(source.includes(forbidden), false, `mutation/network surface present: ${forbidden}`);
+    for (const required of ['mkdtemp(', 'O_CREAT', 'O_EXCL', 'O_NOFOLLOW', 'handle.sync()',
+      "execFileAsync('/usr/bin/codesign'", 'fs.unlink(snapshotPath)', 'fs.rmdir(root)']) {
+      assert.equal(snapshot.includes(required), true, `missing snapshot safeguard: ${required}`);
+    }
+    for (const forbidden of [
+      '/Library/PrivilegedHelperTools/', '/Library/LaunchDaemons/', 'launchctl',
+      'security find-', 'security unlock-', 'chmod(', 'chown(', 'writeFile(', 'appendFile(',
+      'rename(', 'fetch(', 'http.request', 'https.request',
+    ]) assert.equal(snapshot.includes(forbidden), false, `snapshot escape surface present: ${forbidden}`);
   });
 
   it('parses only the exact value-free schema and recomputes the snapshot', () => {
@@ -65,9 +77,16 @@ describe('macOS launchd boundary read-only preflight', () => {
     const matching = Object.freeze(Object.fromEntries(Object.entries(absent).map(([key, value]) => [
       key,
       key === 'schema_version' ? value :
-        ['authorization_ready', 'designated_requirement_verified', 'snapshot_matches_plan'].includes(key) ? false : true,
+        key === 'authorization_ready' ? false : true,
     ])));
     assert.deepEqual(parseMacosLaunchdBoundaryResult(JSON.stringify(matching)), matching);
+    const bindingFailure = Object.freeze({
+      ...matching,
+      binary_binding_verified: false,
+      designated_requirement_verified: false,
+      snapshot_matches_plan: false,
+    });
+    assert.deepEqual(parseMacosLaunchdBoundaryResult(JSON.stringify(bindingFailure)), bindingFailure);
     for (const invalid of [
       '',
       'not json',

@@ -134,6 +134,7 @@ npm run test:phase5h9
 npm run test:phase5h10
 npm run test:phase5h18
 npm run test:phase5h19
+npm run test:phase5h20
 node src/run-demo.js
 ```
 
@@ -352,10 +353,15 @@ AGENTS.md                           experiment rules for agents
 - Phase 5h.19 performs a real read-only inspection of the fixed macOS helper
   artifacts, account, binary digest, and designated code requirement while
   returning booleans only. The current expected result is the canonical absent
-  snapshot. Path-based codesign comparison is reported separately while the
-  verified requirement and aggregate snapshot are forced false until a future
-  fd-bound native reader exists. The result is non-authorizing and ineligible
-  for installation or XPC use.
+  snapshot. Its path-based codesign comparison is reported separately and, by
+  itself, cannot establish verified code or an aggregate match. The result is
+  non-authorizing and ineligible for installation or XPC use.
+- Phase 5h.20 binds Apple signature and designated-requirement verification to
+  an exclusive byte-identical private snapshot copied from the already-open
+  helper descriptor. A matching static snapshot can now be represented, while
+  authorization remains forced false until a live launchd/XPC identity collector
+  exists. The only write is the private temporary measurement file plus mandatory
+  exact cleanup; it never touches `/Library`, user home, Keychain, or Bitwarden.
 - No browser/website automation, query, cookie, form, process-env,
   SSH, database, RDP, or desktop credential injection.
 - Not a substitute for vault, OS keychain, or production broker hardening.

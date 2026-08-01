@@ -12,6 +12,7 @@ import {
   MACOS_HELPER_BINARY_PATH,
   MACOS_HELPER_LABEL,
 } from '../src/macos-launchd-boundary-rules.mjs';
+import { verifyMacosCodeSnapshot } from '../src/macos-code-snapshot-verifier.mjs';
 
 const execFileAsync = promisify(execFile);
 const LABEL = MACOS_HELPER_LABEL;
@@ -74,7 +75,7 @@ try {
     const binaryStat = await safeLstat(BINARY_PATH);
     let binaryBindingVerified = false;
     let designatedRequirementPathSnapshotMatchesPlan = false;
-    const designatedRequirementVerified = false;
+    let designatedRequirementVerified = false;
     let binaryChainSymlinkFree = false;
     let binaryOwnerTrusted = false;
     let callerBinaryControlDenied = false;
@@ -84,6 +85,7 @@ try {
       );
       binaryBindingVerified = binary.binding;
       designatedRequirementPathSnapshotMatchesPlan = binary.requirementPathSnapshot;
+      designatedRequirementVerified = binary.requirementVerified;
       binaryChainSymlinkFree = binary.chain.symlinkFree;
       binaryOwnerTrusted = binary.chain.ownerTrusted;
       callerBinaryControlDenied = binary.chain.callerControlDenied;
@@ -190,12 +192,20 @@ async function inspectBinaryAndRequirement(expectedSha256, expectedLength, expec
   try {
     const before = await handle.stat();
     if (!before.isFile() || before.size < 1 || before.size > MAX_BINARY_BYTES) {
-      return { binding: false, requirementPathSnapshot: false, chain: failedChain() };
+      return {
+        binding: false,
+        requirementPathSnapshot: false,
+        requirementVerified: false,
+        chain: failedChain(),
+      };
     }
     const firstBytes = await readHandleBytes(handle, before.size);
     const firstDigest = createHash('sha256').update(firstBytes).digest('hex');
     const binding = before.size === expectedLength && safeDigestEqual(firstDigest, expectedSha256);
     const requirementPathSnapshot = await inspectDesignatedRequirement(expectedRequirementSha256);
+    const requirementSnapshot = binding
+      ? await verifyMacosCodeSnapshot(firstBytes, expectedRequirementSha256)
+      : false;
     const chain = await inspectChain(BINARY_PATH);
     const after = await handle.stat();
     const pathAfter = await fs.lstat(BINARY_PATH);
@@ -206,6 +216,7 @@ async function inspectBinaryAndRequirement(expectedSha256, expectedLength, expec
     return {
       binding: binding && stable,
       requirementPathSnapshot: requirementPathSnapshot && stable,
+      requirementVerified: requirementSnapshot && stable,
       chain: stable ? chain : failedChain(),
     };
   } finally {

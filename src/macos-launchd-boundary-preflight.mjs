@@ -100,7 +100,6 @@ export function parseMacosLaunchdBoundaryResult(stdout, stderr = '') {
   const impossibleAbsentEvidence = !value.service_present &&
     evidenceFields.slice(1).some((field) => value[field]);
   if (value.snapshot_matches_plan !== expectedSnapshot || value.authorization_ready !== false ||
-      value.designated_requirement_verified !== false ||
       impossibleAbsentEvidence) {
     throw new MacosLaunchdBoundaryPreflightError('invalid_output');
   }
