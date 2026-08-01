@@ -8,6 +8,7 @@ const TERMINAL_OUTCOMES = new Set([
   'preflight_failed',
   'mutation_failed',
   'cleanup_failed',
+  'dry_run_complete',
 ]);
 const BASE_STATUSES = new Set(['verified', 'failed']);
 const EFFECT_STATUSES = new Set(['verified', 'failed_no_effect', 'failed_effect_ambiguous']);
@@ -64,21 +65,27 @@ export function evaluateMacosLaunchdLifecycleTranscript(gate, raw) {
     }
   } else {
     if (!preflight.complete) throw new MacosLaunchdLifecycleEvidenceError('incomplete_preflight');
-    mutation = consumeLinearPhase(events, cursor, gate.mutation_steps, 'mutation');
-    cursor = mutation.cursor;
-    if (mutation.failed || mutation.complete) {
-      cleanupStart = cursor;
-      cleanup = consumeCleanup(events, cursor, gate.always_cleanup_steps);
-      cursor = cleanup.cursor;
-      if (cleanup.complete) {
-        validateCleanupOwnership(
-          events.slice(preflight.cursor, mutation.cursor),
-          events.slice(cleanupStart, cleanup.cursor),
-          gate,
-        );
+    if (transcript.terminal_outcome === 'dry_run_complete') {
+      if (cursor !== events.length) {
+        throw new MacosLaunchdLifecycleEvidenceError('invalid_dry_run_terminal');
       }
+    } else {
+      mutation = consumeLinearPhase(events, cursor, gate.mutation_steps, 'mutation');
+      cursor = mutation.cursor;
+      if (mutation.failed || mutation.complete) {
+        cleanupStart = cursor;
+        cleanup = consumeCleanup(events, cursor, gate.always_cleanup_steps);
+        cursor = cleanup.cursor;
+        if (cleanup.complete) {
+          validateCleanupOwnership(
+            events.slice(preflight.cursor, mutation.cursor),
+            events.slice(cleanupStart, cleanup.cursor),
+            gate,
+          );
+        }
+      }
+      if (cursor !== events.length) throw new MacosLaunchdLifecycleEvidenceError('unexpected_event');
     }
-    if (cursor !== events.length) throw new MacosLaunchdLifecycleEvidenceError('unexpected_event');
   }
 
   const denialComplete = mutation.complete && !mutation.failed;
@@ -99,6 +106,10 @@ export function evaluateMacosLaunchdLifecycleTranscript(gate, raw) {
   }
   if (transcript.terminal_outcome === 'preflight_failed' && !preflight.failed) {
     throw new MacosLaunchdLifecycleEvidenceError('invalid_preflight_terminal');
+  }
+  if (transcript.terminal_outcome === 'dry_run_complete' &&
+      !(preflight.complete && !preflight.failed && mutation.cursor === preflight.cursor)) {
+    throw new MacosLaunchdLifecycleEvidenceError('invalid_dry_run_terminal');
   }
 
   const structureComplete = transcript.terminal_outcome === 'denial_verified' && cleanupComplete;
@@ -226,6 +237,7 @@ function emptyPhase(cursor) {
 }
 
 function terminalCode(outcome, finalAbsenceComplete) {
+  if (outcome === 'dry_run_complete') return 'dry_run_complete_untrusted';
   if (outcome === 'denial_verified') return 'transcript_complete_untrusted';
   if (outcome === 'preflight_failed') return 'preflight_failed';
   if (outcome === 'mutation_failed') return 'mutation_failed_cleanup_complete';

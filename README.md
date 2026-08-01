@@ -382,7 +382,8 @@ AGENTS.md                           experiment rules for agents
 - Phase 5h.23 validates only the structure of a future value-free lifecycle
   transcript. It derives soft account/job and retained-FD file ownership,
   distinguishes proven no-effect from ambiguous mutation failures, enforces
-  ownership-consistent cleanup and final absence, and still returns no trusted,
+  ownership-consistent cleanup and final absence, supports an untrusted
+  pre-mutation-only `dry_run_complete` outcome, and still returns no trusted,
   live, authorizing, or installation-eligible evidence.
 - Phase 5h.24 compiles the real no-argument launchd/MachServices denial-only
   entrypoint. It verifies the fixed non-login account before check-in, accepts

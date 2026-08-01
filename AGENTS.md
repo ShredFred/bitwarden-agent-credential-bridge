@@ -761,6 +761,12 @@ installation eligibility remain false. This phase performs no collection,
 elevation, launchd/OpenDirectory/file/Mach mutation, credential access, or live
 test.
 
+A `dry_run_complete` terminal outcome is permitted only for an exact complete
+pre-mutation prefix with no mutation or cleanup events. It is structural and
+untrusted, and must keep every live, mutation, authorization, and installation
+claim false. A future read-only collector must fail closed rather than infer
+that the fixed Mach service is unbound from label absence alone.
+
 ## Phase 5h.24 scope
 
 Phase 5h.24 may add a native macOS denial-only helper scaffold with exactly two

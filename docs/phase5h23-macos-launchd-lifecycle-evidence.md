@@ -50,7 +50,11 @@ retroactively authorizes the skipped destructive action.
 ## Outcomes and trust boundary
 
 The fixed outcomes are `denial_verified`, `preflight_failed`, `mutation_failed`,
-and `cleanup_failed`. Cleanup continues after every individual failure. If the
+`cleanup_failed`, and `dry_run_complete`. The dry-run outcome is valid only
+after all seven pre-mutation steps are verified and is rejected if any mutation
+or cleanup event follows it. It returns `dry_run_complete_untrusted` and keeps
+all mutation, trust, live-test, authorization, and installation claims false.
+Cleanup continues after every individual failure. If the
 final aggregate absence proof fails, the structural report requires manual
 recovery; if it succeeds after an earlier cleanup error, the report preserves
 the cleanup failure but does not invent a remaining-debris claim.

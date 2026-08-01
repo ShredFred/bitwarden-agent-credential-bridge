@@ -46,6 +46,32 @@ function failedMutationTranscript(value, failedStep, failureStatus, cleanupStatu
 }
 
 describe('macOS LaunchDaemon lifecycle value-free transcript', () => {
+  it('accepts a complete pre-mutation-only dry run without implying mutation or trust', () => {
+    const value = gate();
+    const report = evaluateMacosLaunchdLifecycleTranscript(value, {
+      schema_version: 1,
+      terminal_outcome: 'dry_run_complete',
+      events: value.pre_mutation_steps.map((step) => event(step)),
+    });
+    assert.equal(report.preflight_claim_structurally_complete, true);
+    assert.equal(report.mutation_claim_structurally_complete, false);
+    assert.equal(report.live_test_verified, false);
+    assert.equal(report.install_gate_eligible, false);
+    assert.equal(report.terminal_code, 'dry_run_complete_untrusted');
+  });
+
+  it('rejects mutation or cleanup evidence after a dry-run terminal', () => {
+    const value = gate();
+    for (const extraStep of [value.mutation_steps[0], value.always_cleanup_steps[0]]) {
+      assert.throws(() => evaluateMacosLaunchdLifecycleTranscript(value, {
+        schema_version: 1,
+        terminal_outcome: 'dry_run_complete',
+        events: [...value.pre_mutation_steps.map((step) => event(step)), event(extraStep)],
+      }), (error) => error instanceof MacosLaunchdLifecycleEvidenceError &&
+        error.code === 'invalid_dry_run_terminal');
+    }
+  });
+
   it('recognizes the exact complete denial and cleanup structure without trusting it', () => {
     const value = gate();
     assert.deepEqual(evaluateMacosLaunchdLifecycleTranscript(value, successTranscript(value)), {
