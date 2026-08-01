@@ -26,11 +26,14 @@ bool bw_receive_and_consume_lifecycle_approval(
     int connected_socket_fd,
     const bw_lifecycle_approval_bindings *expected);
 
-#if defined(BW_LIFECYCLE_APPROVAL_TESTING)
-bool bw_write_lifecycle_approval_for_test(
+/* Answer exactly one runner-generated challenge as the non-root launcher. */
+bool bw_answer_lifecycle_approval_challenge(
     int connected_socket_fd,
-    const bw_lifecycle_approval_bindings *bindings,
-    unsigned char nonce_value);
+    const bw_lifecycle_approval_bindings *approved,
+    pid_t *approved_runner_pid);
+
+#if defined(BW_LIFECYCLE_APPROVAL_TESTING)
+void bw_set_lifecycle_approval_nonce_for_test(unsigned char nonce_value);
 #endif
 
 #endif

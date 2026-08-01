@@ -7,6 +7,7 @@
 #include <string.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
+#include <sys/wait.h>
 #include <unistd.h>
 
 #define LABEL "de.frederikstadler.bitwarden-agent-credential-bridge.helper"
@@ -172,11 +173,23 @@ static bool run_case(fake_system *host, int parent, bool replacement) {
       parent, parent, binary, sizeof(binary), plist, sizeof(plist), requirement, getuid(), getgid(),
       &account_value, &job_value)) return false;
   int approval_sockets[2];
-  if (socketpair(AF_UNIX, SOCK_STREAM, 0, approval_sockets) != 0 ||
-      !bw_write_lifecycle_approval_for_test(
-          approval_sockets[0], &wiring.approval_bindings, replacement ? 0xB2 : 0xB1)) return false;
+  if (socketpair(AF_UNIX, SOCK_STREAM, 0, approval_sockets) != 0) return false;
+  bw_set_lifecycle_approval_nonce_for_test(replacement ? 0xB2 : 0xB1);
+  pid_t approval_child = fork();
+  if (approval_child < 0) return false;
+  if (approval_child == 0) {
+    (void)close(approval_sockets[1]);
+    bool answered = bw_answer_lifecycle_approval_challenge(
+        approval_sockets[0], &wiring.approval_bindings, NULL);
+    (void)close(approval_sockets[0]);
+    _exit(answered ? 0 : 1);
+  }
+  (void)close(approval_sockets[0]);
   bw_lifecycle_report report = bw_run_authorized_native_lifecycle(&wiring, approval_sockets[1]);
-  if (close(approval_sockets[0]) != 0 || close(approval_sockets[1]) != 0) return false;
+  int approval_status = 0;
+  if (close(approval_sockets[1]) != 0 ||
+      waitpid(approval_child, &approval_status, 0) != approval_child ||
+      !WIFEXITED(approval_status) || WEXITSTATUS(approval_status) != 0) return false;
   if (!replacement) {
     return report.mutation_complete && report.cleanup_complete &&
         !report.manual_recovery_required && !host->account_present && !host->job_present &&

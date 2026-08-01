@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <sys/socket.h>
+#include <sys/wait.h>
 #include <unistd.h>
 
 static bw_lifecycle_approval_bindings bindings(unsigned char value) {
@@ -18,10 +19,21 @@ static bool receipt(
     unsigned char nonce) {
   int sockets[2];
   if (socketpair(AF_UNIX, SOCK_STREAM, 0, sockets) != 0) return false;
-  bool written = bw_write_lifecycle_approval_for_test(sockets[0], issued, nonce);
-  bool accepted = written && bw_receive_and_consume_lifecycle_approval(sockets[1], expected);
-  bool closed = close(sockets[0]) == 0 && close(sockets[1]) == 0;
-  return accepted && closed;
+  bw_set_lifecycle_approval_nonce_for_test(nonce);
+  pid_t child = fork();
+  if (child < 0) return false;
+  if (child == 0) {
+    (void)close(sockets[1]);
+    bool answered = bw_answer_lifecycle_approval_challenge(sockets[0], issued, NULL);
+    (void)close(sockets[0]);
+    _exit(answered ? 0 : 1);
+  }
+  (void)close(sockets[0]);
+  bool accepted = bw_receive_and_consume_lifecycle_approval(sockets[1], expected);
+  bool closed = close(sockets[1]) == 0;
+  int status = 0;
+  bool reaped = waitpid(child, &status, 0) == child && WIFEXITED(status) && WEXITSTATUS(status) == 0;
+  return accepted && closed && reaped;
 }
 
 int main(int argc, char **argv) {
