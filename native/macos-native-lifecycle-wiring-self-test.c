@@ -5,6 +5,7 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
+#include <sys/socket.h>
 #include <sys/stat.h>
 #include <unistd.h>
 
@@ -154,6 +155,7 @@ static bool absent(int parent, const char *name) {
 static bool run_case(fake_system *host, int parent, bool replacement) {
   static const unsigned char binary[] = "binary-bytes";
   static const unsigned char plist[] = "plist-bytes";
+  static const unsigned char requirement[BW_APPROVAL_DIGEST_BYTES] = {0x33};
   bw_account_record account_value = account();
   bw_launchd_job_record job_value = job();
   host->account = account_value;
@@ -163,13 +165,18 @@ static bool run_case(fake_system *host, int parent, bool replacement) {
   bw_native_lifecycle_wiring wiring;
   bool production_paths_rejected = !bw_init_native_lifecycle_wiring(
       &wiring, fake_commands, mach_presence, denial, host, parent, parent,
-      binary, sizeof(binary), plist, sizeof(plist), getuid(), getgid(),
+      binary, sizeof(binary), plist, sizeof(plist), requirement, getuid(), getgid(),
       &account_value, &job_value);
   if (!production_paths_rejected) return false;
   if (!bw_init_native_lifecycle_wiring_for_test(&wiring, fake_commands, mach_presence, denial, host,
-      parent, parent, binary, sizeof(binary), plist, sizeof(plist), getuid(), getgid(),
+      parent, parent, binary, sizeof(binary), plist, sizeof(plist), requirement, getuid(), getgid(),
       &account_value, &job_value)) return false;
-  bw_lifecycle_report report = bw_run_native_lifecycle(&wiring);
+  int approval_sockets[2];
+  if (socketpair(AF_UNIX, SOCK_STREAM, 0, approval_sockets) != 0 ||
+      !bw_write_lifecycle_approval_for_test(
+          approval_sockets[0], &wiring.approval_bindings, replacement ? 0xB2 : 0xB1)) return false;
+  bw_lifecycle_report report = bw_run_authorized_native_lifecycle(&wiring, approval_sockets[1]);
+  if (close(approval_sockets[0]) != 0 || close(approval_sockets[1]) != 0) return false;
   if (!replacement) {
     return report.mutation_complete && report.cleanup_complete &&
         !report.manual_recovery_required && !host->account_present && !host->job_present &&

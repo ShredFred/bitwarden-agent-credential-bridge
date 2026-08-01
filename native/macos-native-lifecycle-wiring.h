@@ -4,6 +4,7 @@
 #include "macos-dscl-directory-adapter.h"
 #include "macos-launchctl-job-adapter.h"
 #include "macos-lifecycle-controller.h"
+#include "macos-lifecycle-approval.h"
 
 typedef struct {
   const bw_owned_file *binary;
@@ -24,6 +25,7 @@ typedef struct {
   bw_dscl_directory_adapter directory_adapter;
   bw_launchctl_job_adapter launchctl_adapter;
   bw_native_artifact_binding artifact_binding;
+  bw_lifecycle_approval_bindings approval_bindings;
   bw_lifecycle_request request;
 } bw_native_lifecycle_wiring;
 
@@ -41,16 +43,22 @@ bool bw_init_native_lifecycle_wiring(
     size_t binary_length,
     const unsigned char *plist_bytes,
     size_t plist_length,
+    const unsigned char requirement_sha256[BW_APPROVAL_DIGEST_BYTES],
     uid_t owner,
     gid_t group,
     const bw_account_record *account,
     const bw_launchd_job_record *job);
 
-bw_lifecycle_report bw_run_native_lifecycle(bw_native_lifecycle_wiring *wiring);
+bw_lifecycle_report bw_run_authorized_native_lifecycle(
+    bw_native_lifecycle_wiring *wiring,
+    int approval_socket_fd);
 
-/* Artifact buffers must remain immutable and valid until bw_run_native_lifecycle returns. */
+/* Artifact buffers must remain valid until the authorized lifecycle call returns. */
 
 #if defined(BW_NATIVE_WIRING_TESTING)
+/* Fixture-only compatibility entry point; production must supply approval. */
+bw_lifecycle_report bw_run_native_lifecycle_for_test(bw_native_lifecycle_wiring *wiring);
+
 bool bw_init_native_lifecycle_wiring_for_test(
     bw_native_lifecycle_wiring *wiring,
     bw_fixed_command_runner runner,
@@ -63,6 +71,7 @@ bool bw_init_native_lifecycle_wiring_for_test(
     size_t binary_length,
     const unsigned char *plist_bytes,
     size_t plist_length,
+    const unsigned char requirement_sha256[BW_APPROVAL_DIGEST_BYTES],
     uid_t owner,
     gid_t group,
     const bw_account_record *account,

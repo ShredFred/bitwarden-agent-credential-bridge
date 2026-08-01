@@ -16,6 +16,7 @@ const SOURCES = [
   'macos-retained-file-ops.c', 'macos-account-ownership.c',
   'macos-launchd-job-ownership.c', 'macos-dscl-directory-adapter.c',
   'macos-launchctl-job-adapter.c', 'macos-lifecycle-controller.c',
+  'macos-lifecycle-approval.c',
   'macos-native-lifecycle-wiring.c', 'macos-native-lifecycle-wiring-self-test.c',
 ].map((name) => path.join(NATIVE, name));
 
@@ -44,6 +45,7 @@ describe('native macOS production lifecycle wiring', () => {
     try {
       await execFileAsync('/usr/bin/clang', [
         '-std=c17', '-D_DARWIN_C_SOURCE', '-DBW_NATIVE_WIRING_TESTING',
+        '-DBW_LIFECYCLE_APPROVAL_TESTING',
         '-Wall', '-Wextra', '-Werror',
         '-Wno-deprecated-declarations', '-O2', ...SOURCES, '-o', binary,
       ], { timeout: 15000, maxBuffer: 4096, encoding: 'utf8', env: TOOL_ENV });
