@@ -135,6 +135,10 @@ npm run test:phase5h10
 node src/run-demo.js
 ```
 
+For the latest macOS verification evidence and the exact Windows/Cursor
+continuation checklist, see
+[`docs/macos-validation-and-windows-handoff.md`](docs/macos-validation-and-windows-handoff.md).
+
 `run-demo.js` generates a cryptographically random fake sentinel, starts the fake API and foreground broker, calls through the broker bind URL, and prints only caller-visible status/body. It exits non-zero if the sentinel leaks into those surfaces or broker logs.
 
 To perform only the optional local Phase 2 readiness inspection:
