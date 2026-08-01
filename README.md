@@ -420,6 +420,10 @@ AGENTS.md                           experiment rules for agents
   needed by future macOS system adapters. It closes inherited descriptors,
   bounds output and time, and always kills/reaps failed or runaway children;
   tests use harmless system commands only and perform no privileged mutation.
+- Phase 5h.32 adds the exact `_bwagentbridge` `dscl` adapter over that runner.
+  It strictly parses directory results, treats partial creation as ambiguous,
+  and rebinds the full live identity immediately before deletion. Its tests use
+  only a fake runner and do not modify the host directory service.
 - No browser/website automation, query, cookie, form, process-env,
   SSH, database, RDP, or desktop credential injection.
 - Not a substitute for vault, OS keychain, or production broker hardening.

@@ -951,3 +951,19 @@ Its self-test may invoke only harmless macOS system tools (`true`, `false`,
 output-flood termination, and relative-path rejection. This phase must not invoke
 dscl or launchctl, elevate, create/delete accounts, write system paths, perform
 Mach IPC, access credentials, or grant installation approval.
+
+## Phase 5h.32 scope
+
+Phase 5h.32 may add the fixed native `dscl` directory adapter over the Phase
+5h.31 runner. It accepts only `_bwagentbridge`, a system-range UniqueID, the
+canonical generated UUID, `/usr/bin/false`, and `/var/empty`. Searches, reads,
+property creation, and deletion use fixed argument arrays and bounded, silent,
+strictly parsed output. Every partial create or uncertain mutation is ambiguous,
+never no-effect.
+
+Deletion must re-read and compare the complete live identity immediately before
+the fixed-path delete. A mismatch or unreadable record is ambiguous and must not
+invoke delete. The outer account ownership state machine still performs its own
+fresh verification and post-delete three-namespace absence proof. Tests use an
+in-process fake command runner only; they must not invoke real dscl, create an
+account, elevate, touch system paths, access credentials, or grant approval.

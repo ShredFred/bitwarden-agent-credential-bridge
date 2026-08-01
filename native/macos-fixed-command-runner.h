@@ -33,4 +33,11 @@ bw_command_result bw_run_fixed_command(
     size_t maximum_output_bytes,
     bw_command_output *output);
 
+typedef bw_command_result (*bw_fixed_command_runner)(
+    const char *absolute_executable,
+    char *const argv[],
+    unsigned int timeout_milliseconds,
+    size_t maximum_output_bytes,
+    bw_command_output *output);
+
 #endif
