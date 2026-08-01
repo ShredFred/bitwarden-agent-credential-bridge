@@ -43,9 +43,11 @@ needed for the content-bound verified bit and cannot substitute for it.
 `snapshot_matches_plan` may now become true when every static host fact matches.
 `authorization_ready` remains structurally and parent-enforced false. Static
 preflight does not prove which launchd job is loaded or which process is connected
-over XPC. A later denial-only live collector must bind the launchd job, helper and
-caller audit tokens, PIDs plus PID generations, distinct EUIDs, code requirement,
-and target access before any request could become eligible.
+over a production Mach service. Phase 5h.21 subsequently proves kernel audit-
+trailer collection in a same-EUID console denial. A later launchd-bound collector
+must still bind the launchd job, helper and caller audit tokens, PIDs plus PID
+generations, distinct EUIDs, code requirement, and target access before any
+request could become eligible.
 
 The only filesystem mutation added here is the exclusive private temporary copy
 and its mandatory exact cleanup. There is no write to `/Library`, a user home,

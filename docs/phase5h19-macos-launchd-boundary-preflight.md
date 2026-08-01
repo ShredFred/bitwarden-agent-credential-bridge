@@ -2,7 +2,7 @@
 
 This phase adds the first real macOS host inspection for the fixed Phase 5h.18
 system-helper contract. It is read-only and advisory. A matching snapshot never
-authorizes installation, launchd activation, XPC requests, manifest execution,
+authorizes installation, launchd activation, Mach requests, manifest execution,
 Keychain access, vault access, or credential use.
 
 ## Public control plane
@@ -79,13 +79,13 @@ canonical all-false report and does not call `plutil`, `dscl`, or `codesign`.
 That is the expected result before a separately approved installation phase.
 
 Even a fully matching path snapshot is advisory and cannot set Phase 5h.4 live
-XPC evidence. A later handle/audit-token-bound collector must reverify the loaded
+live Mach evidence. A later handle/audit-token-bound collector must reverify the loaded
 helper identity and designated requirement at the request boundary.
 
 ## Prohibited operations
 
 The Phase 5h.19 implementation contained no `launchctl`, account creation,
-signing, chmod/chown, filesystem write, elevation, XPC connection,
+signing, chmod/chown, filesystem write, elevation, Mach connection,
 Security-framework mutation, Keychain lookup, Bitwarden/OneCLI access, or network
 call. Phase 5h.20 adds only one exclusive temporary measurement-file write and
 its mandatory exact cleanup; all other prohibitions remain.

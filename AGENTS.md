@@ -256,10 +256,11 @@ mutation, manifest execution, real-root access, or Bitwarden connection.
 ## Phase 5h.4 scope
 
 Phase 5h.4 may add only a pure macOS peer-evidence evaluator over trusted,
-injected XPC and audit-token collector facts. It must require a bound Mach
-service, verified XPC peer and caller/helper process generations, verified
-audit tokens and effective UIDs, an exact match between the accepted XPC peer
-audit token and the independently verified authorizing caller audit token, a
+injected Mach-message and audit-token collector facts. It must require a bound
+launchd Mach service, verified request/reply peers and caller/helper process
+generations, verified audit tokens and effective UIDs, an exact match between
+the accepted request-sender audit token and the independently verified
+authorizing caller audit token, a
 pinned helper code requirement, unequal
 effective-UID digests, and complete symlink-safe effective-access checks over
 every bound target.
@@ -269,7 +270,7 @@ audit sessions, and sandbox write restrictions are defense-in-depth signals
 only. They must never establish a distinct principal when effective-UID
 digests are equal. Returned evidence contains only the five shared booleans;
 raw UIDs, audit tokens, PIDs, pidversions, code identities, paths, entitlements,
-ACLs, and errors must not escape. This phase performs no XPC/Mach or Security
+ACLs, and errors must not escape. This phase performs no Mach or Security
 framework I/O, helper launch, authorization-service changes, permission
 mutation, manifest execution, real-root access, or Bitwarden connection.
 
@@ -289,7 +290,7 @@ value-free; stderr, timeout, excess output, non-zero exit, malformed UTF-8, and
 any mismatch fail closed. This phase does not prove a different principal or
 local authenticated IPC, inspect tokens/UIDs/audit tokens, execute a manifest,
 touch normal user roots, access Bitwarden, or claim protection from a malicious
-same-user process. Named-pipe/XPC/AF_UNIX identity collection and any successful
+same-user process. Named-pipe/Mach-message/AF_UNIX identity collection and any successful
 authorization remain later live-gated work.
 
 ## Phase 5h.6 scope
@@ -599,15 +600,16 @@ distinct writer.
 The plan must bind the reviewed binary digest/length and the digest of one
 reviewed designated code requirement. Future trusted collectors must reverify
 the installed binary, code requirement, daemon definition, loaded identity,
-complete parent chains, XPC peer/helper PID and pidversion, and symlink-safe
-effective access over every manifest target. The accepted XPC peer audit token
+complete parent chains, Mach request/reply peer/helper PID and pidversion, and
+symlink-safe effective access over every manifest target. The accepted request-
+sender audit token
 must match the independently verified authorizing caller audit token; unrelated
 peer and caller facts must fail both transport and identity closed. Ordinary
 user-home targets are forbidden for the production writer boundary.
 
 The plan is value-free, non-executable, and in-process branded. It must always
 report mutation unauthorized, live test not executed, and install gate
-ineligible. No host inspection, signing, launchd/XPC/Security-framework I/O,
+ineligible. No host inspection, signing, launchd/Mach/Security-framework I/O,
 account or daemon creation, elevation, filesystem/ACL mutation, Keychain/vault
 access, network access, Bitwarden pairing, or credential use is permitted.
 
@@ -634,14 +636,15 @@ Reports contain an exact boolean-only schema. The parent recomputes aggregate
 state, rejects impossible partial claims, and always requires
 `authorization_ready=false`. Because path-based `codesign` cannot bind its
 measurement to the already-open binary descriptor, this phase may report a
-separate path-snapshot match but must force `designated_requirement_verified=false`
-and therefore `snapshot_matches_plan=false`; a later fd-/Mach-O-bound native
-reader is required to lift that gate. An absent fixed plist returns the canonical all-
+separate path-snapshot match. The original Phase 5h.19 implementation must force
+`designated_requirement_verified=false` and therefore
+`snapshot_matches_plan=false`; Phase 5h.20 may lift those static bits only through
+its content-bound private-snapshot verifier. An absent fixed plist returns the canonical all-
 false report without running other tools. Individual matching evidence remains
-advisory and must not become Phase 5h.4 XPC authorization evidence.
+advisory and must not become Phase 5h.4 live Mach authorization evidence.
 
 No launchd/account/signing mutation, installation, elevation, chmod/chown,
-filesystem write, XPC/Security-framework operation, Keychain/vault access,
+filesystem write, Mach/Security-framework operation, Keychain/vault access,
 network access, Bitwarden pairing, OneCLI deployment, manifest execution, or
 credential use is permitted.
 
@@ -667,9 +670,40 @@ requirements-blob parsing must not establish verification.
 The report remains boolean-only. The parent may accept
 `designated_requirement_verified=true` and a recomputed matching snapshot, but
 must still require `authorization_ready=false`. This preflight remains advisory:
-it does not prove the loaded launchd job, live helper process, distinct EUID, XPC
+it does not prove the loaded launchd job, live helper process, distinct EUID, Mach
 peer audit token/PID generation, or target access. The only new write authority
 is the fixed private temporary snapshot and its exact cleanup. No write under
-`/Library` or user home, launchd/account mutation, elevation, XPC operation,
+`/Library` or user home, launchd/account mutation, elevation, Mach operation,
 Keychain/vault access, network access, Bitwarden pairing, OneCLI deployment,
 manifest execution, credential use, or authorization is permitted.
+
+## Phase 5h.21 scope
+
+Phase 5h.21 may add only a console denial harness for the public raw Mach
+request/reply transport that a future launchd `MachServices` helper will use.
+The native probe must use fixed-size non-complex messages, fixed message IDs,
+one generated non-secret nonce, send-once reply rights, bounded send/receive
+timeouts, and `MACH_RCV_TRAILER_AUDIT` on both request and reply. Audit tokens,
+not message-body identity claims, must bind PID, pidversion, EUID, and the exact
+spawned caller/expected helper process generations.
+
+The console rendezvous may use only a fresh random ephemeral bootstrap name and
+must never register, check in, or look up the fixed production Mach service.
+It must report `mach_service_bound=false`,
+`launchd_system_service_verified=false`,
+`helper_code_requirement_satisfied=false`, `manifest_request_sent=false`,
+`authorization_denied=true`, and `install_gate_eligible=false`. Equal EUIDs are
+the expected denial result and must be recomputed from canonical `euid:<decimal>`
+SHA-256 digests by the parent. Raw audit tokens, port names, bootstrap names,
+PIDs, pidversions, UIDs, native errors, and tool output must never escape.
+
+The Node runner may compile only the fixed repo-owned C source with fixed
+absolute tooling into a fresh private canonical-temp directory, execute it with
+no arguments and a minimal environment, bound output/time, and require exact
+cleanup. It accepts no caller input. Public SDK APIs only are permitted;
+`NSXPCConnection.auditToken`, private libxpc audit-token getters, `task_for_pid`,
+and PID-only identity claims are forbidden. This phase must not install or load
+a LaunchDaemon, create an account, elevate, use the production service name,
+verify the production code requirement, pass a launcher/manifest, mutate target
+permissions, execute a manifest, access Keychain/vault/network/Bitwarden, use a
+real credential, or become authorization evidence.

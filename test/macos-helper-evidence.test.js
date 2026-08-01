@@ -14,9 +14,9 @@ const helperDigest = createHash('sha256').update('euid:0').digest('hex');
 function evidence(overrides = {}) {
   return {
     schema_version: 1,
-    transport_kind: 'macos_xpc_mach_service',
+    transport_kind: 'macos_mach_message_service',
     mach_service_bound: true,
-    xpc_peer_connection_verified: true,
+    mach_peer_exchange_verified: true,
     peer_audit_token_verified: true,
     peer_audit_token_matches_caller_audit_token: true,
     peer_pid_verified: true,
@@ -120,7 +120,7 @@ describe('macOS helper peer-evidence evaluator', () => {
 
   it('fails every transport and identity proof closed independently', () => {
     for (const field of [
-      'mach_service_bound', 'xpc_peer_connection_verified', 'peer_audit_token_verified',
+      'mach_service_bound', 'mach_peer_exchange_verified', 'peer_audit_token_verified',
       'peer_audit_token_matches_caller_audit_token',
       'peer_pid_verified', 'peer_pidversion_verified', 'helper_pid_verified', 'helper_pidversion_verified',
     ]) {
@@ -218,7 +218,7 @@ describe('macOS helper peer-evidence evaluator', () => {
     );
   });
 
-  it('rejects a verified XPC peer that is not bound to the authorizing caller', () => {
+  it('rejects a verified Mach request sender not bound to the authorizing caller', () => {
     const fixture = protocolFixture();
     const peerEvidence = evaluateMacosHelperPeerEvidence(evidence({
       peer_audit_token_matches_caller_audit_token: false,

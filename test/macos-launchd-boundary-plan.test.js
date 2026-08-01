@@ -30,7 +30,10 @@ describe('macOS launchd distinct-writer boundary plan', () => {
     assert.equal(plan.service.network_access_forbidden, true);
     assert.equal(plan.service.vault_access_forbidden, true);
     assert.equal(plan.service.keychain_access_forbidden, true);
-    assert.equal(plan.ipc.transport, 'macos_xpc_mach_service');
+    assert.equal(plan.ipc.transport, 'macos_mach_message_service');
+    assert.equal(plan.ipc.mach_audit_trailer_required, true);
+    assert.equal(plan.ipc.complex_messages_forbidden, true);
+    assert.equal(plan.ipc.send_once_reply_port_required, true);
     assert.equal(plan.ipc.peer_audit_token_matches_authorizing_caller_required, true);
     assert.equal(plan.target_access.ordinary_user_home_target_forbidden, true);
     assert.equal(plan.mutation_authorized, false);

@@ -34,6 +34,7 @@ npm test
 npm run test:phase5h18
 npm run test:phase5h19
 npm run test:phase5h20
+npm run test:phase5h21
 npm run start:demo
 npm run preflight:bootstrap
 npm run preflight:onecli
@@ -82,8 +83,8 @@ vault references, command output, or credential material.
 This change improves cross-platform correctness; it does not widen authority.
 Unsupported platforms and malformed inputs still fail closed. Phase 5h.18 now
 defines the fixed system-domain launchd/Mach-service, distinct-EUID, binary, and
-designated-code-requirement contract, and Phase 5h.4 explicitly binds the XPC
-peer audit token to the authorizing caller. Both remain pure and non-executable.
+designated-code-requirement contract, and Phase 5h.4 explicitly binds the Mach
+request audit token to the authorizing caller. Both remain pure and non-executable.
 
 Phase 5h.19 runs that read-only native preflight and returns the canonical
 all-false absent snapshot on an uninstalled Mac. It compares any future fixed
@@ -95,9 +96,14 @@ byte-identical snapshot. The live macOS test verifies `/bin/ls` through this rou
 and proves exact cleanup. A fully matching static snapshot may now be reported,
 but `authorization_ready` remains structurally false.
 
-There is still no live XPC/Mach service, installed distinct writer, Keychain
+Phase 5h.21 now proves a real same-EUID raw-Mach request/reply denial using
+kernel audit trailers on both directions. This console test uses only a random
+ephemeral bootstrap name; it does not claim the fixed launchd service or reviewed
+code requirement and sends no manifest request.
+
+There is still no live production Mach service, installed distinct writer, Keychain
 integration, production installer, or real Bitwarden/OneCLI credential handoff
-on macOS. The next macOS milestone must be a denial-only XPC session design that
-binds the live peer/helper audit tokens, PID generations, loaded launchd identity,
-and plan-pinned code requirement before any request. It must not execute a
-manifest or access credentials.
+on macOS. The next macOS milestone must be an explicitly approved disposable
+LaunchDaemon lifecycle that binds the fixed system service, distinct helper EUID,
+connected helper audit trailer, loaded launchd identity, and plan-pinned code
+requirement. It must still deny and must not execute a manifest or access credentials.

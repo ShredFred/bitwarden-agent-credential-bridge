@@ -2,7 +2,7 @@
 
 This phase adds a pure, value-free plan for a future macOS helper in the launchd
 system domain. It closes the architectural gap between the Phase 5h.4 evidence
-compiler and any later native XPC work. It performs no launchd, XPC, Security
+compiler and any later native Mach-message work. It performs no launchd, Mach, Security
 framework, signing, account, filesystem, Keychain, vault, or network operation.
 
 ## Fixed distinct-writer boundary
@@ -18,9 +18,9 @@ of its reviewed designated code requirement, and the exact LaunchDaemon plist
 SHA-256. The future installed binary, code requirement, daemon definition, parent chains, loaded daemon
 identity, and target access must all be reverified by trusted native collectors.
 
-## XPC caller binding
+## Mach caller binding
 
-Phase 5h.4 now requires an explicit proof that the accepted XPC peer audit token
+Phase 5h.4 now requires an explicit proof that the request audit trailer token
 matches the independently verified authorizing caller audit token. Verifying an
 arbitrary peer and an unrelated caller can no longer produce transport or
 identity success. PID and pidversion bindings remain mandatory for both peer and
@@ -43,7 +43,7 @@ capability. It always reports:
 - `live_test_executed: false`
 - `install_gate_eligible: false`
 
-A later phase must add read-only native preflight before any lifecycle or XPC
+A later phase must add read-only native preflight before any lifecycle or Mach
 denial test is considered. Real installation, elevation, account creation,
 LaunchDaemon loading, Keychain access, Bitwarden pairing, and credential use
 remain outside this phase.

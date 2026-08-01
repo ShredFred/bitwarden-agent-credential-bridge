@@ -1,8 +1,8 @@
 # Phase 5h.4: macOS helper peer evidence
 
 This phase adds a pure, offline compiler for facts that a future native macOS
-collector would obtain from a local XPC connection and trusted OS APIs. It does
-not open a Mach service, inspect a process, invoke the Security framework, or
+collector would obtain from launchd-bound Mach request/reply audit trailers and
+trusted OS APIs. It does not open a Mach service, inspect a process, invoke the Security framework, or
 launch a helper.
 
 ## Authorization boundary
@@ -28,8 +28,9 @@ digests differ.
 
 ## Required native evidence
 
-A future collector must bind a fixed Mach service, obtain the peer audit token
-from the accepted XPC connection, and prove that token is exactly the
+A future production collector must bind a fixed Mach service, obtain the caller
+audit token from the accepted request's kernel audit trailer, obtain the helper
+token from the reply trailer, and prove the caller token is exactly the
 authorizing caller audit token. A mismatch makes both transport and identity
 false. It must bind peer and helper PID plus pidversion to prevent PID-reuse
 substitution, independently verify caller and helper audit tokens and effective
@@ -48,7 +49,9 @@ not create a separate OS writer. Equal effective-UID digests always produce
 
 ## Still not implemented
 
-There is no native XPC listener or collector, launchd helper, Authorization
+Phase 5h.21 later adds a same-EUID console denial collector over raw Mach
+messages, but it cannot feed production authorization evidence. There is still
+no launchd-bound helper, Authorization
 Services workflow, inherited launcher handle transfer, permission mutation,
 manifest execution outside the disposable test root, or Bitwarden connection.
 Those remain behind a later explicit live-test gate.

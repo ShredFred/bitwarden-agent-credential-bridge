@@ -135,6 +135,7 @@ npm run test:phase5h10
 npm run test:phase5h18
 npm run test:phase5h19
 npm run test:phase5h20
+npm run test:phase5h21
 node src/run-demo.js
 ```
 
@@ -258,7 +259,7 @@ docs/phase5g-disposable-executor.md    real install/upgrade/rollback in temp onl
 docs/phase5h-helper-protocol.md         pure separate-writer helper wire contract
 docs/phase5h2-windows-helper-evidence.md pure Windows token/ACL evidence compiler
 docs/phase5h3-linux-helper-evidence.md   pure Linux host-UID/peercred evidence compiler
-docs/phase5h4-macos-helper-evidence.md   pure macOS XPC/audit-token evidence compiler
+docs/phase5h4-macos-helper-evidence.md   pure macOS Mach/audit-token evidence compiler
 docs/phase5h5-inherited-launcher-transfer.md real disposable inherited-handle check
 docs/phase5h6-windows-helper-pipe-session.md real local pipe/token denial check
 docs/phase5h7-windows-native-denial-session.md combined pipe/handle/AccessCheck denial
@@ -271,6 +272,8 @@ docs/phase5h13-server-identity-verifier.md pre-request SCM/PID/token verifier
 docs/phase5h17-linux-systemd-boundary-plan.md pure fixed systemd system-service contract
 docs/phase5h18-macos-launchd-boundary-plan.md pure fixed launchd system-helper contract
 docs/phase5h19-macos-launchd-boundary-preflight.md read-only fixed macOS host inspection
+docs/phase5h20-macos-code-snapshot-verification.md fd-content-bound Apple code verification
+docs/phase5h21-macos-mach-denial-session.md real same-EUID Mach audit-trailer denial
 test/*.test.js                      functional + exposure tests
 AGENTS.md                           experiment rules for agents
 ```
@@ -346,22 +349,27 @@ AGENTS.md                           experiment rules for agents
   creation, socket I/O, or mutation and remains ineligible for installation.
 - Phase 5h.18 fixes the future macOS writer to the launchd system domain, a
   static hidden non-login helper account, a fixed Mach service, and pinned
-  binary/designated-requirement digests. It also requires the accepted XPC peer
+  binary/designated-requirement digests. It also requires the accepted Mach request
   audit token to match the authorizing caller. It performs no host inspection,
-  signing, launchd/XPC I/O, elevation, account/daemon creation, Keychain access,
+  signing, launchd/Mach I/O, elevation, account/daemon creation, Keychain access,
   or mutation and remains ineligible for installation.
 - Phase 5h.19 performs a real read-only inspection of the fixed macOS helper
   artifacts, account, binary digest, and designated code requirement while
   returning booleans only. The current expected result is the canonical absent
   snapshot. Its path-based codesign comparison is reported separately and, by
   itself, cannot establish verified code or an aggregate match. The result is
-  non-authorizing and ineligible for installation or XPC use.
+  non-authorizing and ineligible for installation or Mach-service use.
 - Phase 5h.20 binds Apple signature and designated-requirement verification to
   an exclusive byte-identical private snapshot copied from the already-open
   helper descriptor. A matching static snapshot can now be represented, while
-  authorization remains forced false until a live launchd/XPC identity collector
+  authorization remains forced false until a live launchd/Mach identity collector
   exists. The only write is the private temporary measurement file plus mandatory
   exact cleanup; it never touches `/Library`, user home, Keychain, or Bitwarden.
+- Phase 5h.21 runs a real cross-process raw-Mach nonce exchange and binds both
+  request and reply senders through kernel `MACH_RCV_TRAILER_AUDIT` tokens,
+  including PID generations and EUID digests. It honestly reports a same-EUID
+  denial, never claims the production launchd service or code requirement, sends
+  no manifest request, and remains ineligible for installation or authorization.
 - No browser/website automation, query, cookie, form, process-env,
   SSH, database, RDP, or desktop credential injection.
 - Not a substitute for vault, OS keychain, or production broker hardening.
