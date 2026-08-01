@@ -1,0 +1,12 @@
+{
+  "version": 4,
+  "service": "fake-onecli-gateway-chain",
+  "credential_class": "onecli_proxy",
+  "bind": "http://127.0.0.1:0",
+  "gateway": "http://127.0.0.1:10255",
+  "target_host": "fake-target.test",
+  "target_port": 443,
+  "method": "GET",
+  "path": "/v1/resource",
+  "agent_token": "{{credential}}"
+}

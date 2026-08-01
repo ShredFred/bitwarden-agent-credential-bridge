@@ -4,7 +4,8 @@ Sample-only security experiment. Phase 1 tests a **credential-bridge contract**.
 Phase 2 adds an offline, non-mutating OneCLI readiness audit. Phase 3 adds
 offline supply-chain evidence and a not-run disposable live-test design. Phase
 4a adds a fake-only, policy-pinned HTTP API-key header contract. Phase 4b adds
-a fake-only HTTP Basic contract. Phase 5a adds a pure cross-platform bootstrap
+a fake-only HTTP Basic contract. Phase 4c adds a local OneCLI chained-proxy
+token-placement contract with fake gateway tests. Phase 5a adds a pure cross-platform bootstrap
 plan. None of these phases access a real vault or test Bitwarden product
 security or OneCLI production security.
 
@@ -63,6 +64,22 @@ It does not retrieve credentials from Bitwarden, operate a browser, or provide
 a production authentication proxy. See
 [`docs/phase4b-http-basic.md`](docs/phase4b-http-basic.md).
 
+## What Phase 4c covers
+
+- A strict version-4 `onecli_proxy` policy pinning one loopback OneCLI gateway
+  and one lowercase DNS destination on port 443.
+- A foreground chained proxy that accepts HTTP absolute-form and HTTPS
+  `CONNECT`, strips caller proxy/auth material, and sends exactly one generated
+  OneCLI `Proxy-Authorization` value only to the gateway leg.
+- Bounded headers, bodies, handshakes, idle time, connections, and tunnel bytes,
+  plus fake-gateway functional and agent-token exposure tests.
+- An explicit HTTPS limitation: after CONNECT, this bridge sees opaque bytes
+  and can enforce destination authority only, not method/path/content policy.
+
+Phase 4c does not start OneCLI, pair Bitwarden, install a gateway CA, or handle
+target credentials. See
+[`docs/phase4c-onecli-chained-proxy.md`](docs/phase4c-onecli-chained-proxy.md).
+
 ## What Phase 2 covers
 
 - An upstream lock for OneCLI release `1.45.0`, its reviewed source commit, and
@@ -117,6 +134,7 @@ approved disposable test passes and its evidence is reviewed. See
 npm test
 npm run test:phase4a
 npm run test:phase4b
+npm run test:phase4c
 npm run test:phase5a
 npm run test:phase5b
 npm run test:phase5c

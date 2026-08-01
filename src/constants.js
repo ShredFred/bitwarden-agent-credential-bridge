@@ -17,6 +17,7 @@ export const SUPPORTED_CREDENTIAL_CLASSES = Object.freeze([
   'http_bearer',
   'http_api_key_header',
   'http_basic',
+  'onecli_proxy',
 ]);
 
 /** Exact credential value placeholder required by policies. */
