@@ -12,13 +12,16 @@ export const FAKE_API_CONSTANT_BODY = Object.freeze({
   message: 'constant-response-from-fake-sample-api',
 });
 
-/** Credential classes supported by the fake harness. All others fail closed. */
-export const SUPPORTED_CREDENTIAL_CLASSES = Object.freeze([
-  'http_bearer',
-  'http_api_key_header',
-  'http_basic',
-  'onecli_proxy',
-]);
+export {
+  BASIC_SHAPED_CREDENTIAL_CLASSES,
+  CREDENTIAL_CLASS_BY_VERSION,
+  HTTP_INJECTION_CREDENTIAL_CLASSES,
+  REJECTED_CREDENTIAL_CLASSES,
+  SENTINEL_CREDENTIAL_CLASSES,
+  SUPPORTED_CREDENTIAL_CLASSES,
+  isRejectedCredentialClass,
+  isSupportedCredentialClass,
+} from './credential-classes.js';
 
 /** Exact credential value placeholder required by policies. */
 export const CREDENTIAL_PLACEHOLDER = '{{credential}}';

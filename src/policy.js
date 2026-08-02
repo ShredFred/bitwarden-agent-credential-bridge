@@ -1,11 +1,15 @@
 import { readFile } from 'node:fs/promises';
 import { isIP } from 'node:net';
 import {
+  CREDENTIAL_CLASS_BY_VERSION,
   CREDENTIAL_PLACEHOLDER,
   PASSWORD_PLACEHOLDER,
+  REJECTED_CREDENTIAL_CLASSES,
   SUPPORTED_CREDENTIAL_CLASSES,
   USERNAME_PLACEHOLDER,
+  isRejectedCredentialClass,
 } from './constants.js';
+import { assertBrandedBrowserLiveGate } from './browser-form-login-live-gate.mjs';
 
 const LOOPBACK_HOSTS = new Set(['127.0.0.1', 'localhost']);
 const HTTP_METHODS = new Set([
@@ -35,6 +39,11 @@ const VERSION_2_POLICY_FIELDS = new Set([
   'header_name',
   'header_value',
 ]);
+const VERSION_6_POLICY_FIELDS = new Set([
+  ...COMMON_POLICY_FIELDS,
+  'query_name',
+  'query_value',
+]);
 const VERSION_3_POLICY_FIELDS = new Set([
   ...COMMON_POLICY_FIELDS,
   'username_value',
@@ -52,6 +61,30 @@ const VERSION_4_POLICY_FIELDS = new Set([
   'path',
   'agent_token',
 ]);
+const VERSION_5_POLICY_FIELDS = new Set([
+  'version',
+  'service',
+  'credential_class',
+  'bind',
+  'login_origin',
+  'login_path',
+  'form_action',
+  'username_field',
+  'password_field',
+  'hidden_fields',
+  'success_path',
+  'allowed_paths',
+  'replay_method',
+  'replay_path',
+  'username_value',
+  'password_value',
+  'max_redirect_hops',
+  'session_ttl_ms',
+  'idle_ttl_ms',
+]);
+const FIELD_NAME = /^[A-Za-z][A-Za-z0-9_-]{0,63}$/;
+const MAX_HIDDEN_FIELDS = 16;
+const MAX_ALLOWED_PATHS = 32;
 const DNS_HOSTNAME = /^(?=.{1,253}$)[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)*$/;
 const FORBIDDEN_API_KEY_HEADER_NAMES = new Set([
   'authorization',
@@ -84,6 +117,7 @@ const FORBIDDEN_API_KEY_HEADER_PREFIXES = Object.freeze([
 const LOWERCASE_ASCII_HEADER_NAME = /^[!#$%&'*+\-.^_`|~0-9a-z]+$/;
 /** Conservative protocol-name bound; ASCII characters are one byte each. */
 const MAX_API_KEY_HEADER_NAME_LENGTH = 128;
+const QUERY_PARAM_NAME = /^[a-z][a-z0-9_-]{0,63}$/;
 
 /**
  * @typedef {object} PolicyBase
@@ -100,11 +134,37 @@ const MAX_API_KEY_HEADER_NAME_LENGTH = 128;
 
 /** @typedef {PolicyBase & {version: 2, credential_class: 'http_api_key_header', header_name: string, header_value: string}} ApiKeyHeaderPolicy */
 
+/** @typedef {PolicyBase & {version: 6, credential_class: 'http_api_key_query', query_name: string, query_value: string}} ApiKeyQueryPolicy */
+
 /** @typedef {PolicyBase & {version: 3, credential_class: 'http_basic', username_value: string, password_value: string}} BasicPolicy */
 
 /** @typedef {{version: 4, service: string, credential_class: 'onecli_proxy', bind: string, gateway: string, target_host: string, target_port: 443, method: string, path: string, agent_token: string}} OneCliProxyPolicy */
 
-/** @typedef {BearerPolicy | ApiKeyHeaderPolicy | BasicPolicy | OneCliProxyPolicy} Policy */
+/**
+ * @typedef {{
+ *   version: 5,
+ *   service: string,
+ *   credential_class: 'browser_form_login',
+ *   bind: string,
+ *   login_origin: string,
+ *   login_path: string,
+ *   form_action: string,
+ *   username_field: string,
+ *   password_field: string,
+ *   hidden_fields: string[],
+ *   success_path: string,
+ *   allowed_paths: string[],
+ *   replay_method: string,
+ *   replay_path: string,
+ *   username_value: string,
+ *   password_value: string,
+ *   max_redirect_hops: number,
+ *   session_ttl_ms: number,
+ *   idle_ttl_ms: number,
+ * }} BrowserFormLoginPolicy
+ */
+
+/** @typedef {BearerPolicy | ApiKeyHeaderPolicy | ApiKeyQueryPolicy | BasicPolicy | OneCliProxyPolicy | BrowserFormLoginPolicy} Policy */
 
 /**
  * Validate a declarative policy object. Unsupported credential classes fail closed.
@@ -119,8 +179,9 @@ export function validatePolicy(raw) {
   /** @type {Record<string, unknown>} */
   const obj = /** @type {Record<string, unknown>} */ (raw);
 
-  if (obj.version !== 1 && obj.version !== 2 && obj.version !== 3 && obj.version !== 4) {
-    throw new PolicyValidationError('policy.version must be 1, 2, 3, or 4');
+  if (obj.version !== 1 && obj.version !== 2 && obj.version !== 3 &&
+      obj.version !== 4 && obj.version !== 5 && obj.version !== 6) {
+    throw new PolicyValidationError('policy.version must be 1, 2, 3, 4, 5, or 6');
   }
 
   const allowedFields =
@@ -130,7 +191,11 @@ export function validatePolicy(raw) {
         ? VERSION_2_POLICY_FIELDS
         : obj.version === 3
           ? VERSION_3_POLICY_FIELDS
-          : VERSION_4_POLICY_FIELDS;
+          : obj.version === 4
+            ? VERSION_4_POLICY_FIELDS
+            : obj.version === 5
+              ? VERSION_5_POLICY_FIELDS
+              : VERSION_6_POLICY_FIELDS;
   validateExactFields(
     obj,
     allowedFields,
@@ -146,6 +211,12 @@ export function validatePolicy(raw) {
     );
   }
 
+  if (isRejectedCredentialClass(obj.credential_class)) {
+    throw new PolicyValidationError(
+      `rejected credential_class; permanently unsupported: ${REJECTED_CREDENTIAL_CLASSES.join(', ')}`,
+    );
+  }
+
   if (
     !SUPPORTED_CREDENTIAL_CLASSES.includes(
       /** @type {string} */ (obj.credential_class),
@@ -157,13 +228,9 @@ export function validatePolicy(raw) {
   }
 
   const expectedClass =
-    obj.version === 1
-      ? 'http_bearer'
-      : obj.version === 2
-        ? 'http_api_key_header'
-        : obj.version === 3
-          ? 'http_basic'
-          : 'onecli_proxy';
+    CREDENTIAL_CLASS_BY_VERSION[
+      /** @type {1|2|3|4|5|6} */ (obj.version)
+    ];
   if (obj.credential_class !== expectedClass) {
     throw new PolicyValidationError(
       `policy.version ${obj.version} requires credential_class "${expectedClass}"`,
@@ -171,9 +238,13 @@ export function validatePolicy(raw) {
   }
 
   const bind = parseLoopbackHttpUrl(obj.bind, 'policy.bind');
-  const upstream = obj.version === 4
+  const upstream = obj.version === 4 || obj.version === 5
     ? null
     : parseLoopbackHttpUrl(obj.upstream, 'policy.upstream');
+
+  if (obj.version === 5) {
+    return validateBrowserFormLoginPolicy(obj, bind);
+  }
 
   if (typeof obj.method !== 'string' || !HTTP_METHODS.has(obj.method)) {
     throw new PolicyValidationError(
@@ -264,6 +335,21 @@ export function validatePolicy(raw) {
     };
   }
 
+  if (obj.version === 6) {
+    validateQueryParamName(obj.query_name);
+    if (typeof obj.query_value !== 'string') {
+      throw new PolicyValidationError('policy.query_value must be a string');
+    }
+    validateCredentialPlaceholder(obj.query_value, 'policy.query_value');
+    return {
+      version: 6,
+      ...commonWithUpstream,
+      credential_class: 'http_api_key_query',
+      query_name: /** @type {string} */ (obj.query_name),
+      query_value: CREDENTIAL_PLACEHOLDER,
+    };
+  }
+
   validateExactPlaceholder(
     obj.username_value,
     USERNAME_PLACEHOLDER,
@@ -281,6 +367,127 @@ export function validatePolicy(raw) {
     username_value: USERNAME_PLACEHOLDER,
     password_value: PASSWORD_PLACEHOLDER,
   };
+}
+
+/**
+ * @param {Record<string, unknown>} obj
+ * @param {URL} bind
+ * @param {URL} loginOrigin
+ * @returns {BrowserFormLoginPolicy}
+ */
+function buildBrowserFormLoginPolicy(obj, bind, loginOrigin) {
+  const loginPath = requireOriginPath(obj.login_path, 'policy.login_path');
+  const formAction = requireOriginPath(obj.form_action, 'policy.form_action');
+  const successPath = requireOriginPath(obj.success_path, 'policy.success_path');
+  const replayPath = requireOriginPath(obj.replay_path, 'policy.replay_path');
+  if (typeof obj.replay_method !== 'string' || !HTTP_METHODS.has(obj.replay_method)) {
+    throw new PolicyValidationError(
+      'policy.replay_method must be a standard HTTP method in uppercase',
+    );
+  }
+  if (typeof obj.username_field !== 'string' || !FIELD_NAME.test(obj.username_field)) {
+    throw new PolicyValidationError('policy.username_field must be an exact field name');
+  }
+  if (typeof obj.password_field !== 'string' || !FIELD_NAME.test(obj.password_field)) {
+    throw new PolicyValidationError('policy.password_field must be an exact field name');
+  }
+  if (obj.username_field === obj.password_field) {
+    throw new PolicyValidationError('policy username and password fields must differ');
+  }
+  if (!Array.isArray(obj.hidden_fields) || obj.hidden_fields.length > MAX_HIDDEN_FIELDS) {
+    throw new PolicyValidationError('policy.hidden_fields must be a bounded exact name array');
+  }
+  const hiddenFields = [];
+  for (const name of obj.hidden_fields) {
+    if (typeof name !== 'string' || !FIELD_NAME.test(name)) {
+      throw new PolicyValidationError('policy.hidden_fields entries must be exact field names');
+    }
+    if (name === obj.username_field || name === obj.password_field) {
+      throw new PolicyValidationError('policy.hidden_fields must not repeat credential fields');
+    }
+    if (hiddenFields.includes(name)) {
+      throw new PolicyValidationError('policy.hidden_fields must not contain duplicates');
+    }
+    hiddenFields.push(name);
+  }
+  if (!Array.isArray(obj.allowed_paths) || obj.allowed_paths.length < 1 ||
+      obj.allowed_paths.length > MAX_ALLOWED_PATHS) {
+    throw new PolicyValidationError('policy.allowed_paths must be a non-empty bounded path array');
+  }
+  const allowedPaths = [];
+  for (const pathValue of obj.allowed_paths) {
+    const path = requireOriginPath(pathValue, 'policy.allowed_paths');
+    if (allowedPaths.includes(path)) {
+      throw new PolicyValidationError('policy.allowed_paths must not contain duplicates');
+    }
+    allowedPaths.push(path);
+  }
+  if (!allowedPaths.includes(successPath)) {
+    throw new PolicyValidationError('policy.success_path must be listed in allowed_paths');
+  }
+  if (!allowedPaths.includes(replayPath)) {
+    throw new PolicyValidationError('policy.replay_path must be listed in allowed_paths');
+  }
+  if (obj.max_redirect_hops !== 1 && obj.max_redirect_hops !== 2 && obj.max_redirect_hops !== 3) {
+    throw new PolicyValidationError('policy.max_redirect_hops must be 1, 2, or 3');
+  }
+  if (typeof obj.session_ttl_ms !== 'number' || !Number.isInteger(obj.session_ttl_ms) ||
+      obj.session_ttl_ms < 1000 || obj.session_ttl_ms > 300000) {
+    throw new PolicyValidationError('policy.session_ttl_ms must be an integer 1000–300000');
+  }
+  if (typeof obj.idle_ttl_ms !== 'number' || !Number.isInteger(obj.idle_ttl_ms) ||
+      obj.idle_ttl_ms < 1000 || obj.idle_ttl_ms > obj.session_ttl_ms) {
+    throw new PolicyValidationError('policy.idle_ttl_ms must be an integer 1000–session_ttl_ms');
+  }
+  validateExactPlaceholder(obj.username_value, USERNAME_PLACEHOLDER, 'policy.username_value');
+  validateExactPlaceholder(obj.password_value, PASSWORD_PLACEHOLDER, 'policy.password_value');
+  return {
+    version: 5,
+    service: /** @type {string} */ (obj.service),
+    credential_class: 'browser_form_login',
+    bind: bind.href.replace(/\/$/, ''),
+    login_origin: loginOrigin.href.replace(/\/$/, ''),
+    login_path: loginPath,
+    form_action: formAction,
+    username_field: /** @type {string} */ (obj.username_field),
+    password_field: /** @type {string} */ (obj.password_field),
+    hidden_fields: Object.freeze([...hiddenFields]),
+    success_path: successPath,
+    allowed_paths: Object.freeze([...allowedPaths]),
+    replay_method: /** @type {string} */ (obj.replay_method),
+    replay_path: replayPath,
+    username_value: USERNAME_PLACEHOLDER,
+    password_value: PASSWORD_PLACEHOLDER,
+    max_redirect_hops: /** @type {number} */ (obj.max_redirect_hops),
+    session_ttl_ms: /** @type {number} */ (obj.session_ttl_ms),
+    idle_ttl_ms: /** @type {number} */ (obj.idle_ttl_ms),
+  };
+}
+
+/**
+ * @param {Record<string, unknown>} obj
+ * @param {URL} bind
+ * @returns {BrowserFormLoginPolicy}
+ */
+function validateBrowserFormLoginPolicy(obj, bind) {
+  const loginOrigin = parseLoopbackHttpUrl(obj.login_origin, 'policy.login_origin');
+  return buildBrowserFormLoginPolicy(obj, bind, loginOrigin);
+}
+
+function requireOriginPath(value, fieldName) {
+  if (
+    typeof value !== 'string' ||
+    !value.startsWith('/') ||
+    value.startsWith('//') ||
+    value.includes('?') ||
+    value.includes('#') ||
+    value.includes('*')
+  ) {
+    throw new PolicyValidationError(
+      `${fieldName} must be an exact origin-relative path without query, fragment, or wildcards`,
+    );
+  }
+  return value;
 }
 
 /**
@@ -343,6 +550,63 @@ export function withGateway(policy, gatewayUrl) {
   }
   const gateway = parseLoopbackHttpUrl(gatewayUrl, 'gateway');
   return validatePolicy({ ...policy, gateway: gateway.href.replace(/\/$/, '') });
+}
+
+/** Return a validated v5 policy with a concrete loopback login origin. */
+export function withLoginOrigin(policy, loginOriginUrl) {
+  if (policy?.version !== 5) {
+    throw new PolicyValidationError('withLoginOrigin requires a version-5 policy');
+  }
+  const loginOrigin = parseLoopbackHttpUrl(loginOriginUrl, 'login_origin');
+  return validatePolicy({
+    ...policy,
+    login_origin: loginOrigin.href.replace(/\/$/, ''),
+    hidden_fields: [...policy.hidden_fields],
+    allowed_paths: [...policy.allowed_paths],
+  });
+}
+
+/**
+ * Validate a version-5 browser policy against a branded live HTTPS gate.
+ * Loopback-only validatePolicy remains unchanged for harness tests.
+ * @param {unknown} raw
+ * @param {object} gate
+ * @returns {BrowserFormLoginPolicy}
+ */
+export function validateLiveBrowserFormLoginPolicy(raw, gate) {
+  assertBrandedBrowserLiveGate(gate);
+  if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) {
+    throw new PolicyValidationError('policy must be a JSON object');
+  }
+  /** @type {Record<string, unknown>} */
+  const obj = /** @type {Record<string, unknown>} */ (raw);
+  if (obj.version !== 5 || obj.credential_class !== 'browser_form_login') {
+    throw new PolicyValidationError('live browser policy must be version 5 browser_form_login');
+  }
+  validateExactFields(obj, VERSION_5_POLICY_FIELDS);
+  if (typeof obj.service !== 'string' || obj.service.trim() === '') {
+    throw new PolicyValidationError('policy.service must be a non-empty string');
+  }
+  const bind = parseLoopbackHttpUrl(obj.bind, 'policy.bind');
+  let loginOrigin;
+  try {
+    loginOrigin = new URL(/** @type {string} */ (obj.login_origin));
+  } catch {
+    throw new PolicyValidationError('policy.login_origin must be a valid URL');
+  }
+  if (loginOrigin.protocol !== 'https:') {
+    throw new PolicyValidationError('live policy.login_origin must use https');
+  }
+  if (loginOrigin.hostname !== gate.pinned_hostname) {
+    throw new PolicyValidationError('live policy.login_origin hostname must match the branded gate');
+  }
+  if (loginOrigin.username || loginOrigin.password || loginOrigin.search || loginOrigin.hash) {
+    throw new PolicyValidationError('live policy.login_origin must be a bare origin');
+  }
+  if (loginOrigin.pathname !== '/' && loginOrigin.pathname !== '') {
+    throw new PolicyValidationError('live policy.login_origin must not include a path');
+  }
+  return buildBrowserFormLoginPolicy(obj, bind, loginOrigin);
 }
 
 /**
@@ -424,6 +688,14 @@ function validateExactFields(obj, allowed) {
 /**
  * @param {unknown} value
  */
+function validateQueryParamName(value) {
+  if (typeof value !== 'string' || !QUERY_PARAM_NAME.test(value)) {
+    throw new PolicyValidationError(
+      'policy.query_name must match ^[a-z][a-z0-9_-]{0,63}$',
+    );
+  }
+}
+
 function validateApiKeyHeaderName(value) {
   if (
     typeof value !== 'string' ||

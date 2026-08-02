@@ -35,8 +35,12 @@ internal static class Program
     {
         if (args.Length == 1 && string.Equals(args[0], "--self-test", StringComparison.Ordinal))
         {
-            Console.Out.Write("{\"schema_version\":1,\"platform_win32\":true,\"service_name_bound\":true,\"scm_entrypoint_compiled\":true,\"scm_lifecycle_live_verified\":false,\"console_denial_pipe_compiled\":true,\"explicit_pipe_dacl_compiled\":true,\"server_identity_verifier_compiled\":true,\"service_identity_self_check_compiled\":true,\"service_pipe_activation_compiled\":true,\"service_pipe_activation_live_verified\":false,\"manifest_executor_absent\":true,\"network_stack_absent\":true,\"vault_client_absent\":true,\"install_gate_eligible\":false}\n");
+            Console.Out.Write("{\"schema_version\":1,\"platform_win32\":true,\"service_name_bound\":true,\"scm_entrypoint_compiled\":true,\"scm_lifecycle_live_verified\":false,\"console_denial_pipe_compiled\":true,\"explicit_pipe_dacl_compiled\":true,\"server_identity_verifier_compiled\":true,\"service_identity_self_check_compiled\":true,\"service_pipe_activation_compiled\":true,\"service_pipe_activation_live_verified\":false,\"service_authorize_schema_compiled\":true,\"manifest_executor_absent\":false,\"network_stack_absent\":true,\"vault_client_absent\":true,\"install_gate_eligible\":false}\n");
             return 0;
+        }
+        if (args.Length == 1 && string.Equals(args[0], "--self-test-authorize-schema", StringComparison.Ordinal))
+        {
+            return AuthorizeSchemaProbe.RunSelfTestFromStdin();
         }
         if (args.Length == 2 &&
             string.Equals(args[0], "--console-pipe-denial", StringComparison.Ordinal) &&
@@ -49,6 +53,14 @@ internal static class Program
             IsPipeClientMode(args[1]) && DenialPipeProbe.IsCanonicalNonce(args[2]))
         {
             return NativeDenialPipeClient.Run(args[1], args[2]);
+        }
+        if (args.Length == 4 &&
+            string.Equals(args[0], "--self-test-pipe-client", StringComparison.Ordinal) &&
+            string.Equals(args[1], "service-apply", StringComparison.Ordinal) &&
+            DenialPipeProbe.IsCanonicalNonce(args[2]) &&
+            args[3].Length > 0 && args[3].Length <= 512)
+        {
+            return NativeDenialPipeClient.RunServiceApply(args[2], args[3]);
         }
         if (args.Length == 3 &&
             string.Equals(args[0], "--self-test-pipe-server", StringComparison.Ordinal) &&
@@ -80,8 +92,8 @@ internal static class Program
 
     private static bool IsPipeClientMode(string value)
     {
-        return value == "valid" || value == "mismatch" || value == "partial" || value == "crlf" ||
-            value == "oversize" || value == "idle" || value == "no-ack" || value == "unread";
+        return value == "valid" || value == "service-denial" || value == "mismatch" || value == "partial" ||
+            value == "crlf" || value == "oversize" || value == "idle" || value == "no-ack" || value == "unread";
     }
 
     private static void ServiceMain(uint argumentCount, IntPtr arguments)

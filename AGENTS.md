@@ -1057,3 +1057,202 @@ Tests may parse synthetic snapshots and perform the real read-only system-domain
 print, whose expected current result is fixed-name absence. They must not invoke
 bootstrap, kickstart, kill, bootout, Mach lookup, account or system mutation,
 elevation, credentials, Keychain, vault, or network access.
+
+## Phase 5h.44 scope
+
+Phase 5h.44 may add only a pure Windows elevated-collector provenance evaluator
+over trusted, injected collector facts. It accepts a branded in-process Phase
+5h.15 gate, a transcript revalidated by Phase 5h.16, and an exact boolean
+provenance object. It may set `collector_trust_verified` only when the transcript
+is structurally complete and every required provenance boolean is true:
+elevated-token verification, local-only collection, retained-handle binding,
+absent path reacquisition, value-free emission, absent stderr, gate step-surface
+match, and cleanup-finally binding.
+
+UAC consent, admin-group membership, and high-integrity reports are
+defense-in-depth signals only. They must never establish collector trust when
+required retained-handle elevation facts are incomplete. Exact plain-object
+schemas reject proxies, accessors, extra fields, and wrong versions. The report
+must always keep `live_test_verified=false`, `mutation_authorized=false`,
+`install_gate_eligible=false`, and `authorization_ready=false`. Synthetic
+provenance may satisfy the schema in tests but is not live collection.
+
+This phase performs no collection, PowerShell launch, elevation, SCM/filesystem/
+registry/ACL mutation, path or SID emission, manifest execution, network/vault
+access, or Bitwarden connection. Approval remains out-of-band and must never be
+accepted as API input. A later explicit operator-approved elevated disposable
+install/start/remove collector is required before live verification.
+
+## Phase 5h.45 scope
+
+Phase 5h.45 may implement and run the operator-approved disposable elevated
+Windows service lifecycle collector on an explicitly approved host. It may publish
+the reviewed helper into an OS-temporary build workspace, stage payload bytes under
+a marked temp staging root, elevate a repo-owned PowerShell collector, create a
+fresh disposable root under ProgramData, install the fixed demand-start
+LocalService service with unrestricted service SID, start it, verify
+LocalService/server identity, exercise the different-principal denial pipe using
+the native service-denial client, then stop/delete/remove and prove absence.
+
+The public Node API accepts no approval value, path override, service name,
+pipe name, command, credential, or Bitwarden reference. It rebuilds the branded
+Phase 5h.8/5h.15 objects in-process from the published digest/length. Collector
+stdout/result JSON remains value-free: fixed step ids/statuses plus exact
+provenance booleans only. `live_test_verified` may become true only after a
+structurally complete denial transcript, required provenance, and successful
+cleanup/absence proof. `mutation_authorized`, `install_gate_eligible`, and
+`authorization_ready` remain false; this disposable matrix does not authorize a
+persistent production install.
+
+The collector must refuse to run without elevation, refuse pre-existing service
+or pipe collisions, and never reacquire colliding objects by fixed name for
+destructive cleanup. The different-principal denial client runs from the
+non-elevated Bridge process; LocalService binds the caller through named-pipe
+impersonation rather than `OpenProcess` on the interactive client. It must not
+access Bitwarden, read DPAPI vault credentials, open a network client beyond
+local SCM/pipe, or execute a manifest.
+
+## Phase 5h.46 scope
+
+Phase 5h.46 may add only a pure Windows install-gate evidence compiler. It
+accepts a branded Phase 5h.15 lifecycle gate, an exact Phase 5h.45 live report
+object, and an optional Phase 5h.9 advisory preflight snapshot. It may set
+`install_gate_eligible=true` only when disposable live denial was verified,
+collector trust was complete, the gate binary binding is present, and any
+supplied post-cleanup preflight shows the fixed service absent without claiming
+authorization. It must keep `authorization_ready=false`,
+`mutation_authorized=false`, `persistent_mutator_absent=true`, and
+`vault_access_forbidden=true`. Forged gates, authorizing preflight claims, and
+extra fields fail closed. This phase performs no elevation, SCM mutation,
+persistent install, manifest execution, network/vault access, or Bitwarden
+connection.
+
+## Phase 5h.47 scope
+
+Phase 5h.47 may add only a pure Windows helper layout contract for service-SID
+trusted roots. It must distinguish disposable and persistent layouts, bind the
+fixed service identity from the Phase 5h.8 boundary plan, forbid ordinary
+user-profile roots (LocalAppData/home), require ProgramData-class trusted roots
+owned by trusted administrators/SYSTEM/service SID, and never emit concrete host
+paths, SIDs as caller-chosen inputs, commands, or vault references. The plan is
+non-executable and must report mutation unauthorized until a later apply slice.
+No host I/O, elevation, install, or Bitwarden access is permitted.
+
+## Phase 5h.53 scope
+
+Phase 5h.53 may harden the disposable elevated live collector to retain an
+`OpenService` handle through `DeleteService`, track stderr emptiness, bind
+completion nonces, and report honest provenance. It may set
+`retained_handle_binding_complete` and `path_reacquisition_absent` only when the
+service object was deleted via that retained handle. Binary image handles must
+still close before SCM start so the loader can map the executable.
+
+## Phase 5h.54 scope
+
+Phase 5h.54 may compile a vault-free LocalService first-install apply under the
+helper module's ProgramData-class parent root after a different-principal pipe
+session. It creates exactly five exclusive absent targets (config dir/file,
+install dir, bin dir, launcher file) from launcher bytes delivered on the pipe
+after the denial handshake. Self-test may report `manifest_executor_absent=false`.
+No Bitwarden/vault client, network stack, or persistent apply is permitted. The
+helper must never accept caller-chosen filesystem roots beyond digest-bound
+authorize metadata already validated by schema.
+
+## Phase 5h.48 scope
+
+Phase 5h.48 may add a bounded LocalService authorize-request schema and a
+native stdin self-test that validates the schema shape while always denying
+mutation. It may compile `service_authorize_schema_compiled=true` into the helper
+self-test. Target ACL evidence remains incomplete, and the manifest executor,
+vault client, and network stack remain absent. No persistent install, apply
+execution, or Bitwarden access is permitted.
+
+## Phase 5h.49 scope
+
+Phase 5h.49 may add a pure/Node disposable apply authorization envelope for
+LocalService-targeted ProgramData disposable roots and a test harness that
+simulates helper-side apply under disposable workspace semantics without placing
+vault secrets on the helper pipe. Live elevated apply under the installed
+service remains optional behind existing operator approval; mutation must use
+retained-handle rules and cleanup. Helper stays vault-free.
+
+## Phase 5h.50 scope
+
+Phase 5h.50 may add a pure persistent install/uninstall plan and value-free
+lifecycle report schema for test-persistent LocalService installs under the
+5h.21 layout, plus an elevated collector entrypoint that can install or remove
+the fixed service under ProgramData with absence proof on uninstall. Collision
+and reacquisition fail closed. Vault access remains forbidden in the helper.
+
+## Phase 5h.51 scope
+
+Phase 5h.51 may add a fake vault resolver that maps bootstrap service aliases to
+in-memory fake secrets and feeds `startBroker` without network or DPAPI. Secrets
+must never appear in policies, logs, helper pipes, or exposure surfaces.
+
+## Phase 5h.52 scope
+
+Phase 5h.52 may add a gated dev-Bitwarden resolver that reads only the
+operator-approved DPAPI-backed development credential store, resolves one
+configured item field into short-lived broker memory, and extends exposure tests.
+It must refuse personal/company vaults, never log secrets, and keep the helper
+vault-free. The fixed store basename is opened through a repo-owned PowerShell
+probe that pins Purpose by SHA-256 and emits only the password on stdout for an
+in-process adapter; forged gates and wrong ACL/account flags fail closed.
+
+## Phase 6 scope
+
+Phase 6 supersedes the Phase 1 / 4a / 4b exclusions of browser and form login for
+this milestone only. It may add disposable/dev-only `browser_form_login` (policy
+version 5) with exact `{{username}}` / `{{password}}` placeholders, exact field
+names, an exact hidden-field name allow-list (no wildcards / auto-scrape-all),
+loopback fake login sites, and a dedicated session broker that never routes
+through `startBroker` HTTP header injection.
+
+The session broker uses stdlib `fetch` plus an in-memory cookie jar (Playwright
+remains opt-in and out of default `npm test`). Secrets and issued session cookies
+are confined to broker memory, added to the sensitive-variant set, and must never
+appear on agent-readable surfaces. Opaque session ids are random in-process
+handles; the agent may only call policy-pinned replay paths on the same origin.
+Redirects inside the login child path are same-origin with a hard hop cap; the
+agent-facing HTTP path keeps redirects fail-closed. MFA, CAPTCHA, and login
+failure terminate with fixed value-free codes and must never return HTML, titles,
+screenshots, or DOM. One session writer at a time; destroy jar/profile on stop.
+
+Non-loopback HTTPS login origins require a branded operator live gate. A single
+operator-approved disposable public demo (`the-internet.herokuapp.com`) may
+execute live login behind an explicit approval flag and hostname pin; personal
+and company Bitwarden pairing, FTP/SSH/RDP, interactive MFA/SMS/email, vault
+clients inside LocalService, and `authorization_ready=true` remain forbidden.
+Version 1–4 policies stay compatible.
+
+## Phase 7 scope
+
+Phase 7 may add HQ operational readiness for disposable/dev secrets only:
+
+- policy version 6 `http_api_key_query` with exact `query_name` matching
+  `^[a-z][a-z0-9_-]{0,63}$` and exact `{{credential}}` `query_value`;
+- agent-facing requests remain query/fragment-free; the broker appends exactly
+  one outbound query parameter via `URLSearchParams` and verifies origin,
+  pathname, parameter count, and parameter name before fetch;
+- never log or return the outbound query URL; expand sensitive-variant scanning
+  for raw, percent, form-urlencoded (`+`), `name=value` pairs, Base64, and
+  Base64url forms; scan redirect `Location` headers before fail-closed denial;
+- printable-ASCII runtime sentinels only (8–4096 bytes) for query class;
+- permanently reject named classes `oauth`, `mfa_interactive`, `sms`, `email`,
+  `ssh`, `ftp`, and `env_inject` with stable codes at policy/resolver/broker
+  boundaries (unknown classes stay default-denied); DPAPI unlock is not MFA;
+- one concurrent multi-class loopback matrix across bearer, API-key header,
+  Basic, API-key query, and browser form-login with unique secrets and
+  cross-contamination checks;
+- branded disposable/dev Bitwarden live scope (choice 1B) constructed only by
+  an operator-approved CLI flag; library APIs never accept the flag as a
+  capability; evidence is boolean-only; `authorization_ready` stays false;
+  personal/company/organization vaults remain forbidden.
+- On Windows, the fixed DPAPI store may unlock the pinned disposable account
+  identity `frederikstadler+bridge@gmail.com` (digest-compared, never logged)
+  for broker smoke tests only; DPAPI unlock is not MFA.
+
+Phase 7 must not pair personal or company Bitwarden, implement OAuth/MFA/SMS
+flows, inject process environment secrets, follow redirects with query tokens,
+or claim production writer isolation.

@@ -1,0 +1,11 @@
+{
+  "version": 6,
+  "service": "fake-sample-api",
+  "credential_class": "http_api_key_query",
+  "bind": "http://127.0.0.1:0",
+  "upstream": "http://127.0.0.1:0",
+  "method": "GET",
+  "path": "/v1/resource",
+  "query_name": "api_key",
+  "query_value": "{{credential}}"
+}

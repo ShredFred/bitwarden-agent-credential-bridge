@@ -1,0 +1,21 @@
+{
+  "version": 5,
+  "service": "fake-browser-login",
+  "credential_class": "browser_form_login",
+  "bind": "http://127.0.0.1:0",
+  "login_origin": "http://127.0.0.1:0",
+  "login_path": "/login",
+  "form_action": "/login",
+  "username_field": "username",
+  "password_field": "password",
+  "hidden_fields": ["csrf"],
+  "success_path": "/home",
+  "allowed_paths": ["/home", "/api/me"],
+  "replay_method": "GET",
+  "replay_path": "/api/me",
+  "username_value": "{{username}}",
+  "password_value": "{{password}}",
+  "max_redirect_hops": 3,
+  "session_ttl_ms": 60000,
+  "idle_ttl_ms": 30000
+}

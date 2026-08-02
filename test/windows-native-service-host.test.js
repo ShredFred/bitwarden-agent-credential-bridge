@@ -20,10 +20,20 @@ const ILLINK_NUPKG_SHA256 = '5e75b0b31660410b04fbb17614de9ba40bf44976cae45227094
 const PIPE_PATH = String.raw`\\.\pipe\BitwardenAgentCredentialBridgeHelper.v1.denial`;
 const SERVICE_SID = 'S-1-5-80-4161497498-1516966145-968308051-418532793-1299382607';
 
-function waitForExit(child) {
+function waitForExit(child, timeoutMs = 30000) {
   return new Promise((resolve, reject) => {
-    child.once('error', reject);
-    child.once('exit', (code, signal) => resolve({ code, signal }));
+    const timer = setTimeout(() => {
+      child.kill();
+      reject(new Error('child_timeout'));
+    }, timeoutMs);
+    child.once('error', (error) => {
+      clearTimeout(timer);
+      reject(error);
+    });
+    child.once('exit', (code, signal) => {
+      clearTimeout(timer);
+      resolve({ code, signal });
+    });
   });
 }
 
@@ -126,7 +136,7 @@ describe('native Windows helper service host scaffold', () => {
   it('contains no network, vault, process-launch, or manifest-executor surface', async () => {
     assert.deepEqual(
       (await fs.readdir(SOURCE)).sort(),
-      [PROJECT, 'DenialPipeProbe.cs', 'NativeDenialPipeClient.cs', 'NativeServerIdentityVerifier.cs', 'PipeSecurity.cs', 'Program.cs', 'global.json', 'NuGet.Config'].sort(),
+      [PROJECT, 'AuthorizeSchemaProbe.cs', 'DenialPipeProbe.cs', 'DisposableFirstInstallApply.cs', 'NativeDenialPipeClient.cs', 'NativeServerIdentityVerifier.cs', 'PipeSecurity.cs', 'Program.cs', 'global.json', 'NuGet.Config'].sort(),
     );
     const project = await fs.readFile(path.join(SOURCE, PROJECT), 'utf8');
     assert.equal(project.includes('PackageReference'), false);
@@ -157,12 +167,15 @@ describe('native Windows helper service host scaffold', () => {
     assert.ok(denialProbe.includes('TryEqualTokenUsers(callerToken, clientProcessToken'));
     assert.ok(denialProbe.includes('if (!RevertToSelf()) ExitProcess(16)'));
     assert.ok(denialProbe.includes('\\"authorization_denied\\":true'));
-    assert.ok(denialProbe.includes('\\"manifest_executor_absent\\":true'));
+    assert.ok(denialProbe.includes('DisposableFirstInstallApply.TryApplyFirstInstall'));
+    assert.ok(denialProbe.includes('\\"manifest_executor_absent\\":false'));
+    assert.ok((await fs.readFile(path.join(SOURCE, 'NativeDenialPipeClient.cs'), 'utf8'))
+      .includes('service-apply'));
     for (const forbiddenTrustee of [';;;WD)', ';;;AN)', ';;;NU)', ';;;BA)', ';;;OW)']) {
       assert.equal(pipeSecurity.includes(forbiddenTrustee), false, forbiddenTrustee);
     }
     const source = `${program}\n${denialProbe}\n${await fs.readFile(path.join(SOURCE, 'NativeDenialPipeClient.cs'), 'utf8')}\n${serverVerifier}\n${await fs.readFile(path.join(SOURCE, 'PipeSecurity.cs'), 'utf8')}`;
-    assert.equal(source.match(/CreateFile\(/g)?.length, 2);
+    assert.equal(source.match(/CreateFile\(/g)?.length, 3);
     assert.ok(source.includes('GenericRead | FileWriteData | FileWriteAttributes'));
     for (const forbidden of [
       'System.Net', 'HttpClient', 'Socket', 'TcpListener', 'WinHttp', 'WSAStartup',
@@ -209,10 +222,47 @@ describe('native Windows helper service host scaffold', () => {
         service_identity_self_check_compiled: true,
         service_pipe_activation_compiled: true,
         service_pipe_activation_live_verified: false,
-        manifest_executor_absent: true,
+        service_authorize_schema_compiled: true,
+        manifest_executor_absent: false,
         network_stack_absent: true,
         vault_client_absent: true,
         install_gate_eligible: false,
+      });
+
+      const authorizeRequest = JSON.stringify({
+        protocol_version: 1,
+        request_id: 'abcdefgh',
+        operation: 'apply_disposable_manifest',
+        workspace: {
+          platform: 'win32',
+          root_digest: 'a'.repeat(64),
+          marker_nonce: 'b'.repeat(64),
+        },
+        manifest_digest: 'c'.repeat(64),
+        launcher: { sha256: 'd'.repeat(64), byte_length: 16 },
+      });
+      const authorizeChild = spawn(first.executable, ['--self-test-authorize-schema'], {
+        windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'],
+      });
+      const authorizeStdout = [];
+      const authorizeStderr = [];
+      authorizeChild.stdout.on('data', (chunk) => authorizeStdout.push(chunk));
+      authorizeChild.stderr.on('data', (chunk) => authorizeStderr.push(chunk));
+      authorizeChild.stdin.end(authorizeRequest, 'utf8');
+      const authorizeResult = await waitForExit(authorizeChild, 5000);
+      assert.deepEqual(authorizeResult, { code: 0, signal: null });
+      assert.equal(Buffer.concat(authorizeStderr).length, 0);
+      assert.deepEqual(JSON.parse(Buffer.concat(authorizeStdout).toString('utf8')), {
+        schema_version: 1,
+        request_schema_valid: true,
+        operation_recognized: true,
+        different_principal_required: true,
+        target_acl_evidence_complete: false,
+        manifest_executor_absent: true,
+        vault_client_absent: true,
+        network_stack_absent: true,
+        mutation_authorized: false,
+        authorization_denied: true,
       });
 
       const nonce = 'a'.repeat(64);

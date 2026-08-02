@@ -5,7 +5,10 @@ import {
 } from './basic-credentials.js';
 import {
   CREDENTIAL_PLACEHOLDER,
+  HTTP_INJECTION_CREDENTIAL_CLASSES,
+  REJECTED_CREDENTIAL_CLASSES,
   SUPPORTED_CREDENTIAL_CLASSES,
+  isRejectedCredentialClass,
 } from './constants.js';
 import { parseLoopbackHttpUrl, validatePolicy } from './policy.js';
 
@@ -90,10 +93,38 @@ function buildSentinelSensitiveVariants(sentinel) {
     [
       sentinel,
       encodeURIComponent(sentinel),
+      encodeURIComponent(sentinel).toLowerCase(),
       Buffer.from(sentinel, 'utf8').toString('base64'),
       Buffer.from(sentinel, 'utf8').toString('base64url'),
     ].filter((variant) => variant.length > 0),
   );
+}
+
+/**
+ * Query credentials appear in URL-encoded and form-urlencoded shapes.
+ * @param {string} queryName
+ * @param {string} sentinel
+ * @returns {Set<string>}
+ */
+function buildQuerySensitiveVariants(queryName, sentinel) {
+  const variants = buildSentinelSensitiveVariants(sentinel);
+  const params = new URLSearchParams();
+  params.set(queryName, sentinel);
+  const serialized = params.toString();
+  const encodedValue = encodeURIComponent(sentinel);
+  for (const value of [
+    `${queryName}=${sentinel}`,
+    `${queryName}=${encodedValue}`,
+    `${queryName}=${encodedValue.toLowerCase()}`,
+    serialized,
+  ]) {
+    if (value.length > 0) variants.add(value);
+  }
+  // Form encoding may use + for spaces even when encodeURIComponent uses %20.
+  if (sentinel.includes(' ')) {
+    variants.add(`${queryName}=${sentinel.replace(/ /g, '+')}`);
+  }
+  return variants;
 }
 
 /**
@@ -210,6 +241,12 @@ export async function startBroker(options) {
     'credential_class' in suppliedPolicy
       ? suppliedPolicy.credential_class
       : undefined;
+  if (isRejectedCredentialClass(suppliedClass)) {
+    throw new BrokerError(
+      `rejected credential_class; permanently unsupported: ${REJECTED_CREDENTIAL_CLASSES.join(', ')}`,
+      { code: 'rejected_credential_class' },
+    );
+  }
   if (
     typeof suppliedClass !== 'string' ||
     !SUPPORTED_CREDENTIAL_CLASSES.includes(suppliedClass)
@@ -222,6 +259,18 @@ export async function startBroker(options) {
   if (suppliedClass === 'onecli_proxy') {
     throw new BrokerError(
       'onecli_proxy requires the dedicated chained proxy broker',
+      { code: 'wrong_broker' },
+    );
+  }
+  if (suppliedClass === 'browser_form_login') {
+    throw new BrokerError(
+      'browser_form_login requires the dedicated browser session broker',
+      { code: 'wrong_broker' },
+    );
+  }
+  if (!HTTP_INJECTION_CREDENTIAL_CLASSES.includes(suppliedClass)) {
+    throw new BrokerError(
+      'credential_class requires a dedicated broker',
       { code: 'wrong_broker' },
     );
   }
@@ -268,7 +317,7 @@ export async function startBroker(options) {
   } else {
     if (suppliedCredentials !== undefined) {
       throw new BrokerError(
-        'version 1 and 2 accept sentinel material only; credentials are rejected',
+        'sentinel classes accept sentinel material only; credentials are rejected',
         { code: 'ambiguous_runtime_material' },
       );
     }
@@ -277,11 +326,17 @@ export async function startBroker(options) {
         code: 'missing_sentinel',
       });
     }
-    sensitiveVariants = buildSentinelSensitiveVariants(sentinel);
-    outboundCredentialValue =
-      policy.credential_class === 'http_bearer'
-        ? `Bearer ${sentinel}`
-        : sentinel;
+    if (policy.credential_class === 'http_api_key_query') {
+      validateQueryRuntimeSentinel(sentinel);
+      sensitiveVariants = buildQuerySensitiveVariants(policy.query_name, sentinel);
+      outboundCredentialValue = sentinel;
+    } else {
+      sensitiveVariants = buildSentinelSensitiveVariants(sentinel);
+      outboundCredentialValue =
+        policy.credential_class === 'http_bearer'
+          ? `Bearer ${sentinel}`
+          : sentinel;
+    }
   }
 
   /**
@@ -434,11 +489,44 @@ async function handleBrokerRequest(req, res, ctx) {
     outboundHeaders.authorization = outboundCredentialValue;
   } else if (policy.credential_class === 'http_api_key_header') {
     outboundHeaders[policy.header_name] = outboundCredentialValue;
-  } else {
+  } else if (policy.credential_class === 'http_basic') {
     outboundHeaders.authorization = outboundCredentialValue;
+  } else if (policy.credential_class === 'http_api_key_query') {
+    // Query credential is appended to the URL only — never as a header.
+  } else {
+    throw new BrokerError('unsupported credential_class; refusing to inject', {
+      code: 'unsupported_credential_class',
+    });
   }
 
-  const outboundUrl = `${upstreamOrigin}${policy.path}`;
+  let outboundUrl;
+  if (policy.credential_class === 'http_api_key_query') {
+    const params = new URLSearchParams();
+    params.set(policy.query_name, outboundCredentialValue);
+    const serialized = params.toString();
+    const candidate = `${upstreamOrigin}${policy.path}?${serialized}`;
+    let parsed;
+    try {
+      parsed = new URL(candidate);
+    } catch {
+      log({ level: 'error', message: 'outbound query URL construction failed' });
+      writeJson(res, 502, { error: 'upstream_failed' });
+      return;
+    }
+    if (
+      parsed.origin !== upstreamOrigin ||
+      parsed.pathname !== policy.path ||
+      [...parsed.searchParams.keys()].length !== 1 ||
+      parsed.searchParams.get(policy.query_name) !== outboundCredentialValue
+    ) {
+      log({ level: 'error', message: 'outbound query URL failed integrity check' });
+      writeJson(res, 502, { error: 'upstream_failed' });
+      return;
+    }
+    outboundUrl = candidate;
+  } else {
+    outboundUrl = `${upstreamOrigin}${policy.path}`;
+  }
 
   log({
     level: 'info',
@@ -446,6 +534,7 @@ async function handleBrokerRequest(req, res, ctx) {
     meta: {
       method: policy.method,
       path: policy.path,
+      // Never log query strings or assembled credential URLs.
       upstream: `${upstreamOrigin}${policy.path}`,
     },
   });
@@ -496,6 +585,15 @@ async function handleBrokerRequest(req, res, ctx) {
   }
 
   if (isRedirectResponse(upstreamResponse)) {
+    if (headersContainSensitiveVariant(upstreamResponse.headers, sensitiveVariants)) {
+      await cancelResponseBody(upstreamResponse);
+      log({
+        level: 'error',
+        message: 'upstream redirect contained credential material; refusing to forward',
+      });
+      writeJson(res, 502, { error: 'upstream_failed' });
+      return;
+    }
     await cancelResponseBody(upstreamResponse);
     log({
       level: 'warn',
@@ -847,6 +945,26 @@ function isRequestBodyTooLarge(err) {
  * @param {number} status
  * @param {unknown} body
  */
+/**
+ * Query API-key runtime values stay printable ASCII and bounded.
+ * @param {string} sentinel
+ */
+function validateQueryRuntimeSentinel(sentinel) {
+  if (sentinel.length < 8 || sentinel.length > 4096) {
+    throw new BrokerError('query sentinel length out of bounds', {
+      code: 'invalid_sentinel',
+    });
+  }
+  for (let i = 0; i < sentinel.length; i += 1) {
+    const code = sentinel.charCodeAt(i);
+    if (code < 0x20 || code > 0x7e) {
+      throw new BrokerError('query sentinel must be printable ASCII', {
+        code: 'invalid_sentinel',
+      });
+    }
+  }
+}
+
 function writeJson(res, status, body) {
   const payload = JSON.stringify(body);
   res.writeHead(status, {

@@ -25,6 +25,7 @@ internal static class DenialPipeProbe
     private const uint WaitObject0 = 0;
     private const uint WaitTimeout = 258;
     private const uint SessionTimeoutMilliseconds = 1500;
+    private const uint ApplySessionTimeoutMilliseconds = 30000;
     private static readonly IntPtr InvalidHandleValue = new(-1);
     private static readonly byte[] DenialResponse = Encoding.ASCII.GetBytes(
         "{\"schema_version\":1,\"local_transport\":true,\"remote_clients_rejected\":true," +
@@ -34,18 +35,112 @@ internal static class DenialPipeProbe
         "\"helper_token_bound\":true,\"same_token_user\":true,\"different_principal\":false," +
         "\"authorization_denied\":true}\n"
     );
-    private static readonly byte[] ServiceDenialResponse = Encoding.ASCII.GetBytes(
-        "{\"schema_version\":1,\"local_transport\":true,\"remote_clients_rejected\":true," +
-        "\"first_instance\":true,\"explicit_pipe_dacl_verified\":true," +
-        "\"service_identity_self_verified\":true,\"client_pid_bound\":true," +
-        "\"caller_token_bound\":true,\"helper_token_bound\":true," +
-        "\"same_token_user\":false,\"different_principal\":true," +
-        "\"target_acl_evidence_complete\":false,\"manifest_executor_absent\":true," +
-        "\"authorization_denied\":true}\n"
-    );
     private static readonly byte[] TrailingJunkResponse = Encoding.ASCII.GetBytes(
         Encoding.ASCII.GetString(DenialResponse) + "junk"
     );
+
+    private static byte[] BuildServiceDenialResponse(bool clientPidBound, bool callerTokenBound)
+    {
+        string json =
+            "{\"schema_version\":1,\"local_transport\":true,\"remote_clients_rejected\":true," +
+            "\"first_instance\":true,\"explicit_pipe_dacl_verified\":true," +
+            "\"service_identity_self_verified\":true,\"client_pid_bound\":" +
+            (clientPidBound ? "true" : "false") + ",\"caller_token_bound\":" +
+            (callerTokenBound ? "true" : "false") +
+            ",\"helper_token_bound\":true,\"same_token_user\":false,\"different_principal\":true," +
+            "\"target_acl_evidence_complete\":false,\"manifest_executor_absent\":false," +
+            "\"authorization_denied\":true}\n";
+        return Encoding.ASCII.GetBytes(json);
+    }
+
+    private static bool TryOptionalDisposableApply(IntPtr pipe)
+    {
+        // Bounded authorize JSON frame (must start with '{').
+        // Keep the first peek short so denial-only clients disconnect quickly; once
+        // authorize JSON arrives, use the longer apply deadline for launcher bytes.
+        if (!ReadBoundedFrame(pipe, 64 * 1024, out byte[] authorizeBytes, SessionTimeoutMilliseconds))
+        {
+            return false;
+        }
+        string authorizeText = Encoding.UTF8.GetString(authorizeBytes).Trim();
+        if (!authorizeText.StartsWith('{') ||
+            !authorizeText.Contains("\"operation\":\"apply_disposable_manifest\"", StringComparison.Ordinal) ||
+            !authorizeText.Contains("\"protocol_version\":1", StringComparison.Ordinal))
+        {
+            _ = WriteAll(pipe, Encoding.ASCII.GetBytes(
+                "{\"schema_version\":1,\"applied\":false,\"authorization_denied\":true,\"helper_vault_free\":true}\n"));
+            return false;
+        }
+
+        if (!ReadBoundedFrame(pipe, 16, out byte[] lengthFrame, ApplySessionTimeoutMilliseconds))
+        {
+            return false;
+        }
+        string lengthText = Encoding.ASCII.GetString(lengthFrame).Trim();
+        if (!int.TryParse(lengthText, out int launcherLength) ||
+            launcherLength < 1 || launcherLength > 1024 * 1024)
+        {
+            _ = WriteAll(pipe, Encoding.ASCII.GetBytes(
+                "{\"schema_version\":1,\"applied\":false,\"authorization_denied\":true,\"helper_vault_free\":true}\n"));
+            return false;
+        }
+        if (!ReadExactBytes(pipe, launcherLength, out byte[] launcherBytes, ApplySessionTimeoutMilliseconds))
+        {
+            return false;
+        }
+
+        bool ok = DisposableFirstInstallApply.TryApplyFirstInstall(launcherBytes, out int pathsCreated, out _);
+        string response =
+            "{\"schema_version\":1,\"applied\":" + (ok ? "true" : "false") +
+            ",\"paths_created\":" + pathsCreated +
+            ",\"helper_vault_free\":true,\"authorization_denied\":" + (ok ? "false" : "true") +
+            ",\"mutation_authorized\":" + (ok ? "true" : "false") +
+            ",\"authorization_ready\":false}\n";
+        return WriteAll(pipe, Encoding.ASCII.GetBytes(response));
+    }
+
+    private static bool ReadBoundedFrame(IntPtr pipe, int maxBytes, out byte[] bytes,
+        uint timeoutMilliseconds = SessionTimeoutMilliseconds)
+    {
+        bytes = Array.Empty<byte>();
+        IntPtr buffer = Marshal.AllocHGlobal(maxBytes);
+        try
+        {
+            if (!ReadMessageWithDeadline(pipe, buffer, (uint)maxBytes, out uint read, timeoutMilliseconds) ||
+                read < 1 || read > maxBytes)
+            {
+                return false;
+            }
+            bytes = new byte[read];
+            Marshal.Copy(buffer, bytes, 0, (int)read);
+            return true;
+        }
+        finally
+        {
+            Marshal.FreeHGlobal(buffer);
+        }
+    }
+
+    private static bool ReadExactBytes(IntPtr pipe, int length, out byte[] bytes,
+        uint timeoutMilliseconds = SessionTimeoutMilliseconds)
+    {
+        bytes = new byte[length];
+        IntPtr buffer = Marshal.AllocHGlobal(length);
+        try
+        {
+            if (!ReadMessageWithDeadline(pipe, buffer, (uint)length, out uint read, timeoutMilliseconds) ||
+                read != length)
+            {
+                return false;
+            }
+            Marshal.Copy(buffer, bytes, 0, length);
+            return true;
+        }
+        finally
+        {
+            Marshal.FreeHGlobal(buffer);
+        }
+    }
 
     internal static bool IsCanonicalNonce(string value)
     {
@@ -90,10 +185,24 @@ internal static class DenialPipeProbe
                 try
                 {
                     if (stopEvent.IsSet || !ReadAndMatchNonce(pipe, null)) continue;
-                    if (!TryBindSameTokenUser(pipe, out bool sameTokenUser) || sameTokenUser) continue;
-                    if (stopEvent.IsSet || !WriteAll(pipe, ServiceDenialResponse)) continue;
+                    if (!TryBindDifferentPrincipal(pipe, out bool differentPrincipal, out bool clientPidBound,
+                            out bool callerTokenBound) ||
+                        !differentPrincipal)
+                    {
+                        continue;
+                    }
+                    if (stopEvent.IsSet ||
+                        !WriteAll(pipe, BuildServiceDenialResponse(clientPidBound, callerTokenBound)))
+                    {
+                        continue;
+                    }
                     if (!stopEvent.IsSet) _ = ReadFixedMessage(pipe, "ack\n");
-                }
+                    // Optional post-ack first-install apply: client may send authorize JSON then
+                    // launcher bytes. Denial-only clients disconnect; timeout is fail-closed no-op.
+                    if (!stopEvent.IsSet)
+                    {
+                        _ = TryOptionalDisposableApply(pipe);
+                    }                }
                 finally
                 {
                     _ = DisconnectNamedPipe(pipe);
@@ -273,7 +382,8 @@ internal static class DenialPipeProbe
         }
     }
 
-    private static bool ReadMessageWithDeadline(IntPtr pipe, IntPtr buffer, uint length, out uint bytesRead)
+    private static bool ReadMessageWithDeadline(IntPtr pipe, IntPtr buffer, uint length, out uint bytesRead,
+        uint timeoutMilliseconds = SessionTimeoutMilliseconds)
     {
         bytesRead = 0;
         IntPtr waitEvent = CreateEvent(IntPtr.Zero, true, false, null);
@@ -292,7 +402,7 @@ internal static class DenialPipeProbe
             {
                 return false;
             }
-            if (WaitForSingleObject(waitEvent, SessionTimeoutMilliseconds) != WaitObject0)
+            if (WaitForSingleObject(waitEvent, timeoutMilliseconds) != WaitObject0)
             {
                 CancelAndDrainOrExit(pipe, overlapped, waitEvent);
                 return false;
@@ -379,6 +489,105 @@ internal static class DenialPipeProbe
         finally
         {
             _ = CloseHandle(clientProcess);
+        }
+    }
+
+    // Prefer OpenProcess PID↔token binding. When LocalService cannot open the interactive
+    // caller, fall back to pipe-impersonation TokenUser compare and report client_pid_bound
+    // false instead of over-claiming process binding.
+    private static bool TryBindDifferentPrincipal(
+        IntPtr pipe,
+        out bool differentPrincipal,
+        out bool clientPidBound,
+        out bool callerTokenBound)
+    {
+        differentPrincipal = false;
+        clientPidBound = false;
+        callerTokenBound = false;
+        if (!GetNamedPipeClientProcessId(pipe, out uint clientProcessId) || clientProcessId == 0)
+        {
+            return false;
+        }
+        if (!OpenProcessToken(GetCurrentProcess(), TokenQuery, out IntPtr helperToken))
+        {
+            return false;
+        }
+        try
+        {
+            IntPtr clientProcess = OpenProcess(ProcessQueryLimitedInformation | Synchronize, false, clientProcessId);
+            if (clientProcess != IntPtr.Zero)
+            {
+                try
+                {
+                    if (GetProcessId(clientProcess) == clientProcessId &&
+                        WaitForSingleObject(clientProcess, 0) == WaitTimeout &&
+                        OpenProcessToken(clientProcess, TokenQuery, out IntPtr clientProcessToken))
+                    {
+                        try
+                        {
+                            if (!ImpersonateNamedPipeClient(pipe)) return false;
+                            IntPtr callerToken = IntPtr.Zero;
+                            try
+                            {
+                                if (!OpenThreadToken(GetCurrentThread(), TokenQuery, true, out callerToken))
+                                {
+                                    return false;
+                                }
+                                callerTokenBound = true;
+                                if (!TryEqualTokenUsers(callerToken, clientProcessToken, out bool callerMatchesProcess) ||
+                                    !callerMatchesProcess)
+                                {
+                                    return false;
+                                }
+                                if (!TryEqualTokenUsers(callerToken, helperToken, out bool sameTokenUser))
+                                {
+                                    return false;
+                                }
+                                differentPrincipal = !sameTokenUser;
+                                clientPidBound =
+                                    GetProcessId(clientProcess) == clientProcessId &&
+                                    WaitForSingleObject(clientProcess, 0) == WaitTimeout;
+                                return differentPrincipal && clientPidBound;
+                            }
+                            finally
+                            {
+                                if (callerToken != IntPtr.Zero) _ = CloseHandle(callerToken);
+                                if (!RevertToSelf()) ExitProcess(16);
+                            }
+                        }
+                        finally
+                        {
+                            _ = CloseHandle(clientProcessToken);
+                        }
+                    }
+                }
+                finally
+                {
+                    _ = CloseHandle(clientProcess);
+                }
+            }
+
+            // Impersonation-only fallback: prove different TokenUser without PID binding.
+            if (!ImpersonateNamedPipeClient(pipe)) return false;
+            IntPtr fallbackCaller = IntPtr.Zero;
+            try
+            {
+                if (!OpenThreadToken(GetCurrentThread(), TokenQuery, true, out fallbackCaller)) return false;
+                callerTokenBound = true;
+                if (!TryEqualTokenUsers(fallbackCaller, helperToken, out bool sameTokenUser)) return false;
+                differentPrincipal = !sameTokenUser;
+                clientPidBound = false;
+                return differentPrincipal;
+            }
+            finally
+            {
+                if (fallbackCaller != IntPtr.Zero) _ = CloseHandle(fallbackCaller);
+                if (!RevertToSelf()) ExitProcess(16);
+            }
+        }
+        finally
+        {
+            _ = CloseHandle(helperToken);
         }
     }
 
