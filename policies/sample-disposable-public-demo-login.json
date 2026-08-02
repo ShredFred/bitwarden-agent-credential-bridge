@@ -1,0 +1,21 @@
+{
+  "version": 5,
+  "service": "disposable-public-demo-login",
+  "credential_class": "browser_form_login",
+  "bind": "http://127.0.0.1:0",
+  "login_origin": "https://the-internet.herokuapp.com",
+  "login_path": "/login",
+  "form_action": "/authenticate",
+  "username_field": "username",
+  "password_field": "password",
+  "hidden_fields": [],
+  "success_path": "/secure",
+  "allowed_paths": ["/secure"],
+  "replay_method": "GET",
+  "replay_path": "/secure",
+  "username_value": "{{username}}",
+  "password_value": "{{password}}",
+  "max_redirect_hops": 3,
+  "session_ttl_ms": 60000,
+  "idle_ttl_ms": 30000
+}

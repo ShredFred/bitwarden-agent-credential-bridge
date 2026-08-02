@@ -13,6 +13,8 @@ only. The HTTP `startBroker` path rejects this class (`wrong_broker`).
   fail closed with value-free codes
 - Fake-vault + gated dev-resolver shapes for `{username,password}`
 - HTTPS hostname pin gate (`pin-https`) without executing third-party login
+- Operator-approved disposable public demo login against
+  `the-internet.herokuapp.com` (public automation credentials only)
 
 ## Contract
 
@@ -20,6 +22,8 @@ only. The HTTP `startBroker` path rejects this class (`wrong_broker`).
 - Exact username/password field names and exact hidden-field name allow-list
 - Session cookies join the sensitive-variant set; `Set-Cookie` is never returned
 - One session writer at a time; jar cleared on `close`
+- Non-loopback HTTPS login requires a branded live gate whose hostname matches
+  `login_origin`
 - Default `npm test` includes Phase 6 tests (no extra CI job required)
 
 ## Commands
@@ -28,13 +32,17 @@ only. The HTTP `startBroker` path rejects this class (`wrong_broker`).
 npm run test:phase6
 npm run live:browser-form-login
 npm run live:browser-form-login -- pin-https login.example.test
+npm run live:browser-public-demo
 ```
+
+`live:browser-public-demo` contacts a public disposable demo host and requires
+the embedded approval flag. It does not read personal/company Bitwarden.
 
 ## Non-claims / not ready
 
 - Not a general password manager for personal/company Bitwarden
-- Not automatic login to arbitrary public websites (no disposable third-party
-  live login executor yet beyond origin pinning)
+- Not automatic login to arbitrary public websites (only pinned disposable demos
+  behind an explicit operator approval flag)
 - Not Playwright/browser DOM automation by default
 - Not FTP/SSH/RDP/cookie export to the agent
 - `authorization_ready` remains false; same-user process isolation is not claimed

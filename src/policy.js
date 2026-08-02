@@ -6,6 +6,7 @@ import {
   SUPPORTED_CREDENTIAL_CLASSES,
   USERNAME_PLACEHOLDER,
 } from './constants.js';
+import { assertBrandedBrowserLiveGate } from './browser-form-login-live-gate.mjs';
 
 const LOOPBACK_HOSTS = new Set(['127.0.0.1', 'localhost']);
 const HTTP_METHODS = new Set([
@@ -343,10 +344,10 @@ export function validatePolicy(raw) {
 /**
  * @param {Record<string, unknown>} obj
  * @param {URL} bind
+ * @param {URL} loginOrigin
  * @returns {BrowserFormLoginPolicy}
  */
-function validateBrowserFormLoginPolicy(obj, bind) {
-  const loginOrigin = parseLoopbackHttpUrl(obj.login_origin, 'policy.login_origin');
+function buildBrowserFormLoginPolicy(obj, bind, loginOrigin) {
   const loginPath = requireOriginPath(obj.login_path, 'policy.login_path');
   const formAction = requireOriginPath(obj.form_action, 'policy.form_action');
   const successPath = requireOriginPath(obj.success_path, 'policy.success_path');
@@ -433,6 +434,16 @@ function validateBrowserFormLoginPolicy(obj, bind) {
     session_ttl_ms: /** @type {number} */ (obj.session_ttl_ms),
     idle_ttl_ms: /** @type {number} */ (obj.idle_ttl_ms),
   };
+}
+
+/**
+ * @param {Record<string, unknown>} obj
+ * @param {URL} bind
+ * @returns {BrowserFormLoginPolicy}
+ */
+function validateBrowserFormLoginPolicy(obj, bind) {
+  const loginOrigin = parseLoopbackHttpUrl(obj.login_origin, 'policy.login_origin');
+  return buildBrowserFormLoginPolicy(obj, bind, loginOrigin);
 }
 
 function requireOriginPath(value, fieldName) {
@@ -525,6 +536,49 @@ export function withLoginOrigin(policy, loginOriginUrl) {
     hidden_fields: [...policy.hidden_fields],
     allowed_paths: [...policy.allowed_paths],
   });
+}
+
+/**
+ * Validate a version-5 browser policy against a branded live HTTPS gate.
+ * Loopback-only validatePolicy remains unchanged for harness tests.
+ * @param {unknown} raw
+ * @param {object} gate
+ * @returns {BrowserFormLoginPolicy}
+ */
+export function validateLiveBrowserFormLoginPolicy(raw, gate) {
+  assertBrandedBrowserLiveGate(gate);
+  if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) {
+    throw new PolicyValidationError('policy must be a JSON object');
+  }
+  /** @type {Record<string, unknown>} */
+  const obj = /** @type {Record<string, unknown>} */ (raw);
+  if (obj.version !== 5 || obj.credential_class !== 'browser_form_login') {
+    throw new PolicyValidationError('live browser policy must be version 5 browser_form_login');
+  }
+  validateExactFields(obj, VERSION_5_POLICY_FIELDS);
+  if (typeof obj.service !== 'string' || obj.service.trim() === '') {
+    throw new PolicyValidationError('policy.service must be a non-empty string');
+  }
+  const bind = parseLoopbackHttpUrl(obj.bind, 'policy.bind');
+  let loginOrigin;
+  try {
+    loginOrigin = new URL(/** @type {string} */ (obj.login_origin));
+  } catch {
+    throw new PolicyValidationError('policy.login_origin must be a valid URL');
+  }
+  if (loginOrigin.protocol !== 'https:') {
+    throw new PolicyValidationError('live policy.login_origin must use https');
+  }
+  if (loginOrigin.hostname !== gate.pinned_hostname) {
+    throw new PolicyValidationError('live policy.login_origin hostname must match the branded gate');
+  }
+  if (loginOrigin.username || loginOrigin.password || loginOrigin.search || loginOrigin.hash) {
+    throw new PolicyValidationError('live policy.login_origin must be a bare origin');
+  }
+  if (loginOrigin.pathname !== '/' && loginOrigin.pathname !== '') {
+    throw new PolicyValidationError('live policy.login_origin must not include a path');
+  }
+  return buildBrowserFormLoginPolicy(obj, bind, loginOrigin);
 }
 
 /**

@@ -86,4 +86,31 @@ describe('browser vault wiring and live gate', () => {
       (error) => error instanceof BrowserFormLoginLiveGateError,
     );
   });
+
+  it('rejects forged live gates and hostname-mismatched HTTPS policies', async () => {
+    const { PolicyValidationError, validateLiveBrowserFormLoginPolicy } = await import('../src/policy.js');
+    const sample = await loadPolicy(samplePath);
+    const httpsPolicy = {
+      ...sample,
+      login_origin: 'https://login.example.test',
+      hidden_fields: [],
+    };
+    assert.throws(
+      () => validateLiveBrowserFormLoginPolicy(httpsPolicy, {
+        mode: 'browser_form_login_live',
+        hostname: 'login.example.test',
+      }),
+      (error) => error instanceof BrowserFormLoginLiveGateError,
+    );
+    const gate = buildBrowserFormLoginLiveGate('login.example.test');
+    assert.throws(
+      () => validateLiveBrowserFormLoginPolicy({
+        ...httpsPolicy,
+        login_origin: 'https://evil.example.test',
+      }, gate),
+      (error) => error instanceof PolicyValidationError,
+    );
+    const accepted = validateLiveBrowserFormLoginPolicy(httpsPolicy, gate);
+    assert.equal(accepted.login_origin, 'https://login.example.test');
+  });
 });

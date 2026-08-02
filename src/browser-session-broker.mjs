@@ -2,7 +2,10 @@ import { randomBytes } from 'node:crypto';
 import http from 'node:http';
 import { validateBasicCredentials } from './basic-credentials.js';
 import { PASSWORD_PLACEHOLDER, USERNAME_PLACEHOLDER } from './constants.js';
-import { validatePolicy } from './policy.js';
+import {
+  assertBrandedBrowserLiveGate,
+} from './browser-form-login-live-gate.mjs';
+import { validateLiveBrowserFormLoginPolicy, validatePolicy } from './policy.js';
 
 export class BrowserSessionBrokerError extends Error {
   /**
@@ -40,8 +43,16 @@ export async function startBrowserSessionBroker(options) {
 
   let policy;
   try {
-    policy = validatePolicy(options.policy);
-  } catch {
+    if (options.liveGate) {
+      assertBrandedBrowserLiveGate(options.liveGate);
+      policy = validateLiveBrowserFormLoginPolicy(options.policy, options.liveGate);
+    } else {
+      policy = validatePolicy(options.policy);
+    }
+  } catch (error) {
+    if (error && typeof error === 'object' && error.name === 'BrowserFormLoginLiveGateError') {
+      throw new BrowserSessionBrokerError('invalid_live_gate');
+    }
     throw new BrowserSessionBrokerError('invalid_policy');
   }
   if (policy.credential_class !== 'browser_form_login' || policy.version !== 5) {

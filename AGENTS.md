@@ -1219,7 +1219,9 @@ agent-facing HTTP path keeps redirects fail-closed. MFA, CAPTCHA, and login
 failure terminate with fixed value-free codes and must never return HTML, titles,
 screenshots, or DOM. One session writer at a time; destroy jar/profile on stop.
 
-Non-loopback HTTPS login origins require a branded operator live gate. Personal
+Non-loopback HTTPS login origins require a branded operator live gate. A single
+operator-approved disposable public demo (`the-internet.herokuapp.com`) may
+execute live login behind an explicit approval flag and hostname pin; personal
 and company Bitwarden pairing, FTP/SSH/RDP, interactive MFA/SMS/email, vault
 clients inside LocalService, and `authorization_ready=true` remain forbidden.
 Version 1–4 policies stay compatible.
