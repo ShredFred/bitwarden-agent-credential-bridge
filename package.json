@@ -10,6 +10,7 @@
   },
   "scripts": {
     "test": "node scripts/run-tests.mjs",
+    "test:ci": "node --test --test-concurrency=1 test/policy.test.js test/fake-api.test.js test/broker.test.js test/exposure.test.js test/basic-credentials.test.js test/agent-token.test.js test/onecli-proxy-broker.test.js test/bootstrap-plan.test.js test/browser-form-login-policy.test.js test/fake-login-site.test.js test/browser-session-broker.test.js test/browser-session-hardening.test.js test/browser-exposure.test.js test/browser-vault-wiring.test.js test/phase7-query-and-rejects.test.js test/phase7-multi-class-matrix.test.js test/disposable-bitwarden-dpapi-collector.test.js test/operational-bridge.test.js test/fake-vault-resolver.test.js test/broker-from-vault.test.js test/dev-bitwarden-resolver.test.js",
     "test:phase4a": "node --test test/policy.test.js test/fake-api.test.js test/broker.test.js test/exposure.test.js",
     "test:phase4b": "node --test test/basic-credentials.test.js test/policy.test.js test/fake-api.test.js test/broker.test.js",
     "test:phase4c": "node --test --test-concurrency=1 test/agent-token.test.js test/policy.test.js test/onecli-proxy-broker.test.js test/onecli-proxy-runtime-frame.test.js test/onecli-proxy-runtime-supervisor.test.js",

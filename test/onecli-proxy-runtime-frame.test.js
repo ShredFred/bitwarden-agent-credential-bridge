@@ -148,7 +148,7 @@ describe('OneCLI proxy inherited runtime', () => {
   });
 
   it('rejects device descriptors and duplicate inherited IPC identities', async () => {
-    const devicePath = process.platform === 'win32' ? 'NUL' : '/dev/null';
+    const devicePath = process.platform === 'win32' ? '\\\\.\\NUL' : '/dev/null';
     const deviceFd = fs.openSync(devicePath, 'r');
     try {
       await assert.rejects(readOneCliAgentTokenFrame(deviceFd),

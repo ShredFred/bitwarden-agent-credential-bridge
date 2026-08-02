@@ -31,4 +31,4 @@ jobs:
         with:
           node-version: 20
       - name: Run the fake-only test suite
-        run: npm test
+        run: npm run test:ci
