@@ -1,5 +1,11 @@
 import { timingSafeEqual } from 'node:crypto';
 import { types as utilTypes } from 'node:util';
+import {
+  BASIC_SHAPED_CREDENTIAL_CLASSES,
+  SENTINEL_CREDENTIAL_CLASSES,
+  isRejectedCredentialClass,
+  isSupportedCredentialClass,
+} from './credential-classes.js';
 
 export class DevBitwardenResolverError extends Error {
   constructor(code) {
@@ -51,8 +57,18 @@ export async function resolveDevBitwardenSecret(gate, adapter, request) {
   }
   const req = exactObject(request, new Set(['item_ref', 'field', 'credential_class']));
   if (typeof req.item_ref !== 'string' || req.item_ref.length < 1 || req.item_ref.length > 128 ||
-      typeof req.field !== 'string' || req.field.length < 1 || req.field.length > 64 ||
-      !['http_bearer', 'http_api_key_header', 'http_basic', 'browser_form_login'].includes(req.credential_class)) {
+      typeof req.field !== 'string' || req.field.length < 1 || req.field.length > 64) {
+    throw new DevBitwardenResolverError('invalid_request');
+  }
+  if (isRejectedCredentialClass(req.credential_class)) {
+    throw new DevBitwardenResolverError('rejected_credential_class');
+  }
+  if (!isSupportedCredentialClass(req.credential_class) ||
+      req.credential_class === 'onecli_proxy') {
+    throw new DevBitwardenResolverError('invalid_request');
+  }
+  if (![...SENTINEL_CREDENTIAL_CLASSES, ...BASIC_SHAPED_CREDENTIAL_CLASSES]
+    .includes(req.credential_class)) {
     throw new DevBitwardenResolverError('invalid_request');
   }
 

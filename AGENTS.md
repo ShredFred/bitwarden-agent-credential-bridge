@@ -1225,3 +1225,31 @@ execute live login behind an explicit approval flag and hostname pin; personal
 and company Bitwarden pairing, FTP/SSH/RDP, interactive MFA/SMS/email, vault
 clients inside LocalService, and `authorization_ready=true` remain forbidden.
 Version 1–4 policies stay compatible.
+
+## Phase 7 scope
+
+Phase 7 may add HQ operational readiness for disposable/dev secrets only:
+
+- policy version 6 `http_api_key_query` with exact `query_name` matching
+  `^[a-z][a-z0-9_-]{0,63}$` and exact `{{credential}}` `query_value`;
+- agent-facing requests remain query/fragment-free; the broker appends exactly
+  one outbound query parameter via `URLSearchParams` and verifies origin,
+  pathname, parameter count, and parameter name before fetch;
+- never log or return the outbound query URL; expand sensitive-variant scanning
+  for raw, percent, form-urlencoded (`+`), `name=value` pairs, Base64, and
+  Base64url forms; scan redirect `Location` headers before fail-closed denial;
+- printable-ASCII runtime sentinels only (8–4096 bytes) for query class;
+- permanently reject named classes `oauth`, `mfa_interactive`, `sms`, `email`,
+  `ssh`, `ftp`, and `env_inject` with stable codes at policy/resolver/broker
+  boundaries (unknown classes stay default-denied); DPAPI unlock is not MFA;
+- one concurrent multi-class loopback matrix across bearer, API-key header,
+  Basic, API-key query, and browser form-login with unique secrets and
+  cross-contamination checks;
+- branded disposable/dev Bitwarden live scope (choice 1B) constructed only by
+  an operator-approved CLI flag; library APIs never accept the flag as a
+  capability; evidence is boolean-only; `authorization_ready` stays false;
+  personal/company/organization vaults remain forbidden.
+
+Phase 7 must not pair personal or company Bitwarden, implement OAuth/MFA/SMS
+flows, inject process environment secrets, follow redirects with query tokens,
+or claim production writer isolation.

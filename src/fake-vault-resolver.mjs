@@ -34,7 +34,9 @@ export function resolveFakeVaultSecrets(aliasMap) {
       throw new FakeVaultResolverError('invalid_entry');
     }
     const credentialClass = entry.credential_class;
-    if (credentialClass === 'http_bearer' || credentialClass === 'http_api_key_header') {
+    if (credentialClass === 'http_bearer' ||
+        credentialClass === 'http_api_key_header' ||
+        credentialClass === 'http_api_key_query') {
       secrets[alias] = Object.freeze({
         credential_class: credentialClass,
         credential: generateFakeSentinel(),

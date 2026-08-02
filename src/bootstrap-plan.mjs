@@ -13,7 +13,12 @@ const USER_SERVICE_COMMON_FIELDS = new Set([
 const ALIAS_PATTERN = /^[a-z0-9](?:[a-z0-9_-]{0,62}[a-z0-9])?$/;
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 const FIELD_PATTERN = /^[A-Za-z0-9](?:[A-Za-z0-9_. -]{0,62}[A-Za-z0-9])?$/;
-const CLASSES = new Set(['http_bearer', 'http_api_key_header', 'http_basic']);
+const CLASSES = new Set([
+  'http_bearer',
+  'http_api_key_header',
+  'http_basic',
+  'http_api_key_query',
+]);
 
 export class BootstrapPlanError extends Error {
   constructor(code, message) {

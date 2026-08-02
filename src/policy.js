@@ -1,10 +1,13 @@
 import { readFile } from 'node:fs/promises';
 import { isIP } from 'node:net';
 import {
+  CREDENTIAL_CLASS_BY_VERSION,
   CREDENTIAL_PLACEHOLDER,
   PASSWORD_PLACEHOLDER,
+  REJECTED_CREDENTIAL_CLASSES,
   SUPPORTED_CREDENTIAL_CLASSES,
   USERNAME_PLACEHOLDER,
+  isRejectedCredentialClass,
 } from './constants.js';
 import { assertBrandedBrowserLiveGate } from './browser-form-login-live-gate.mjs';
 
@@ -35,6 +38,11 @@ const VERSION_2_POLICY_FIELDS = new Set([
   ...COMMON_POLICY_FIELDS,
   'header_name',
   'header_value',
+]);
+const VERSION_6_POLICY_FIELDS = new Set([
+  ...COMMON_POLICY_FIELDS,
+  'query_name',
+  'query_value',
 ]);
 const VERSION_3_POLICY_FIELDS = new Set([
   ...COMMON_POLICY_FIELDS,
@@ -109,6 +117,7 @@ const FORBIDDEN_API_KEY_HEADER_PREFIXES = Object.freeze([
 const LOWERCASE_ASCII_HEADER_NAME = /^[!#$%&'*+\-.^_`|~0-9a-z]+$/;
 /** Conservative protocol-name bound; ASCII characters are one byte each. */
 const MAX_API_KEY_HEADER_NAME_LENGTH = 128;
+const QUERY_PARAM_NAME = /^[a-z][a-z0-9_-]{0,63}$/;
 
 /**
  * @typedef {object} PolicyBase
@@ -124,6 +133,8 @@ const MAX_API_KEY_HEADER_NAME_LENGTH = 128;
 /** @typedef {PolicyBase & {version: 1, credential_class: 'http_bearer', authorization: string}} BearerPolicy */
 
 /** @typedef {PolicyBase & {version: 2, credential_class: 'http_api_key_header', header_name: string, header_value: string}} ApiKeyHeaderPolicy */
+
+/** @typedef {PolicyBase & {version: 6, credential_class: 'http_api_key_query', query_name: string, query_value: string}} ApiKeyQueryPolicy */
 
 /** @typedef {PolicyBase & {version: 3, credential_class: 'http_basic', username_value: string, password_value: string}} BasicPolicy */
 
@@ -153,7 +164,7 @@ const MAX_API_KEY_HEADER_NAME_LENGTH = 128;
  * }} BrowserFormLoginPolicy
  */
 
-/** @typedef {BearerPolicy | ApiKeyHeaderPolicy | BasicPolicy | OneCliProxyPolicy | BrowserFormLoginPolicy} Policy */
+/** @typedef {BearerPolicy | ApiKeyHeaderPolicy | ApiKeyQueryPolicy | BasicPolicy | OneCliProxyPolicy | BrowserFormLoginPolicy} Policy */
 
 /**
  * Validate a declarative policy object. Unsupported credential classes fail closed.
@@ -169,8 +180,8 @@ export function validatePolicy(raw) {
   const obj = /** @type {Record<string, unknown>} */ (raw);
 
   if (obj.version !== 1 && obj.version !== 2 && obj.version !== 3 &&
-      obj.version !== 4 && obj.version !== 5) {
-    throw new PolicyValidationError('policy.version must be 1, 2, 3, 4, or 5');
+      obj.version !== 4 && obj.version !== 5 && obj.version !== 6) {
+    throw new PolicyValidationError('policy.version must be 1, 2, 3, 4, 5, or 6');
   }
 
   const allowedFields =
@@ -182,7 +193,9 @@ export function validatePolicy(raw) {
           ? VERSION_3_POLICY_FIELDS
           : obj.version === 4
             ? VERSION_4_POLICY_FIELDS
-            : VERSION_5_POLICY_FIELDS;
+            : obj.version === 5
+              ? VERSION_5_POLICY_FIELDS
+              : VERSION_6_POLICY_FIELDS;
   validateExactFields(
     obj,
     allowedFields,
@@ -198,6 +211,12 @@ export function validatePolicy(raw) {
     );
   }
 
+  if (isRejectedCredentialClass(obj.credential_class)) {
+    throw new PolicyValidationError(
+      `rejected credential_class; permanently unsupported: ${REJECTED_CREDENTIAL_CLASSES.join(', ')}`,
+    );
+  }
+
   if (
     !SUPPORTED_CREDENTIAL_CLASSES.includes(
       /** @type {string} */ (obj.credential_class),
@@ -209,15 +228,9 @@ export function validatePolicy(raw) {
   }
 
   const expectedClass =
-    obj.version === 1
-      ? 'http_bearer'
-      : obj.version === 2
-        ? 'http_api_key_header'
-        : obj.version === 3
-          ? 'http_basic'
-          : obj.version === 4
-            ? 'onecli_proxy'
-            : 'browser_form_login';
+    CREDENTIAL_CLASS_BY_VERSION[
+      /** @type {1|2|3|4|5|6} */ (obj.version)
+    ];
   if (obj.credential_class !== expectedClass) {
     throw new PolicyValidationError(
       `policy.version ${obj.version} requires credential_class "${expectedClass}"`,
@@ -319,6 +332,21 @@ export function validatePolicy(raw) {
       credential_class: 'http_api_key_header',
       header_name: /** @type {string} */ (obj.header_name),
       header_value: CREDENTIAL_PLACEHOLDER,
+    };
+  }
+
+  if (obj.version === 6) {
+    validateQueryParamName(obj.query_name);
+    if (typeof obj.query_value !== 'string') {
+      throw new PolicyValidationError('policy.query_value must be a string');
+    }
+    validateCredentialPlaceholder(obj.query_value, 'policy.query_value');
+    return {
+      version: 6,
+      ...commonWithUpstream,
+      credential_class: 'http_api_key_query',
+      query_name: /** @type {string} */ (obj.query_name),
+      query_value: CREDENTIAL_PLACEHOLDER,
     };
   }
 
@@ -660,6 +688,14 @@ function validateExactFields(obj, allowed) {
 /**
  * @param {unknown} value
  */
+function validateQueryParamName(value) {
+  if (typeof value !== 'string' || !QUERY_PARAM_NAME.test(value)) {
+    throw new PolicyValidationError(
+      'policy.query_name must match ^[a-z][a-z0-9_-]{0,63}$',
+    );
+  }
+}
+
 function validateApiKeyHeaderName(value) {
   if (
     typeof value !== 'string' ||

@@ -23,6 +23,8 @@ let writerBusy = false;
 
 const MFA_HINT = /\b(mfa|2fa|totp|otp|one[-\s]?time)|mfa_required|otp_required\b/i;
 const CAPTCHA_HINT = /\b(captcha|recaptcha|hcaptcha|bot[-\s]?check)\b/i;
+/** Maximum response body buffered by the browser session broker (1 MiB). */
+export const MAX_BROWSER_RESPONSE_BODY_BYTES = 1 * 1024 * 1024;
 
 /**
  * Start a disposable/dev browser form-login session broker.
@@ -122,13 +124,21 @@ export async function startBrowserSessionBroker(options) {
     });
   });
 
-  await new Promise((resolve, reject) => {
-    server.once('error', reject);
-    server.listen(Number(bindUrl.port), bindUrl.hostname, () => {
-      server.off('error', reject);
-      resolve(undefined);
+  try {
+    await new Promise((resolve, reject) => {
+      server.once('error', reject);
+      server.listen(Number(bindUrl.port), bindUrl.hostname, () => {
+        server.off('error', reject);
+        resolve(undefined);
+      });
     });
-  });
+  } catch {
+    closed = true;
+    writerBusy = false;
+    jar.clear();
+    await closeServer(server).catch(() => {});
+    throw new BrowserSessionBrokerError('bind_failed');
+  }
 
   const address = server.address();
   if (address === null || typeof address === 'string') {
@@ -166,7 +176,7 @@ async function performLogin(ctx) {
   const loginUrl = `${origin}${policy.login_path}`;
 
   const formResponse = await fetchImpl(loginUrl, { method: 'GET', redirect: 'manual' });
-  const formText = await formResponse.text();
+  const formText = await readBoundedText(formResponse);
   assertNoChallenge(formText);
   const hiddenValues = extractPinnedHiddenFields(formText, policy.hidden_fields);
 
@@ -220,7 +230,7 @@ async function performLogin(ctx) {
     throw new BrowserSessionBrokerError('redirect_hop_exhausted');
   }
 
-  const finalText = await response.text();
+  const finalText = await readBoundedText(response);
   assertNoChallenge(finalText);
   if (!response.ok) {
     throw new BrowserSessionBrokerError('login_failed');
@@ -241,7 +251,7 @@ async function performLogin(ctx) {
     redirect: 'manual',
   });
   ingestSetCookie(verify, jar, sensitive, origin);
-  const verifyText = await verify.text();
+  const verifyText = await readBoundedText(verify);
   assertNoChallenge(verifyText);
   if (!verify.ok) {
     throw new BrowserSessionBrokerError('login_failed');
@@ -297,7 +307,17 @@ async function handleReplay(req, res, ctx) {
     return;
   }
   ingestSetCookie(upstream, jar, sensitive, origin);
-  const text = await upstream.text();
+  let text;
+  try {
+    text = await readBoundedText(upstream);
+  } catch (error) {
+    if (error instanceof BrowserSessionBrokerError && error.code === 'response_too_large') {
+      writeFixed(res, 502, 'response_too_large');
+      return;
+    }
+    writeFixed(res, 502, 'upstream_failed');
+    return;
+  }
   if (containsSensitive(text, sensitive) || containsSensitiveHeader(upstream.headers, sensitive)) {
     log({ level: 'error', message: 'blocked sensitive upstream payload' });
     writeFixed(res, 502, 'sensitive_response_blocked');
@@ -310,6 +330,24 @@ async function handleReplay(req, res, ctx) {
     'x-bridge-session-id-present': sessionId.length === 64 ? 'true' : 'false',
   });
   res.end(text);
+}
+
+async function readBoundedText(response) {
+  const lengthHeader = response.headers.get('content-length');
+  if (lengthHeader !== null) {
+    const declared = Number(lengthHeader);
+    if (Number.isFinite(declared) && declared > MAX_BROWSER_RESPONSE_BODY_BYTES) {
+      if (typeof response.body?.cancel === 'function') {
+        await response.body.cancel().catch(() => {});
+      }
+      throw new BrowserSessionBrokerError('response_too_large');
+    }
+  }
+  const buffer = Buffer.from(await response.arrayBuffer());
+  if (buffer.length > MAX_BROWSER_RESPONSE_BODY_BYTES) {
+    throw new BrowserSessionBrokerError('response_too_large');
+  }
+  return buffer.toString('utf8');
 }
 
 function assertNoChallenge(text) {

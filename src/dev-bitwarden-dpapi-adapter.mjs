@@ -27,7 +27,8 @@ export function createDevBitwardenDpapiAdapter() {
       throw new DevBitwardenResolverError('unsupported_item_ref');
     }
     if (request.credential_class !== 'http_bearer' &&
-        request.credential_class !== 'http_api_key_header') {
+        request.credential_class !== 'http_api_key_header' &&
+        request.credential_class !== 'http_api_key_query') {
       throw new DevBitwardenResolverError('unsupported_credential_class');
     }
     if (process.platform !== 'win32') {
