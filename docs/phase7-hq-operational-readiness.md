@@ -30,13 +30,17 @@ Logs expose only the path (never the assembled query URL).
 
 ## Disposable Bitwarden live scope (1B)
 
+Pinned disposable account identity (not a secret):
+`frederikstadler+bridge@gmail.com` — compared by SHA-256 digest against the
+DPAPI username; password stays in short-lived broker memory only.
+
 ```bash
 npm run live:disposable-bitwarden -- --i-approve-disposable-dev-bitwarden
 ```
 
-Without a verified disposable account collector the runner fails closed with
-`disposable_vault_unavailable`. Mock/unit evidence never sets
-`authorization_ready=true` or `live_secret_resolved=true`.
+Success reports value-free booleans plus `account_email_digest` only. Failure
+modes include `approval_flag_required`, `dpapi_probe_failed`, and
+`account_mismatch`. Mock/unit evidence never sets `authorization_ready=true`.
 
 ## Commands
 

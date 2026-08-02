@@ -1,5 +1,5 @@
 param(
-    [Parameter(Mandatory = $true)][ValidateSet('password')][string]$Field,
+    [Parameter(Mandatory = $true)][ValidateSet('password', 'username')][string]$Field,
     [Parameter(Mandatory = $true)][string]$ExpectedPurposeSha256
 )
 
@@ -41,6 +41,7 @@ if ([bool]$obj.PersonalVaultAllowed) {
     [Console]::Error.Write('personal_vault_forbidden')
     exit 14
 }
+
 if ([bool]$obj.CompanyVaultAllowed) {
     [Console]::Error.Write('company_vault_forbidden')
     exit 15
@@ -53,16 +54,30 @@ if ([string]::IsNullOrEmpty($purpose) -or (Get-Sha256Hex $purpose) -cne $Expecte
 }
 
 $network = $obj.Credential.GetNetworkCredential()
-if ($null -eq $network -or [string]::IsNullOrEmpty($network.Password)) {
-    [Console]::Error.Write('password_absent')
+if ($null -eq $network) {
+    [Console]::Error.Write('credential_absent')
     exit 17
 }
 
-if ($Field -ne 'password') {
-    [Console]::Error.Write('unsupported_field')
-    exit 18
+if ($Field -eq 'password') {
+    if ([string]::IsNullOrEmpty($network.Password)) {
+        [Console]::Error.Write('password_absent')
+        exit 17
+    }
+    # Emit only the password bytes to stdout. Callers must never log stdout.
+    [Console]::Out.Write($network.Password)
+    exit 0
 }
 
-# Emit only the password bytes to stdout. Callers must never log stdout.
-[Console]::Out.Write($network.Password)
-exit 0
+if ($Field -eq 'username') {
+    if ([string]::IsNullOrEmpty($network.UserName)) {
+        [Console]::Error.Write('username_absent')
+        exit 19
+    }
+    # Emit only the username bytes to stdout. Callers must never log stdout.
+    [Console]::Out.Write($network.UserName)
+    exit 0
+}
+
+[Console]::Error.Write('unsupported_field')
+exit 18

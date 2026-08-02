@@ -1249,6 +1249,9 @@ Phase 7 may add HQ operational readiness for disposable/dev secrets only:
   an operator-approved CLI flag; library APIs never accept the flag as a
   capability; evidence is boolean-only; `authorization_ready` stays false;
   personal/company/organization vaults remain forbidden.
+- On Windows, the fixed DPAPI store may unlock the pinned disposable account
+  identity `frederikstadler+bridge@gmail.com` (digest-compared, never logged)
+  for broker smoke tests only; DPAPI unlock is not MFA.
 
 Phase 7 must not pair personal or company Bitwarden, implement OAuth/MFA/SMS
 flows, inject process environment secrets, follow redirects with query tokens,

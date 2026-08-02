@@ -77,7 +77,7 @@
     "test:phase6": "node --test --test-concurrency=1 test/browser-form-login-policy.test.js test/fake-login-site.test.js test/browser-session-broker.test.js test/browser-session-hardening.test.js test/browser-exposure.test.js test/browser-vault-wiring.test.js",
     "live:browser-form-login": "node scripts/run-browser-form-login-live.mjs",
     "live:browser-public-demo": "node scripts/run-browser-form-login-live.mjs public-demo --i-approve-disposable-public-demo",
-    "test:phase7": "node --test --test-concurrency=1 test/phase7-query-and-rejects.test.js test/phase7-multi-class-matrix.test.js",
+    "test:phase7": "node --test --test-concurrency=1 test/phase7-query-and-rejects.test.js test/phase7-multi-class-matrix.test.js test/disposable-bitwarden-dpapi-collector.test.js",
     "live:disposable-bitwarden": "node scripts/run-disposable-bitwarden-live.mjs",
     "test:phase2": "node --test test/onecli-audit.test.js test/onecli-artifacts.test.js test/onecli-preflight.test.js",
     "test:phase3": "node --test test/supply-chain-audit.test.js test/phase3-artifacts.test.js",
