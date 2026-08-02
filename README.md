@@ -59,6 +59,8 @@ Agent Access readiness evidence; and approval-gated, disposable platform-boundar
 research. None of these slices are a production password manager or an
 authorization to use a personal/company Bitwarden vault. OAuth, interactive MFA,
 SMS/email codes, SSH/FTP, and process-env injection remain permanently rejected.
+Day-to-day disposable/dev multi-service use is available via
+`npm run start:operational` (`harness_ready`); `authorization_ready` stays false.
 
 ---
 

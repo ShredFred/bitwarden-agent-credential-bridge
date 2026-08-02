@@ -1256,3 +1256,20 @@ Phase 7 may add HQ operational readiness for disposable/dev secrets only:
 Phase 7 must not pair personal or company Bitwarden, implement OAuth/MFA/SMS
 flows, inject process environment secrets, follow redirects with query tokens,
 or claim production writer isolation.
+
+## Phase 8 scope
+
+Phase 8 may add an in-process operational disposable/dev multi-service bridge:
+
+- a tracked secret-free binding table mapping aliases to repo-relative policy
+  paths and exact credential classes;
+- foreground start of fake-vault-backed HTTP and browser brokers for the bound
+  aliases with atomic alias/policy/class matching before resolve/start;
+- transactional reverse-order cleanup on startup failure and on SIGINT/SIGTERM;
+- readiness taxonomy with `harness_ready`, optional `disposable_dev_ready`, and
+  structurally false `authorization_ready`;
+- no PID-file stop, no lease-based remote kill, no company/personal vault pairing,
+  and no reuse of the disposable DPAPI account password across multiple aliases.
+
+Phase 8 must not claim production writer isolation, elevate install eligibility,
+or set `authorization_ready=true`.

@@ -9,7 +9,7 @@
     "node": ">=20"
   },
   "scripts": {
-    "test": "node --test --test-concurrency=1 \"./test/*.test.js\"",
+    "test": "node scripts/run-tests.mjs",
     "test:phase4a": "node --test test/policy.test.js test/fake-api.test.js test/broker.test.js test/exposure.test.js",
     "test:phase4b": "node --test test/basic-credentials.test.js test/policy.test.js test/fake-api.test.js test/broker.test.js",
     "test:phase4c": "node --test --test-concurrency=1 test/agent-token.test.js test/policy.test.js test/onecli-proxy-broker.test.js test/onecli-proxy-runtime-frame.test.js test/onecli-proxy-runtime-supervisor.test.js",
@@ -78,7 +78,9 @@
     "live:browser-form-login": "node scripts/run-browser-form-login-live.mjs",
     "live:browser-public-demo": "node scripts/run-browser-form-login-live.mjs public-demo --i-approve-disposable-public-demo",
     "test:phase7": "node --test --test-concurrency=1 test/phase7-query-and-rejects.test.js test/phase7-multi-class-matrix.test.js test/disposable-bitwarden-dpapi-collector.test.js",
+    "test:phase8": "node --test --test-concurrency=1 test/operational-bridge.test.js",
     "live:disposable-bitwarden": "node scripts/run-disposable-bitwarden-live.mjs",
+    "start:operational": "node scripts/run-operational-bridge.mjs",
     "test:phase2": "node --test test/onecli-audit.test.js test/onecli-artifacts.test.js test/onecli-preflight.test.js",
     "test:phase3": "node --test test/supply-chain-audit.test.js test/phase3-artifacts.test.js",
     "preflight:onecli": "node scripts/preflight-onecli.mjs",

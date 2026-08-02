@@ -1,0 +1,38 @@
+# Phase 8: Operational disposable/dev multi-service bridge
+
+Phase 8 adds a foreground operator profile for day-to-day disposable/dev use of
+the supported auth contracts. It is **not** company-HQ production authorization.
+
+## Readiness taxonomy
+
+| Flag | Meaning |
+|---|---|
+| `harness_ready` | Bound fake policies validated; brokers started; smoke passed |
+| `disposable_dev_ready` | Separate DPAPI disposable smoke passed (`live:disposable-bitwarden`) |
+| `authorization_ready` | Always `false` — same-user isolation is not claimed |
+
+## Commands
+
+```bash
+npm run test:phase8
+npm run start:operational
+npm run live:disposable-bitwarden -- --i-approve-disposable-dev-bitwarden
+```
+
+`start:operational` loads `samples/operational/bindings.json`, starts bearer,
+API-key header, Basic, API-key query, and browser form-login brokers with fake
+vault secrets, prints value-free status JSON, then waits for Ctrl+C.
+
+## Binding rules
+
+- Policies must live under `policies/*.json`
+- Alias, policy path, and `credential_class` must match atomically
+- Rejected classes (`oauth`, MFA/SMS/email, SSH/FTP, `env_inject`) fail closed
+- DPAPI disposable password is never reused across multiple aliases
+
+## Non-claims
+
+- Not personal/company Bitwarden pairing
+- Not PID-file multi-process supervision
+- Not LocalService writer production readiness
+- Not OAuth/MFA issuance
