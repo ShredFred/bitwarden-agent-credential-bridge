@@ -1,7 +1,7 @@
-# Phase 5h.24: test-persistent LocalService lifecycle plan
+# Phase 5h.50: test-persistent LocalService lifecycle plan
 
-Pure persistent install/uninstall plan that requires an eligible Phase 5h.20
-install-gate report and a persistent Phase 5h.21 layout. Value-free operation
+Pure persistent install/uninstall plan that requires an eligible Phase 5h.46
+install-gate report and a persistent Phase 5h.47 layout. Value-free operation
 reports cover install/preflight/uninstall/prove_absent with collision rejection.
 `authorization_ready` remains false; helper stays vault-free.
 

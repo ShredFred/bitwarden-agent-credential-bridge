@@ -1,4 +1,4 @@
-# Phase 5h.19: disposable elevated Windows service lifecycle live test
+# Phase 5h.45: disposable elevated Windows service lifecycle live test
 
 This phase executes the operator-approved disposable LocalService
 install/start/deny/stop/delete matrix on Windows. Approval is out-of-band in the
@@ -24,7 +24,7 @@ active task and is never an API field.
    client). Forgeable `state.json` handoff is not used. Cleanup re-checks the
    run-owned binary path/digest before `sc delete`, then proves absence.
 6. Node parses the value-free result, revalidates the transcript (5h.16) and
-   provenance (5h.18), and brands the live report only from the operator-approved
+   provenance (5h.44), and brands the live report only from the operator-approved
    runner. Structural `evaluateLiveCollectorResult` alone is not an install
    capability. The live collector currently reports honest
    `retained_handle_binding_complete=false` and `path_reacquisition_absent=false`

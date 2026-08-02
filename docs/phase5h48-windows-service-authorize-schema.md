@@ -1,4 +1,4 @@
-# Phase 5h.22: LocalService authorize schema (deny-only)
+# Phase 5h.48: LocalService authorize schema (deny-only)
 
 Adds a bounded authorize-request schema for future LocalService pipe apply
 requests and a native `--self-test-authorize-schema` stdin probe. Valid schemas

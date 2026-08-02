@@ -18,6 +18,7 @@ export const SUPPORTED_CREDENTIAL_CLASSES = Object.freeze([
   'http_api_key_header',
   'http_basic',
   'onecli_proxy',
+  'browser_form_login',
 ]);
 
 /** Exact credential value placeholder required by policies. */

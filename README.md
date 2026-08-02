@@ -383,10 +383,16 @@ AGENTS.md                           experiment rules for agents
 
 ## Limitations
 
-- Three fake HTTP credential classes (`http_bearer`,
-  `http_api_key_header`, and `http_basic`) for a single sample service.
+- Fake HTTP credential classes (`http_bearer`, `http_api_key_header`,
+  `http_basic`) plus disposable/dev `browser_form_login` (policy v5) for
+  loopback form login via a dedicated session broker (not `startBroker`).
+- Browser sessions use stdlib fetch + cookie jar; Playwright is not default.
+  Secrets and session cookies must not appear on agent-readable surfaces.
+  MFA/CAPTCHA/login failure are fail-closed and value-free.
 - Sample policy uses port `0` for bind/upstream placeholders; runtime code supplies the concrete upstream origin after the fake API listens.
-- No TLS, no persistence, no multi-writer coordination beyond “one writer at a time” for this repo.
+- No TLS for the fake harness bind path, no persistence, no multi-writer coordination beyond “one writer at a time” for this repo.
+- Not a personal/company Bitwarden password manager; `authorization_ready` stays false.
+- See [docs/phase6-browser-form-login.md](docs/phase6-browser-form-login.md).
 - The disposable executor does not isolate against a malicious concurrent process
   running as the same OS user; production use requires a separate identity or
   equivalent sandbox. Phase 5h.1 defines its fail-closed wire contract, but the

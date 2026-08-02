@@ -1,4 +1,4 @@
-# Phase 5h.21: Windows helper trusted layout contract
+# Phase 5h.47: Windows helper trusted layout contract
 
 This phase defines a pure layout contract for LocalService helper artifacts that
 deliberately supersedes Phase 5a LocalAppData/home roots for the distinct-writer

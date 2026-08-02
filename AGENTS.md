@@ -1057,6 +1057,9 @@ Tests may parse synthetic snapshots and perform the real read-only system-domain
 print, whose expected current result is fixed-name absence. They must not invoke
 bootstrap, kickstart, kill, bootout, Mach lookup, account or system mutation,
 elevation, credentials, Keychain, vault, or network access.
+
+## Phase 5h.44 scope
+
 Phase 5h.44 may add only a pure Windows elevated-collector provenance evaluator
 over trusted, injected collector facts. It accepts a branded in-process Phase
 5h.15 gate, a transcript revalidated by Phase 5h.16, and an exact boolean
@@ -1112,7 +1115,7 @@ local SCM/pipe, or execute a manifest.
 ## Phase 5h.46 scope
 
 Phase 5h.46 may add only a pure Windows install-gate evidence compiler. It
-accepts a branded Phase 5h.15 lifecycle gate, an exact Phase 5h.19 live report
+accepts a branded Phase 5h.15 lifecycle gate, an exact Phase 5h.45 live report
 object, and an optional Phase 5h.9 advisory preflight snapshot. It may set
 `install_gate_eligible=true` only when disposable live denial was verified,
 collector trust was complete, the gate binary binding is present, and any
@@ -1196,3 +1199,27 @@ It must refuse personal/company vaults, never log secrets, and keep the helper
 vault-free. The fixed store basename is opened through a repo-owned PowerShell
 probe that pins Purpose by SHA-256 and emits only the password on stdout for an
 in-process adapter; forged gates and wrong ACL/account flags fail closed.
+
+## Phase 6 scope
+
+Phase 6 supersedes the Phase 1 / 4a / 4b exclusions of browser and form login for
+this milestone only. It may add disposable/dev-only `browser_form_login` (policy
+version 5) with exact `{{username}}` / `{{password}}` placeholders, exact field
+names, an exact hidden-field name allow-list (no wildcards / auto-scrape-all),
+loopback fake login sites, and a dedicated session broker that never routes
+through `startBroker` HTTP header injection.
+
+The session broker uses stdlib `fetch` plus an in-memory cookie jar (Playwright
+remains opt-in and out of default `npm test`). Secrets and issued session cookies
+are confined to broker memory, added to the sensitive-variant set, and must never
+appear on agent-readable surfaces. Opaque session ids are random in-process
+handles; the agent may only call policy-pinned replay paths on the same origin.
+Redirects inside the login child path are same-origin with a hard hop cap; the
+agent-facing HTTP path keeps redirects fail-closed. MFA, CAPTCHA, and login
+failure terminate with fixed value-free codes and must never return HTML, titles,
+screenshots, or DOM. One session writer at a time; destroy jar/profile on stop.
+
+Non-loopback HTTPS login origins require a branded operator live gate. Personal
+and company Bitwarden pairing, FTP/SSH/RDP, interactive MFA/SMS/email, vault
+clients inside LocalService, and `authorization_ready=true` remain forbidden.
+Version 1–4 policies stay compatible.

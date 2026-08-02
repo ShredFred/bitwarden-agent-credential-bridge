@@ -1,4 +1,4 @@
-# Phase 5h.26: gated dev Bitwarden resolver
+# Phase 5h.52: gated dev Bitwarden resolver
 
 Branded in-process live gate plus injected adapter resolve one item field into
 short-lived broker memory. Personal/company vaults are forbidden; helper remains

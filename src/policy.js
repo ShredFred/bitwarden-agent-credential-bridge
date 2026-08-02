@@ -52,6 +52,30 @@ const VERSION_4_POLICY_FIELDS = new Set([
   'path',
   'agent_token',
 ]);
+const VERSION_5_POLICY_FIELDS = new Set([
+  'version',
+  'service',
+  'credential_class',
+  'bind',
+  'login_origin',
+  'login_path',
+  'form_action',
+  'username_field',
+  'password_field',
+  'hidden_fields',
+  'success_path',
+  'allowed_paths',
+  'replay_method',
+  'replay_path',
+  'username_value',
+  'password_value',
+  'max_redirect_hops',
+  'session_ttl_ms',
+  'idle_ttl_ms',
+]);
+const FIELD_NAME = /^[A-Za-z][A-Za-z0-9_-]{0,63}$/;
+const MAX_HIDDEN_FIELDS = 16;
+const MAX_ALLOWED_PATHS = 32;
 const DNS_HOSTNAME = /^(?=.{1,253}$)[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)*$/;
 const FORBIDDEN_API_KEY_HEADER_NAMES = new Set([
   'authorization',
@@ -104,7 +128,31 @@ const MAX_API_KEY_HEADER_NAME_LENGTH = 128;
 
 /** @typedef {{version: 4, service: string, credential_class: 'onecli_proxy', bind: string, gateway: string, target_host: string, target_port: 443, method: string, path: string, agent_token: string}} OneCliProxyPolicy */
 
-/** @typedef {BearerPolicy | ApiKeyHeaderPolicy | BasicPolicy | OneCliProxyPolicy} Policy */
+/**
+ * @typedef {{
+ *   version: 5,
+ *   service: string,
+ *   credential_class: 'browser_form_login',
+ *   bind: string,
+ *   login_origin: string,
+ *   login_path: string,
+ *   form_action: string,
+ *   username_field: string,
+ *   password_field: string,
+ *   hidden_fields: string[],
+ *   success_path: string,
+ *   allowed_paths: string[],
+ *   replay_method: string,
+ *   replay_path: string,
+ *   username_value: string,
+ *   password_value: string,
+ *   max_redirect_hops: number,
+ *   session_ttl_ms: number,
+ *   idle_ttl_ms: number,
+ * }} BrowserFormLoginPolicy
+ */
+
+/** @typedef {BearerPolicy | ApiKeyHeaderPolicy | BasicPolicy | OneCliProxyPolicy | BrowserFormLoginPolicy} Policy */
 
 /**
  * Validate a declarative policy object. Unsupported credential classes fail closed.
@@ -119,8 +167,9 @@ export function validatePolicy(raw) {
   /** @type {Record<string, unknown>} */
   const obj = /** @type {Record<string, unknown>} */ (raw);
 
-  if (obj.version !== 1 && obj.version !== 2 && obj.version !== 3 && obj.version !== 4) {
-    throw new PolicyValidationError('policy.version must be 1, 2, 3, or 4');
+  if (obj.version !== 1 && obj.version !== 2 && obj.version !== 3 &&
+      obj.version !== 4 && obj.version !== 5) {
+    throw new PolicyValidationError('policy.version must be 1, 2, 3, 4, or 5');
   }
 
   const allowedFields =
@@ -130,7 +179,9 @@ export function validatePolicy(raw) {
         ? VERSION_2_POLICY_FIELDS
         : obj.version === 3
           ? VERSION_3_POLICY_FIELDS
-          : VERSION_4_POLICY_FIELDS;
+          : obj.version === 4
+            ? VERSION_4_POLICY_FIELDS
+            : VERSION_5_POLICY_FIELDS;
   validateExactFields(
     obj,
     allowedFields,
@@ -163,7 +214,9 @@ export function validatePolicy(raw) {
         ? 'http_api_key_header'
         : obj.version === 3
           ? 'http_basic'
-          : 'onecli_proxy';
+          : obj.version === 4
+            ? 'onecli_proxy'
+            : 'browser_form_login';
   if (obj.credential_class !== expectedClass) {
     throw new PolicyValidationError(
       `policy.version ${obj.version} requires credential_class "${expectedClass}"`,
@@ -171,9 +224,13 @@ export function validatePolicy(raw) {
   }
 
   const bind = parseLoopbackHttpUrl(obj.bind, 'policy.bind');
-  const upstream = obj.version === 4
+  const upstream = obj.version === 4 || obj.version === 5
     ? null
     : parseLoopbackHttpUrl(obj.upstream, 'policy.upstream');
+
+  if (obj.version === 5) {
+    return validateBrowserFormLoginPolicy(obj, bind);
+  }
 
   if (typeof obj.method !== 'string' || !HTTP_METHODS.has(obj.method)) {
     throw new PolicyValidationError(
@@ -284,6 +341,117 @@ export function validatePolicy(raw) {
 }
 
 /**
+ * @param {Record<string, unknown>} obj
+ * @param {URL} bind
+ * @returns {BrowserFormLoginPolicy}
+ */
+function validateBrowserFormLoginPolicy(obj, bind) {
+  const loginOrigin = parseLoopbackHttpUrl(obj.login_origin, 'policy.login_origin');
+  const loginPath = requireOriginPath(obj.login_path, 'policy.login_path');
+  const formAction = requireOriginPath(obj.form_action, 'policy.form_action');
+  const successPath = requireOriginPath(obj.success_path, 'policy.success_path');
+  const replayPath = requireOriginPath(obj.replay_path, 'policy.replay_path');
+  if (typeof obj.replay_method !== 'string' || !HTTP_METHODS.has(obj.replay_method)) {
+    throw new PolicyValidationError(
+      'policy.replay_method must be a standard HTTP method in uppercase',
+    );
+  }
+  if (typeof obj.username_field !== 'string' || !FIELD_NAME.test(obj.username_field)) {
+    throw new PolicyValidationError('policy.username_field must be an exact field name');
+  }
+  if (typeof obj.password_field !== 'string' || !FIELD_NAME.test(obj.password_field)) {
+    throw new PolicyValidationError('policy.password_field must be an exact field name');
+  }
+  if (obj.username_field === obj.password_field) {
+    throw new PolicyValidationError('policy username and password fields must differ');
+  }
+  if (!Array.isArray(obj.hidden_fields) || obj.hidden_fields.length > MAX_HIDDEN_FIELDS) {
+    throw new PolicyValidationError('policy.hidden_fields must be a bounded exact name array');
+  }
+  const hiddenFields = [];
+  for (const name of obj.hidden_fields) {
+    if (typeof name !== 'string' || !FIELD_NAME.test(name)) {
+      throw new PolicyValidationError('policy.hidden_fields entries must be exact field names');
+    }
+    if (name === obj.username_field || name === obj.password_field) {
+      throw new PolicyValidationError('policy.hidden_fields must not repeat credential fields');
+    }
+    if (hiddenFields.includes(name)) {
+      throw new PolicyValidationError('policy.hidden_fields must not contain duplicates');
+    }
+    hiddenFields.push(name);
+  }
+  if (!Array.isArray(obj.allowed_paths) || obj.allowed_paths.length < 1 ||
+      obj.allowed_paths.length > MAX_ALLOWED_PATHS) {
+    throw new PolicyValidationError('policy.allowed_paths must be a non-empty bounded path array');
+  }
+  const allowedPaths = [];
+  for (const pathValue of obj.allowed_paths) {
+    const path = requireOriginPath(pathValue, 'policy.allowed_paths');
+    if (allowedPaths.includes(path)) {
+      throw new PolicyValidationError('policy.allowed_paths must not contain duplicates');
+    }
+    allowedPaths.push(path);
+  }
+  if (!allowedPaths.includes(successPath)) {
+    throw new PolicyValidationError('policy.success_path must be listed in allowed_paths');
+  }
+  if (!allowedPaths.includes(replayPath)) {
+    throw new PolicyValidationError('policy.replay_path must be listed in allowed_paths');
+  }
+  if (obj.max_redirect_hops !== 1 && obj.max_redirect_hops !== 2 && obj.max_redirect_hops !== 3) {
+    throw new PolicyValidationError('policy.max_redirect_hops must be 1, 2, or 3');
+  }
+  if (typeof obj.session_ttl_ms !== 'number' || !Number.isInteger(obj.session_ttl_ms) ||
+      obj.session_ttl_ms < 1000 || obj.session_ttl_ms > 300000) {
+    throw new PolicyValidationError('policy.session_ttl_ms must be an integer 1000–300000');
+  }
+  if (typeof obj.idle_ttl_ms !== 'number' || !Number.isInteger(obj.idle_ttl_ms) ||
+      obj.idle_ttl_ms < 1000 || obj.idle_ttl_ms > obj.session_ttl_ms) {
+    throw new PolicyValidationError('policy.idle_ttl_ms must be an integer 1000–session_ttl_ms');
+  }
+  validateExactPlaceholder(obj.username_value, USERNAME_PLACEHOLDER, 'policy.username_value');
+  validateExactPlaceholder(obj.password_value, PASSWORD_PLACEHOLDER, 'policy.password_value');
+  return {
+    version: 5,
+    service: /** @type {string} */ (obj.service),
+    credential_class: 'browser_form_login',
+    bind: bind.href.replace(/\/$/, ''),
+    login_origin: loginOrigin.href.replace(/\/$/, ''),
+    login_path: loginPath,
+    form_action: formAction,
+    username_field: /** @type {string} */ (obj.username_field),
+    password_field: /** @type {string} */ (obj.password_field),
+    hidden_fields: Object.freeze([...hiddenFields]),
+    success_path: successPath,
+    allowed_paths: Object.freeze([...allowedPaths]),
+    replay_method: /** @type {string} */ (obj.replay_method),
+    replay_path: replayPath,
+    username_value: USERNAME_PLACEHOLDER,
+    password_value: PASSWORD_PLACEHOLDER,
+    max_redirect_hops: /** @type {number} */ (obj.max_redirect_hops),
+    session_ttl_ms: /** @type {number} */ (obj.session_ttl_ms),
+    idle_ttl_ms: /** @type {number} */ (obj.idle_ttl_ms),
+  };
+}
+
+function requireOriginPath(value, fieldName) {
+  if (
+    typeof value !== 'string' ||
+    !value.startsWith('/') ||
+    value.startsWith('//') ||
+    value.includes('?') ||
+    value.includes('#') ||
+    value.includes('*')
+  ) {
+    throw new PolicyValidationError(
+      `${fieldName} must be an exact origin-relative path without query, fragment, or wildcards`,
+    );
+  }
+  return value;
+}
+
+/**
  * Load and validate a policy JSON file.
  * @param {string} filePath
  * @returns {Promise<Policy>}
@@ -343,6 +511,20 @@ export function withGateway(policy, gatewayUrl) {
   }
   const gateway = parseLoopbackHttpUrl(gatewayUrl, 'gateway');
   return validatePolicy({ ...policy, gateway: gateway.href.replace(/\/$/, '') });
+}
+
+/** Return a validated v5 policy with a concrete loopback login origin. */
+export function withLoginOrigin(policy, loginOriginUrl) {
+  if (policy?.version !== 5) {
+    throw new PolicyValidationError('withLoginOrigin requires a version-5 policy');
+  }
+  const loginOrigin = parseLoopbackHttpUrl(loginOriginUrl, 'login_origin');
+  return validatePolicy({
+    ...policy,
+    login_origin: loginOrigin.href.replace(/\/$/, ''),
+    hidden_fields: [...policy.hidden_fields],
+    allowed_paths: [...policy.allowed_paths],
+  });
 }
 
 /**

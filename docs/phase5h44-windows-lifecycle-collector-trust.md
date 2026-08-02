@@ -1,4 +1,4 @@
-# Phase 5h.18: Windows elevated-collector provenance trust
+# Phase 5h.44: Windows elevated-collector provenance trust
 
 This phase adds the missing adapter after Phase 5h.16: a pure evaluator that may
 set `collector_trust_verified` only when a branded Phase 5h.15 gate, a

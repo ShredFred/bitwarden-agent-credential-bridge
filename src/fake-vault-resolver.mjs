@@ -39,7 +39,7 @@ export function resolveFakeVaultSecrets(aliasMap) {
         credential_class: credentialClass,
         credential: generateFakeSentinel(),
       });
-    } else if (credentialClass === 'http_basic') {
+    } else if (credentialClass === 'http_basic' || credentialClass === 'browser_form_login') {
       secrets[alias] = Object.freeze({
         credential_class: credentialClass,
         username: `user_${alias}`,

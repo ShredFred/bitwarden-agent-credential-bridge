@@ -225,6 +225,12 @@ export async function startBroker(options) {
       { code: 'wrong_broker' },
     );
   }
+  if (suppliedClass === 'browser_form_login') {
+    throw new BrokerError(
+      'browser_form_login requires the dedicated browser session broker',
+      { code: 'wrong_broker' },
+    );
+  }
 
   let policy;
   try {
@@ -434,8 +440,12 @@ async function handleBrokerRequest(req, res, ctx) {
     outboundHeaders.authorization = outboundCredentialValue;
   } else if (policy.credential_class === 'http_api_key_header') {
     outboundHeaders[policy.header_name] = outboundCredentialValue;
-  } else {
+  } else if (policy.credential_class === 'http_basic') {
     outboundHeaders.authorization = outboundCredentialValue;
+  } else {
+    throw new BrokerError('unsupported credential_class; refusing to inject', {
+      code: 'unsupported_credential_class',
+    });
   }
 
   const outboundUrl = `${upstreamOrigin}${policy.path}`;

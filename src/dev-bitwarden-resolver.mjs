@@ -52,7 +52,7 @@ export async function resolveDevBitwardenSecret(gate, adapter, request) {
   const req = exactObject(request, new Set(['item_ref', 'field', 'credential_class']));
   if (typeof req.item_ref !== 'string' || req.item_ref.length < 1 || req.item_ref.length > 128 ||
       typeof req.field !== 'string' || req.field.length < 1 || req.field.length > 64 ||
-      !['http_bearer', 'http_api_key_header', 'http_basic'].includes(req.credential_class)) {
+      !['http_bearer', 'http_api_key_header', 'http_basic', 'browser_form_login'].includes(req.credential_class)) {
     throw new DevBitwardenResolverError('invalid_request');
   }
 
@@ -70,7 +70,7 @@ function sanitizeResolvedSecret(resolved, credentialClass) {
       utilTypes.isProxy(resolved) || Object.getPrototypeOf(resolved) !== Object.prototype) {
     throw new DevBitwardenResolverError('invalid_secret');
   }
-  if (credentialClass === 'http_basic') {
+  if (credentialClass === 'http_basic' || credentialClass === 'browser_form_login') {
     const keys = Reflect.ownKeys(resolved);
     if (keys.length !== 2 || !keys.includes('username') || !keys.includes('password')) {
       throw new DevBitwardenResolverError('invalid_secret');
