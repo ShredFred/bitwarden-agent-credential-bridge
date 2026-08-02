@@ -1,0 +1,31 @@
+{
+  "version": 1,
+  "profile": "operational_disposable_dev",
+  "bindings": [
+    {
+      "alias": "demo_bearer",
+      "policy": "policies/sample-fake-service.json",
+      "credential_class": "http_bearer"
+    },
+    {
+      "alias": "demo_api_key_header",
+      "policy": "policies/sample-fake-api-key-service.json",
+      "credential_class": "http_api_key_header"
+    },
+    {
+      "alias": "demo_basic",
+      "policy": "policies/sample-fake-basic-service.json",
+      "credential_class": "http_basic"
+    },
+    {
+      "alias": "demo_api_key_query",
+      "policy": "policies/sample-fake-api-key-query-service.json",
+      "credential_class": "http_api_key_query"
+    },
+    {
+      "alias": "demo_browser",
+      "policy": "policies/sample-fake-browser-login.json",
+      "credential_class": "browser_form_login"
+    }
+  ]
+}
