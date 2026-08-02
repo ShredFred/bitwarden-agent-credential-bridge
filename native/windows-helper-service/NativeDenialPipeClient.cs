@@ -20,6 +20,7 @@ internal static class NativeDenialPipeClient
     private const int ErrorIoPending = 997;
     private const uint WaitObject0 = 0;
     private const uint IoTimeoutMilliseconds = 1500;
+    private const uint ApplyIoTimeoutMilliseconds = 30000;
     private static readonly IntPtr InvalidHandleValue = new(-1);
     private const string ExpectedServerResponse =
         "{\"schema_version\":1,\"local_transport\":true,\"remote_clients_rejected\":true," +
@@ -28,12 +29,33 @@ internal static class NativeDenialPipeClient
         "\"client_pid_bound\":true,\"caller_token_bound\":true," +
         "\"helper_token_bound\":true,\"same_token_user\":true,\"different_principal\":false," +
         "\"authorization_denied\":true}\n";
+    private const string ExpectedServiceDenialResponse =
+        "{\"schema_version\":1,\"local_transport\":true,\"remote_clients_rejected\":true," +
+        "\"first_instance\":true,\"explicit_pipe_dacl_verified\":true," +
+        "\"service_identity_self_verified\":true,\"client_pid_bound\":true," +
+        "\"caller_token_bound\":true,\"helper_token_bound\":true," +
+        "\"same_token_user\":false,\"different_principal\":true," +
+        "\"target_acl_evidence_complete\":false,\"manifest_executor_absent\":true," +
+        "\"authorization_denied\":true}\n";
     private const string ClientReport =
         "{\"schema_version\":1,\"narrow_pipe_rights\":true,\"create_pipe_instance_right_absent\":true," +
         "\"response_schema_exact\":true,\"server_identity_verified\":false," +
         "\"authorization_denied\":true}\n";
+    private const string ServiceDenialClientReport =
+        "{\"schema_version\":1,\"narrow_pipe_rights\":true,\"create_pipe_instance_right_absent\":true," +
+        "\"response_schema_exact\":true,\"different_principal\":true,\"authorization_denied\":true}\n";
 
     internal static int Run(string mode, string nonce)
+    {
+        return Run(mode, nonce, launcherPath: null);
+    }
+
+    internal static int RunServiceApply(string nonce, string launcherPath)
+    {
+        return Run("service-apply", nonce, launcherPath);
+    }
+
+    internal static int Run(string mode, string nonce, string? launcherPath)
     {
         if (!TryOpenPipe(out IntPtr pipe))
         {
@@ -48,7 +70,7 @@ internal static class NativeDenialPipeClient
             }
             string request = mode switch
             {
-                "valid" or "no-ack" or "unread" => nonce + "\n",
+                "valid" or "service-denial" or "service-apply" or "no-ack" or "unread" => nonce + "\n",
                 "mismatch" => new string(nonce[0] == 'a' ? 'b' : 'a', 64) + "\n",
                 "partial" => nonce[..8] + "\n",
                 "crlf" => nonce + "\r\n",
@@ -64,11 +86,19 @@ internal static class NativeDenialPipeClient
                 Thread.Sleep(2500);
                 return 0;
             }
-            if (mode != "valid" && mode != "no-ack")
+            if (mode != "valid" && mode != "service-denial" && mode != "service-apply" && mode != "no-ack")
             {
                 return 0;
             }
-            if (!ReadExact(pipe, Encoding.ASCII.GetByteCount(ExpectedServerResponse), out byte[] response) ||
+            if (mode == "service-denial" || mode == "service-apply")
+            {
+                if (!ReadMessage(pipe, 4096, out byte[] serviceResponse) ||
+                    !LooksLikeServiceDenial(Encoding.ASCII.GetString(serviceResponse)))
+                {
+                    return 23;
+                }
+            }
+            else if (!ReadExact(pipe, Encoding.ASCII.GetByteCount(ExpectedServerResponse), out byte[] response) ||
                 Encoding.ASCII.GetString(response) != ExpectedServerResponse)
             {
                 return 23;
@@ -82,7 +112,11 @@ internal static class NativeDenialPipeClient
             {
                 return 24;
             }
-            Console.Out.Write(ClientReport);
+            if (mode == "service-apply")
+            {
+                return CompleteServiceApply(pipe, launcherPath);
+            }
+            Console.Out.Write(mode == "service-denial" ? ServiceDenialClientReport : ClientReport);
             return 0;
         }
         finally
@@ -91,13 +125,98 @@ internal static class NativeDenialPipeClient
         }
     }
 
-    private static bool WriteExact(IntPtr pipe, byte[] bytes)
+    private static int CompleteServiceApply(IntPtr pipe, string? launcherPath)
+    {
+        if (string.IsNullOrEmpty(launcherPath) || launcherPath.Length > 512)
+        {
+            return 26;
+        }
+        if (!TryReadLauncherBytes(launcherPath, out byte[] launcherBytes))
+        {
+            return 26;
+        }
+        if (launcherBytes.Length < 1 || launcherBytes.Length > 1024 * 1024)
+        {
+            return 26;
+        }
+
+        string digest = DisposableFirstInstallApply.Sha256Hex(launcherBytes);
+        string authJson =
+            "{\"protocol_version\":1,\"request_id\":\"reqapply000001\",\"operation\":\"apply_disposable_manifest\"," +
+            "\"workspace\":{\"platform\":\"win32\",\"root_digest\":\"" + digest +
+            "\",\"marker_nonce\":\"" + digest + "\"},\"manifest_digest\":\"" + digest +
+            "\",\"launcher\":{\"sha256\":\"" + digest + "\",\"byte_length\":" + launcherBytes.Length + "}}";
+        if (!WriteExact(pipe, Encoding.UTF8.GetBytes(authJson), ApplyIoTimeoutMilliseconds))
+        {
+            return 27;
+        }
+        if (!WriteExact(pipe, Encoding.ASCII.GetBytes(launcherBytes.Length.ToString()), ApplyIoTimeoutMilliseconds))
+        {
+            return 27;
+        }
+        if (!WriteExact(pipe, launcherBytes, ApplyIoTimeoutMilliseconds))
+        {
+            return 27;
+        }
+        if (!ReadMessage(pipe, 4096, out byte[] applyResponse, ApplyIoTimeoutMilliseconds))
+        {
+            return 28;
+        }
+        Console.Out.Write(Encoding.ASCII.GetString(applyResponse));
+        string text = Encoding.ASCII.GetString(applyResponse);
+        return text.Contains("\"applied\":true", StringComparison.Ordinal) &&
+            text.Contains("\"helper_vault_free\":true", StringComparison.Ordinal) &&
+            text.Contains("\"paths_created\":5", StringComparison.Ordinal)
+            ? 0
+            : 29;
+    }
+
+    private static bool TryReadLauncherBytes(string path, out byte[] bytes)
+    {
+        bytes = Array.Empty<byte>();
+        IntPtr file = CreateFile(path, GenericRead, 1 /* FILE_SHARE_READ */, IntPtr.Zero,
+            OpenExisting, 0, IntPtr.Zero);
+        if (file == InvalidHandleValue)
+        {
+            return false;
+        }
+        try
+        {
+            if (!GetFileSizeEx(file, out long size) || size < 1 || size > 1024 * 1024)
+            {
+                return false;
+            }
+            bytes = new byte[(int)size];
+            IntPtr buffer = Marshal.AllocHGlobal(bytes.Length);
+            try
+            {
+                if (!ReadFile(file, buffer, (uint)bytes.Length, out uint read, IntPtr.Zero) ||
+                    read != bytes.Length)
+                {
+                    return false;
+                }
+                Marshal.Copy(buffer, bytes, 0, bytes.Length);
+                return true;
+            }
+            finally
+            {
+                Marshal.FreeHGlobal(buffer);
+            }
+        }
+        finally
+        {
+            _ = CloseHandle(file);
+        }
+    }
+
+    private static bool WriteExact(IntPtr pipe, byte[] bytes, uint timeoutMilliseconds = IoTimeoutMilliseconds)
     {
         IntPtr buffer = Marshal.AllocHGlobal(bytes.Length);
         try
         {
             Marshal.Copy(bytes, 0, buffer, bytes.Length);
-            return RunOverlapped(pipe, buffer, (uint)bytes.Length, false, out uint written) && written == bytes.Length;
+            return RunOverlapped(pipe, buffer, (uint)bytes.Length, false, out uint written, timeoutMilliseconds) &&
+                written == bytes.Length;
         }
         finally
         {
@@ -122,6 +241,35 @@ internal static class NativeDenialPipeClient
         {
             Marshal.FreeHGlobal(buffer);
         }
+    }
+
+    private static bool ReadMessage(IntPtr pipe, int maxLength, out byte[] bytes,
+        uint timeoutMilliseconds = IoTimeoutMilliseconds)
+    {
+        bytes = Array.Empty<byte>();
+        IntPtr buffer = Marshal.AllocHGlobal(maxLength);
+        try
+        {
+            if (!RunOverlapped(pipe, buffer, (uint)maxLength, true, out uint read, timeoutMilliseconds) ||
+                read < 1 || read > maxLength)
+            {
+                return false;
+            }
+            bytes = new byte[read];
+            Marshal.Copy(buffer, bytes, 0, (int)read);
+            return true;
+        }
+        finally
+        {
+            Marshal.FreeHGlobal(buffer);
+        }
+    }
+
+    private static bool LooksLikeServiceDenial(string text)
+    {
+        return text.Contains("\"authorization_denied\":true", StringComparison.Ordinal) &&
+            text.Contains("\"different_principal\":true", StringComparison.Ordinal) &&
+            text.Contains("\"manifest_executor_absent\":", StringComparison.Ordinal);
     }
 
     internal static bool TryOpenPipe(out IntPtr pipe)
@@ -168,7 +316,8 @@ internal static class NativeDenialPipeClient
         if (pipe != InvalidHandleValue && pipe != IntPtr.Zero) _ = CloseHandle(pipe);
     }
 
-    private static bool RunOverlapped(IntPtr pipe, IntPtr buffer, uint length, bool read, out uint transferred)
+    private static bool RunOverlapped(IntPtr pipe, IntPtr buffer, uint length, bool read, out uint transferred,
+        uint timeoutMilliseconds = IoTimeoutMilliseconds)
     {
         transferred = 0;
         IntPtr waitEvent = CreateEvent(IntPtr.Zero, true, false, null);
@@ -191,7 +340,7 @@ internal static class NativeDenialPipeClient
             {
                 return false;
             }
-            if (WaitForSingleObject(waitEvent, IoTimeoutMilliseconds) != WaitObject0)
+            if (WaitForSingleObject(waitEvent, timeoutMilliseconds) != WaitObject0)
             {
                 CancelAndDrainOrExit(pipe, overlapped, waitEvent);
                 return false;
@@ -224,6 +373,10 @@ internal static class NativeDenialPipeClient
         public uint OffsetHigh;
         public IntPtr EventHandle;
     }
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool GetFileSizeEx(IntPtr file, out long fileSize);
 
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]

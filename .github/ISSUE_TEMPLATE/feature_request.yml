@@ -1,0 +1,40 @@
+name: Feature request
+description: Propose a bounded, public-safe improvement.
+title: "feature: "
+labels:
+  - feature
+  - needs-triage
+body:
+  - type: markdown
+    attributes:
+      value: |
+        For new credential classes, policy language, platform boundaries, or public security claims, start a Discussion first.
+        Do not include real credentials, vault references, private endpoints, or private service inventories.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem to solve
+      description: What safe, concrete problem would this solve?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior
+      description: Describe the smallest acceptable change.
+    validations:
+      required: true
+  - type: textarea
+    id: boundaries
+    attributes:
+      label: Security-boundary impact
+      description: Which existing invariant could this affect, and how should it fail closed?
+    validations:
+      required: true
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Safety confirmation
+      options:
+        - label: This proposal does not require a real credential, vault, account, or private infrastructure.
+          required: true

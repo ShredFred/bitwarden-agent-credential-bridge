@@ -1,4 +1,64 @@
-# Agent Credential Bridge Experiment
+# Agent Credential Bridge
+
+> A fail-closed security research harness for exploring how an AI agent can use
+> a narrowly scoped credential without receiving its plaintext value.
+
+**Experimental. Fake data only. Not a production credential manager.**
+
+This project turns a deliberately small security question into testable
+contracts: can a policy pin one outbound request while a broker injects a
+runtime-only fake value and the caller never receives it? It does not access a
+Bitwarden vault, deploy OneCLI, or use any real credential.
+
+It is not affiliated with, endorsed by, or supported by Bitwarden or OneCLI.
+
+## Start here
+
+- Read [Architecture and repository boundaries](docs/architecture.md) to
+  understand the public, private, and machine-local separation.
+- Read [Development and releases](docs/development-and-releases.md) for the
+  issue, pull request, discussion, and versioning workflow.
+- Copy the later public GitHub description, topics, and feature settings from
+  [GitHub launch settings](docs/github-launch-settings.md).
+- Read [SECURITY.md](SECURITY.md) before reporting a potential vulnerability.
+- Read the [public release checklist](docs/public-release-checklist.md) before
+  changing repository visibility or publishing a release.
+
+## Reference flow
+
+```mermaid
+flowchart LR
+  A["Calling agent\\nNever receives plaintext"] -->|"Allowed request only"| B["Foreground broker\\nValidates policy and strips caller credentials"]
+  S["Generated fake sentinel\\nRuntime memory only"] --> B
+  S --> U["Fake loopback API"]
+  B -->|"One policy-pinned outbound injection"| U
+  U -->|"Sanitized response"| B
+  B -->|"Caller-visible response"| A
+```
+
+The diagram describes the harness contract, not a production security
+architecture. The generated sentinel is passed directly to the fake API and
+broker in runtime memory; it is never stored in a policy, file, or general
+process environment.
+
+## What this repository is and is not
+
+| It is | It is not |
+| --- | --- |
+| A fake-only research and regression harness | A production credential manager or vault integration |
+| A set of narrow, fail-closed policy contracts | Permission to connect a real vault or account |
+| A record of explicit platform-boundary evidence | A claim that same-user controls establish production isolation |
+| A public codebase for synthetic tests and reproducible docs | A place for credentials, vault references, private inventories, or raw host output |
+
+## Research status
+
+The repository currently contains fake loopback contracts for bearer, API-key
+header, and HTTP Basic injection; offline OneCLI and Agent Access readiness
+evidence; and approval-gated, disposable platform-boundary research. None of
+these slices are a production deployment or an authorization to use a real
+secret.
+
+---
 
 Sample-only security experiment. Phase 1 tests a **credential-bridge contract**.
 Phase 2 adds an offline, non-mutating OneCLI readiness audit. Phase 3 adds
@@ -290,6 +350,9 @@ docs/phase5h10-native-windows-service-host.md deterministic native lifecycle sca
 docs/phase5h11-native-pipe-denial.md native local pipe/token denial probe
 docs/phase5h12-explicit-pipe-dacl.md fixed protected native pipe DACL proof
 docs/phase5h13-server-identity-verifier.md pre-request SCM/PID/token verifier
+docs/phase5h14-denial-only-service-loop.md ServiceMain denial pipe activation
+docs/phase5h15-windows-service-lifecycle-gate.md pure disposable elevated gate
+docs/phase5h16-windows-service-lifecycle-evidence.md value-free transcript machine
 docs/phase5h17-linux-systemd-boundary-plan.md pure fixed systemd system-service contract
 docs/phase5h18-macos-launchd-boundary-plan.md pure fixed launchd system-helper contract
 docs/phase5h19-macos-launchd-boundary-preflight.md read-only fixed macOS host inspection
@@ -304,6 +367,16 @@ docs/phase5h27-macos-retained-file-ownership.md native retained-FD publication/c
 docs/phase5h28-macos-account-soft-ownership.md native full-tuple account ownership core
 docs/phase5h29-macos-launchd-job-soft-ownership.md native full-identity launchd ownership core
 docs/phase5h30-macos-composite-lifecycle-controller.md cross-layer native finally-cleanup controller
+docs/phase5h44-windows-lifecycle-collector-trust.md pure elevated-collector provenance trust
+docs/phase5h45-windows-service-lifecycle-live.md disposable elevated install/deny live matrix
+docs/phase5h46-windows-service-install-gate.md install-gate evidence compiler
+docs/phase5h47-windows-helper-layout-plan.md ProgramData-class helper layout contract
+docs/phase5h48-windows-service-authorize-schema.md deny-only authorize schema
+docs/phase5h49-windows-helper-disposable-apply.md disposable apply envelope/simulation
+docs/phase5h50-windows-persistent-service-lifecycle.md persistent install/uninstall plan
+docs/phase5h51-fake-vault-resolver.md fake alias to broker secrets
+docs/phase5h52-dev-bitwarden-resolver.md gated DPAPI/dev Bitwarden resolver
+docs/phase5h53-54-localservice-apply.md retained-handle cleanup + LocalService apply
 test/*.test.js                      functional + exposure tests
 AGENTS.md                           experiment rules for agents
 ```
@@ -462,6 +535,24 @@ AGENTS.md                           experiment rules for agents
   bounded `launchctl print system`, matches only the exact endpoint-entry line,
   rejects path/name substrings, and shares the hardened executable validator.
   The live read-only result on this Mac is fixed-name absent.
+- Phase 5h.44 compiles branded gate + structurally complete transcript + exact
+  injected collector provenance into `collector_trust_verified` without treating
+  UAC/admin/high-integrity alone as trust. Even a complete provenance schema stays
+  unlive, mutation-unauthorized, install-ineligible, and non-authorizing until a
+  later operator-approved elevated disposable collector runs.
+- Phase 5h.45 runs that disposable elevated LocalService install/start/deny/stop/
+  delete matrix under explicit operator approval, may set `live_test_verified`
+  after cleanup/absence proof, and still keeps production install authorization
+  false. It does not read Bitwarden or DPAPI vault credentials.
+- Phase 5h.46–5h.54 continue the Windows finish line: install-gate evidence,
+  ProgramData layout, authorize schema, disposable LocalService first-install
+  apply over the denial pipe (narrow-rights native client), persistent
+  install/uninstall under ProgramData, fake vault→broker wiring, and a gated
+  DPAPI/dev-Bitwarden resolver that keeps the helper vault-free. Live disposable
+  denial can set collector trust and install-gate eligibility; persistent
+  `authorization_ready` remains false until handle-bound production evidence
+  exists. Run `npm run live:windows-persistent -- install|uninstall` only under
+  operator approval (UAC); leave the machine clean after uninstall.
 - No browser/website automation, query, cookie, form, process-env,
   SSH, database, RDP, or desktop credential injection.
 - Not a substitute for vault, OS keychain, or production broker hardening.
@@ -472,6 +563,38 @@ AGENTS.md                           experiment rules for agents
   download, install, image pull, deployment, pairing, or live compatibility
   test.
 
-## Publication
+## Contributing and community
 
-Do not create a remote or push this repository until a separate secret scan and publication review pass succeeds.
+Public collaboration is deliberately separated by purpose:
+
+- **Issues** are for reproducible bugs and bounded, agreed work.
+- **Pull requests** are for tested changes with a documented security-boundary
+  review.
+- **Discussions** are for architecture, Q&A, and early research ideas.
+- **Private vulnerability reporting** is the only route for suspected security
+  problems. Never disclose those in a public issue, pull request, or discussion.
+
+See [CONTRIBUTING.md](CONTRIBUTING.md), [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md),
+and [SUPPORT.md](SUPPORT.md) for the working agreement.
+
+## Funding
+
+If this research project is useful, you can support its maintenance through
+[Buy Me a Coffee](https://buymeacoffee.com/shredfred). GitHub will display the
+Sponsor button when this repository becomes public.
+
+## License and upstream references
+
+Agent Credential Bridge is licensed under [Apache-2.0](LICENSE). This aligns
+with the Apache-2.0 licensing of the upstream Bitwarden Agent Access and OneCLI
+projects, which this repository references for research evidence only. It does
+not ship their source code, claim compatibility, or imply an endorsement. See
+[Licensing and upstream use](docs/licensing.md).
+
+## Public-release gate
+
+Do not make this repository public, create a public release, or push a release
+tag until an independent secret scan and publication review pass succeeds. The
+full gate also requires an explicit license decision, GitHub security settings,
+maintainer-owned reporting/funding channels, and a tested release process. See
+the [public release checklist](docs/public-release-checklist.md).

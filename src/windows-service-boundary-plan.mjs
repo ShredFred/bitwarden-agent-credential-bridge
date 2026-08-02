@@ -1,6 +1,6 @@
 const SERVICE_NAME = 'BitwardenAgentCredentialBridgeHelper';
 const SERVICE_ACCOUNT = 'NT AUTHORITY\\LocalService';
-const PIPE_NAME = 'bitwarden-agent-credential-bridge-helper-v1';
+const PIPE_NAME = 'BitwardenAgentCredentialBridgeHelper.v1.denial';
 const SHA256 = /^[0-9a-f]{64}$/;
 const MAX_BINARY_BYTES = 64 * 1024 * 1024;
 const VALID_PLANS = new WeakSet();
