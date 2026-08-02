@@ -17,6 +17,7 @@ const SESSION_COOKIE = 'fake_session';
  *   usernameField?: string,
  *   passwordField?: string,
  *   hiddenFields?: Record<string, string>,
+ *   challengeMode?: 'none' | 'mfa' | 'captcha',
  * }} options
  */
 export async function startFakeLoginSite(options) {
@@ -29,12 +30,23 @@ export async function startFakeLoginSite(options) {
   const usernameField = options.usernameField ?? 'username';
   const passwordField = options.passwordField ?? 'password';
   const hiddenFields = options.hiddenFields ?? Object.create(null);
+  const challengeMode = options.challengeMode ?? 'none';
   /** @type {Set<string>} */
   const sessions = new Set();
 
   const server = http.createServer((req, res) => {
     const url = new URL(req.url ?? '/', `http://${host}`);
     if (req.method === 'GET' && url.pathname === loginPath) {
+      if (challengeMode === 'mfa') {
+        res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
+        res.end('<!doctype html><html><body><p>Enter MFA code</p></body></html>');
+        return;
+      }
+      if (challengeMode === 'captcha') {
+        res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
+        res.end('<!doctype html><html><body><div class="recaptcha">bot-check</div></body></html>');
+        return;
+      }
       const hiddenHtml = Object.entries(hiddenFields)
         .map(([name, value]) =>
           `<input type="hidden" name="${escapeHtml(name)}" value="${escapeHtml(value)}" />`)

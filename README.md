@@ -53,10 +53,11 @@ process environment.
 ## Research status
 
 The repository currently contains fake loopback contracts for bearer, API-key
-header, and HTTP Basic injection; offline OneCLI and Agent Access readiness
-evidence; and approval-gated, disposable platform-boundary research. None of
-these slices are a production deployment or an authorization to use a real
-secret.
+header, HTTP Basic, and disposable/dev `browser_form_login` (form + session
+replay without exposing plaintext to the agent); offline OneCLI and Agent Access
+readiness evidence; and approval-gated, disposable platform-boundary research.
+None of these slices are a production password manager or an authorization to
+use a personal/company Bitwarden vault.
 
 ---
 

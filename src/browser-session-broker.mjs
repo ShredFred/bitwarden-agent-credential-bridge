@@ -340,6 +340,9 @@ function ingestSetCookie(response, jar, sensitive, origin) {
     const value = pair.slice(eq + 1).trim();
     if (!name || !value) continue;
     jar.set(name, value);
+    if (jar.size > 32) {
+      throw new BrowserSessionBrokerError('cookie_jar_overflow');
+    }
     for (const variant of sensitiveVariantsFor(value)) sensitive.add(variant);
     for (const variant of sensitiveVariantsFor(`${name}=${value}`)) sensitive.add(variant);
   }
