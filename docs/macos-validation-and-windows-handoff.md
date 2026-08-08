@@ -185,13 +185,14 @@ Recommended next development order on Windows:
 8. ~~Phase 9f package-bind reviewed helper/supervisor digests and expand pure
    Windows CI without live service install.~~ Done
    (`docs/phase9f-windows-helper-package-binding.md`).
-9. Keep personal/company Bitwarden pairing forbidden. macOS/Linux distinct-writer
-   parity remains a separate milestone; do not claim cross-platform
-   `authorization_ready` from Windows-only evidence.
-10. For a real host `authorization_ready=true`, run the operator live sequence
-    (install → 9b/9c/9d collect → compose via 9e → uninstall). No further Phase 9
-    code slices are planned after 9f; remaining work is operator evidence and
-    optional later apply-gate / cross-platform parity milestones.
+9. ~~Phase 10a Day-2 evidence refresh for an already-installed LocalService.~~
+   Done (`docs/phase10a-windows-authorization-evidence-refresh.md`;
+   `npm run live:windows-authorization-refresh`). Uninstall stays explicit.
+10. Keep personal/company Bitwarden pairing forbidden. macOS/Linux distinct-writer
+    parity remains a separate milestone; do not claim cross-platform
+    `authorization_ready` from Windows-only evidence.
+11. Day-2 refresh does not claim same-user memory isolation; agent-readable
+    surface non-disclosure remains the exposure-test contract.
 
 Cursor should treat a Windows-only skip on macOS as expected, but any failure in
 a pure validator or disposable test as a portability regression. Keep fixes

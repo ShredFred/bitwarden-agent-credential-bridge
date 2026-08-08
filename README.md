@@ -591,6 +591,9 @@ AGENTS.md                           experiment rules for agents
 - Phase 9f package-binds reviewed helper source/toolchain/entrypoint digests and
   the OneCLI proxy supervisor entrypoint/imports for collector publish paths;
   see [docs/phase9f-windows-helper-package-binding.md](docs/phase9f-windows-helper-package-binding.md).
+- Phase 10a adds a foreground Day-2 evidence refresh loop for an already-installed
+  LocalService (`npm run live:windows-authorization-refresh`); see
+  [docs/phase10a-windows-authorization-evidence-refresh.md](docs/phase10a-windows-authorization-evidence-refresh.md).
 - No browser/website automation, query, cookie, form, process-env,
   SSH, database, RDP, or desktop credential injection.
 - Not a substitute for vault, OS keychain, or production broker hardening.

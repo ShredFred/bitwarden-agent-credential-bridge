@@ -49,6 +49,11 @@ Semantic Versioning while it remains on the experimental 0.x line.
   source/toolchain/entrypoint digests and the OneCLI proxy supervisor
   entrypoint/imports; publish/collector paths brand fail-closed publish
   bindings. Pure CI expanded without live service install.
+- Phase 10a Day-2 authorization evidence refresh
+  (`docs/phase10a-windows-authorization-evidence-refresh.md`): foreground loop
+  re-collects branded 9b/9c/9d evidence and recomposes Phase 9e readiness for an
+  already-installed LocalService; optional operational-bridge restart; uninstall
+  stays explicit. Does not claim same-user memory isolation.
 
 ### Fixed
 

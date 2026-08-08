@@ -1402,3 +1402,22 @@ client in LocalService.
 Phase 9 must not pair personal/company Bitwarden, place a vault client in
 LocalService, implement OAuth/MFA/SMS/SSH/FTP/`env_inject`, or claim macOS/Linux
 authorization from Windows-only evidence.
+
+## Phase 10a scope
+
+Phase 10a may add a foreground Windows Day-2 authorization evidence refresh:
+
+- assume an already-installed persistent LocalService helper;
+- periodically re-collect branded Phase 9b/9c/9d evidence via injected or live
+  collectors and recompose Phase 9e readiness;
+- emit value-free snapshots (`refresh_generation`, booleans, terminal codes);
+- fail closed to `authorization_ready=false` on collector errors;
+- optionally restart the operational bridge with the latest branded evidence
+  bundle;
+- keep uninstall explicit and operator-gated;
+- keep `mutation_authorized=false`, helper vault-free, and personal/company
+  vaults forbidden.
+
+Phase 10a must not auto-elevate, auto-install, implement OAuth/MFA/SSH/
+`env_inject`, pair personal/company Bitwarden, claim same-user memory isolation,
+or leave a persistent service installed after CI.
