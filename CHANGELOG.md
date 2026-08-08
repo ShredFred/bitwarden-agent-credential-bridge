@@ -22,6 +22,12 @@ Semantic Versioning while it remains on the experimental 0.x line.
 
 - CI `npm test` glob so Node discovers `test/*.test.js` on Ubuntu and Windows
   runners.
+- Windows Phase 4c inherited `stdio: "pipe"` descriptors: accept libuv's FIFO
+  mode bit when `Stats.isFIFO()` is false, while still rejecting files and
+  devices such as `NUL`.
+- Portable macOS source-contract tests under Windows `core.autocrlf` checkouts
+  by normalizing CRLF before newline-sensitive ordering checks, plus a
+  repository `.gitattributes` LF policy.
 
 ## 0.1.0 - Unreleased experimental baseline
 

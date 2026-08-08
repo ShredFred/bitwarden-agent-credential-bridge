@@ -20,7 +20,9 @@ const TOOL_ENV = { PATH: '/usr/bin:/bin:/usr/sbin:/sbin', LANG: 'C', LC_ALL: 'C'
 
 describe('native macOS composite lifecycle controller', () => {
   it('orders preflight, mutation, denial, and reverse finally-cleanup exactly', async () => {
-    const source = await fs.readFile(path.join(NATIVE, 'macos-lifecycle-controller.c'), 'utf8');
+    // Normalize CRLF so Windows autocrlf checkouts keep this portable source contract.
+    const source = (await fs.readFile(path.join(NATIVE, 'macos-lifecycle-controller.c'), 'utf8'))
+      .replace(/\r\n/g, '\n');
     const ordered = [
       'bw_prepare_owned_account', 'bw_prepare_owned_launchd_job', 'bw_create_owned_account',
       'bw_publish_owned_file(\n      request->binary_parent_fd',

@@ -84,6 +84,29 @@ read Keychain, access Bitwarden, or use network credentials.
 
 ## Continue on Windows with Cursor
 
+### Windows validation checkpoint (2026-08-08)
+
+Validated on Windows 11 (`win32` 10.0.26200) in a non-elevated PowerShell 7.6.3
+shell with Node.js v24.13.1, npm 11.8.0, and .NET SDK 8.0.423. Only generated
+fake credentials and disposable temporary workspaces were used. No native
+service install, elevation, Bitwarden pairing, or real secret was performed.
+
+Outcome:
+
+- `npm run test:phase4c`: 41/41 passed after a narrow Windows IPC descriptor
+  fix. Node/libuv reports anonymous `stdio: "pipe"` channels with FIFO mode bit
+  `0x1000` while `Stats.isFIFO()` remains false; the runtime now accepts that
+  exact mode class on `win32` and still rejects files and character devices
+  such as `NUL`.
+- Windows handoff slices passed: `test:phase5c`, `test:phase5f`,
+  `test:phase5h6`, `test:phase5h10`, `test:phase5h15`, `test:phase5h16`.
+- Full `npm test`: 361 passed, 35 skipped (macOS/live gates), 0 failed.
+- `npm run start:demo`: status `200` with the constant fake API body only.
+- `npm run start:operational`: `ok=true`, `harness_ready=true`, all five sample
+  smoke aliases true, `authorization_ready=false`.
+- Portable source-contract tests tolerate Windows `core.autocrlf` via CRLF
+  normalization plus a repository `.gitattributes` LF policy.
+
 1. Pull this branch and verify that the worktree is clean before testing.
 2. Use Node.js 20 or newer and run `npm test` in a normal, non-elevated shell.
 3. Run the Windows-specific slices explicitly:
@@ -118,8 +141,8 @@ read Keychain, access Bitwarden, or use network credentials.
 
 Recommended next development order on Windows:
 
-1. Prove `npm run test:phase4c` unchanged in a non-elevated shell and record
-   exact OS/Node/npm results in this document.
+1. ~~Prove `npm run test:phase4c` unchanged in a non-elevated shell and record
+   exact OS/Node/npm results in this document.~~ Done on 2026-08-08.
 2. Add Windows CI for Phase 4c and the existing Windows security/service
    slices; keep real service installation disabled.
 3. Package-bind the fixed supervisor entrypoint, its imports, and Node runtime

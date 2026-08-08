@@ -44,7 +44,10 @@ token and policy bytes on inherited IPC descriptors 3 and 4. Descriptor 5 is a
 parent lease: EOF, data, or error closes the broker, preventing an orphaned
 listener. All three descriptors must be distinct FIFO/pipe endpoints or local
 socketpair endpoints; Node implements extra child-process pipes as Unix
-socketpairs on macOS. Regular files, devices, directories, duplicate
+socketpairs on macOS. On Windows, anonymous `stdio: "pipe"` channels report
+the FIFO type bit (`0x1000`) while `Stats.isFIFO()` remains false, so the
+runtime accepts that exact mode class only and still rejects regular files,
+character devices (including `NUL`), directories, and links. Duplicate
 descriptors, malformed/oversized/trailing frames, invalid encodings, and
 timeouts fail silently with a nonzero exit. Successful stdout contains only one
 value-free ready record; shutdown failures remain silent and nonzero.

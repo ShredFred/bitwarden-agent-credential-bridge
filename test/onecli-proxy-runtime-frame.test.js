@@ -158,6 +158,18 @@ describe('OneCLI proxy inherited runtime', () => {
       fs.closeSync(deviceFd);
     }
 
+    if (process.platform === 'win32') {
+      const filePath = path.join(root, 'package.json');
+      const fileFd = fs.openSync(filePath, 'r');
+      try {
+        await assert.rejects(readOneCliAgentTokenFrame(fileFd),
+          (error) => error instanceof OneCliProxyRuntimeFrameError &&
+            error.code === 'descriptor_not_ipc');
+      } finally {
+        fs.closeSync(fileFd);
+      }
+    }
+
     const moduleUrl = new URL('../src/onecli-proxy-runtime-frame.js', import.meta.url).href;
     const code = `import { requireDistinctRuntimeIpcDescriptors as check } from ${JSON.stringify(moduleUrl)};` +
       `try { check(3, 3, 5); process.exitCode = 1; } catch (e) { process.exitCode = e.code === 'descriptors_not_distinct' ? 0 : 2; }`;

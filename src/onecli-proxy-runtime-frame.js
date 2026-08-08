@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import process from 'node:process';
 
 export const TOKEN_FRAME_FD = 3;
 export const POLICY_FRAME_FD = 4;
@@ -155,8 +156,26 @@ function requireIpcDescriptor(fd) {
   }
   // Node child_process implements extra `stdio: "pipe"` channels as Unix
   // socketpairs on macOS and as FIFOs/pipes on other supported platforms.
-  if (!stat.isFIFO() && !stat.isSocket()) {
-    throw new OneCliProxyRuntimeFrameError('descriptor_not_ipc');
+  if (stat.isFIFO() || stat.isSocket()) {
+    return stat;
   }
-  return stat;
+  // Windows: libuv reports anonymous stdio pipes with the FIFO type bit
+  // (S_IFIFO / 0x1000), but Node's Stats.isFIFO() stays false. Accept only
+  // that mode class and keep files, devices, directories, and links rejected.
+  if (process.platform === 'win32' && isWindowsAnonymousPipeStat(stat)) {
+    return stat;
+  }
+  throw new OneCliProxyRuntimeFrameError('descriptor_not_ipc');
+}
+
+const WINDOWS_S_IFMT = 0xf000;
+const WINDOWS_S_IFIFO = 0x1000;
+
+function isWindowsAnonymousPipeStat(stat) {
+  return (stat.mode & WINDOWS_S_IFMT) === WINDOWS_S_IFIFO &&
+    !stat.isFile() &&
+    !stat.isDirectory() &&
+    !stat.isCharacterDevice() &&
+    !stat.isBlockDevice() &&
+    !stat.isSymbolicLink();
 }
