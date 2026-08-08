@@ -135,11 +135,74 @@ public static class BridgeScmNative {
 }
 "@
 
+function Grant-ServiceProcessQueryAccess {
+    param([Parameter(Mandatory = $true)][uint32]$ProcessId)
+    if ($ProcessId -eq 0) { return $false }
+    if (-not ('BridgeServiceProcessQueryDacl' -as [type])) {
+        Add-Type -TypeDefinition @'
+using System;
+using System.Runtime.InteropServices;
+
+public static class BridgeServiceProcessQueryDacl {
+    const uint PROCESS_QUERY_LIMITED_INFORMATION = 0x1000;
+    const uint READ_CONTROL = 0x20000;
+    const uint WRITE_DAC = 0x40000;
+    const uint SddlRevision1 = 1;
+    const int SeKernelObject = 6;
+    const uint DaclSecurityInformation = 0x00000004;
+    const uint ProtectedDaclSecurityInformation = 0x80000000;
+    const string ServiceSid = "S-1-5-80-4161497498-1516966145-968308051-418532793-1299382607";
+    const string ProcessSddl =
+        "D:P(A;;0x1FFFFF;;;SY)(A;;0x1FFFFF;;;BA)(A;;0x1FFFFF;;;LS)(A;;0x1FFFFF;;;" + ServiceSid +
+        ")(A;;0x00001400;;;AU)";
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    static extern IntPtr OpenProcess(uint access, bool inherit, uint pid);
+    [DllImport("kernel32.dll")]
+    static extern bool CloseHandle(IntPtr handle);
+    [DllImport("advapi32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    static extern bool ConvertStringSecurityDescriptorToSecurityDescriptor(
+        string sddl, uint revision, out IntPtr sd, out uint size);
+    [DllImport("advapi32.dll")]
+    static extern bool GetSecurityDescriptorDacl(IntPtr sd, out bool present, out IntPtr dacl, out bool defaulted);
+    [DllImport("advapi32.dll")]
+    static extern uint SetSecurityInfo(IntPtr handle, int objectType, uint securityInfo,
+        IntPtr owner, IntPtr group, IntPtr dacl, IntPtr sacl);
+    [DllImport("kernel32.dll")]
+    static extern IntPtr LocalFree(IntPtr memory);
+
+    public static bool TryGrant(uint pid) {
+        IntPtr process = OpenProcess(
+            PROCESS_QUERY_LIMITED_INFORMATION | READ_CONTROL | WRITE_DAC, false, pid);
+        if (process == IntPtr.Zero) return false;
+        IntPtr sd = IntPtr.Zero;
+        try {
+            uint size;
+            if (!ConvertStringSecurityDescriptorToSecurityDescriptor(ProcessSddl, SddlRevision1, out sd, out size))
+                return false;
+            bool present; IntPtr dacl; bool defaulted;
+            if (!GetSecurityDescriptorDacl(sd, out present, out dacl, out defaulted) || !present || dacl == IntPtr.Zero)
+                return false;
+            return SetSecurityInfo(process, SeKernelObject,
+                DaclSecurityInformation | ProtectedDaclSecurityInformation,
+                IntPtr.Zero, IntPtr.Zero, dacl, IntPtr.Zero) == 0;
+        } finally {
+            if (sd != IntPtr.Zero) LocalFree(sd);
+            CloseHandle(process);
+        }
+    }
+}
+'@
+    }
+    return [BridgeServiceProcessQueryDacl]::TryGrant($ProcessId)
+}
+
 function Set-BinaryTrustedAcl([string]$Path) {
     $acl = New-Object System.Security.AccessControl.FileSecurity
     $acl.SetAccessRuleProtection($true, $false)
+    $system = New-Object System.Security.Principal.SecurityIdentifier('S-1-5-18')
     $idents = @(
-        (New-Object System.Security.Principal.SecurityIdentifier('S-1-5-18')),
+        $system,
         (New-Object System.Security.Principal.SecurityIdentifier('S-1-5-32-544')),
         (New-Object System.Security.Principal.SecurityIdentifier($serviceSid)),
         (New-Object System.Security.Principal.SecurityIdentifier('S-1-5-19'))
@@ -150,14 +213,18 @@ function Set-BinaryTrustedAcl([string]$Path) {
         )
         $acl.AddAccessRule($rule)
     }
+    $acl.AddAccessRule((New-Object System.Security.AccessControl.FileSystemAccessRule(
+        (New-Object System.Security.Principal.SecurityIdentifier('S-1-5-11')),
+        'ReadAndExecute', 'Allow')))
     [IO.File]::SetAccessControl($Path, $acl)
 }
 
 function Set-DirectoryTrustedAcl([string]$Path) {
     $acl = New-Object System.Security.AccessControl.DirectorySecurity
     $acl.SetAccessRuleProtection($true, $false)
+    $system = New-Object System.Security.Principal.SecurityIdentifier('S-1-5-18')
     $full = @(
-        (New-Object System.Security.Principal.SecurityIdentifier('S-1-5-18')),
+        $system,
         (New-Object System.Security.Principal.SecurityIdentifier('S-1-5-32-544'))
     )
     foreach ($id in $full) {
@@ -181,6 +248,12 @@ function Set-DirectoryTrustedAcl([string]$Path) {
     $acl.AddAccessRule((New-Object System.Security.AccessControl.FileSystemAccessRule(
         (New-Object System.Security.Principal.SecurityIdentifier($serviceSid)),
         'Modify,Synchronize',
+        'ContainerInherit,ObjectInherit',
+        'None',
+        'Allow')))
+    $acl.AddAccessRule((New-Object System.Security.AccessControl.FileSystemAccessRule(
+        (New-Object System.Security.Principal.SecurityIdentifier('S-1-5-11')),
+        'ReadAndExecute',
         'ContainerInherit,ObjectInherit',
         'None',
         'Allow')))
@@ -307,9 +380,12 @@ try {
     Set-BinaryTrustedAcl $binaryPath
     $events.Add([ordered]@{ step = $mutationSteps[5]; status = 'verified' })
 
+    # Probe contracts require a quoted ImagePath. Escape quotes for CreateProcess
+    # so sc.exe receives literal "path" and persists them in ImagePath.
+    $quotedBinaryPath = '\"{0}\"' -f $binaryPath
     $create = Invoke-Sc @(
         'create', $serviceName,
-        'binPath=', $binaryPath,
+        'binPath=', $quotedBinaryPath,
         'start=', 'demand',
         'obj=', $serviceAccount,
         'DisplayName=', $serviceName
@@ -388,8 +464,10 @@ try {
             Start-Sleep -Milliseconds 250
             continue
         }
+        # Use the staged payload copy for the verifier client so ACL hardening on
+        # the installed LocalService image cannot block the elevated collector start.
         $psi = New-Object System.Diagnostics.ProcessStartInfo
-        $psi.FileName = $binaryPath
+        $psi.FileName = $payloadPath
         $psi.Arguments = '--verify-fixed-server-identity'
         $psi.UseShellExecute = $false
         $psi.RedirectStandardOutput = $true
@@ -409,6 +487,9 @@ try {
         $events.Add([ordered]@{ step = $mutationSteps[15]; status = 'failed' })
         throw 'identity_verify_failed'
     }
+    # Best-effort elevated grant; ServiceMain also self-grants AU QUERY_LIMITED.
+    $svcPid = [uint32](Get-CimInstance Win32_Service -Filter "Name='$serviceName'").ProcessId
+    $null = Grant-ServiceProcessQueryAccess -ProcessId $svcPid
     $events.Add([ordered]@{ step = $mutationSteps[15]; status = 'verified' })
 
     # Allow the service loop to finish the identity-verifier connection before the

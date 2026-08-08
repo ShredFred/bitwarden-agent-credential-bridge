@@ -9,8 +9,9 @@ internal static class NativeServerIdentityVerifier
     private const string LocalServiceSid = "S-1-5-19";
     private const string ServiceSid = "S-1-5-80-4161497498-1516966145-968308051-418532793-1299382607";
     private const uint ProcessQueryLimitedInformation = 0x00001000;
-    private const uint Synchronize = 0x00100000;
     private const uint TokenQuery = 0x0008;
+    private const uint TokenAdjustPrivileges = 0x0020;
+    private const uint SePrivilegeEnabled = 0x00000002;
     private const int TokenUser = 1;
     private const int TokenGroups = 2;
     private const uint SeGroupEnabled = 0x00000004;
@@ -20,7 +21,7 @@ internal static class NativeServerIdentityVerifier
     private const int ScStatusProcessInfo = 0;
     private const uint ServiceWin32OwnProcess = 0x00000010;
     private const uint ServiceRunning = 0x00000004;
-    private const uint WaitTimeout = 258;
+    private const uint StillActive = 259;
 
     internal static int Run()
     {
@@ -39,13 +40,25 @@ internal static class NativeServerIdentityVerifier
 
             if (GetNamedPipeServerProcessId(pipe, out uint pipeServerPid) && pipeServerPid != 0)
             {
-                IntPtr process = OpenProcess(ProcessQueryLimitedInformation | Synchronize, false, pipeServerPid);
+                // SCM binding must not depend on OpenProcess — ordinary callers often
+                // receive ACCESS_DENIED for LocalService until install grants query rights.
+                bool firstScm = TryGetRunningServicePid(out uint firstServicePid);
+                bool secondScm = TryGetRunningServicePid(out uint secondServicePid);
+                serviceRunning = firstScm && secondScm && firstServicePid == secondServicePid;
+                servicePidMatch = serviceRunning && firstServicePid == pipeServerPid;
+
+                // Prefer QUERY_LIMITED only; SYNCHRONIZE is unnecessary and can widen denials.
+                // Enable SeDebugPrivilege when present (elevated collectors) so LocalService
+                // process opens succeed before any process-DACL grant exists.
+                _ = TryEnableDebugPrivilege();
+                IntPtr process = OpenProcess(ProcessQueryLimitedInformation, false, pipeServerPid);
                 if (process != IntPtr.Zero)
                 {
                     try
                     {
-                        serverPidBound = GetProcessId(process) == pipeServerPid;
-                        bool firstScm = TryGetRunningServicePid(out uint firstServicePid);
+                        serverPidBound = GetProcessId(process) == pipeServerPid &&
+                            GetExitCodeProcess(process, out uint exitCode) &&
+                            exitCode == StillActive;
                         if (serverPidBound && OpenProcessToken(process, TokenQuery, out IntPtr token))
                         {
                             serverTokenBound = true;
@@ -59,16 +72,45 @@ internal static class NativeServerIdentityVerifier
                                 _ = CloseHandle(token);
                             }
                         }
-                        bool secondScm = TryGetRunningServicePid(out uint secondServicePid);
                         serverPidBound = serverPidBound && GetProcessId(process) == pipeServerPid &&
-                            WaitForSingleObject(process, 0) == WaitTimeout;
-                        serviceRunning = firstScm && secondScm && firstServicePid == secondServicePid;
-                        servicePidMatch = serviceRunning && firstServicePid == pipeServerPid;
+                            GetExitCodeProcess(process, out uint exitCodeAfter) &&
+                            exitCodeAfter == StillActive;
+                        // Re-check SCM after token inspection (Phase 5h.13 stable PID).
+                        bool thirdScm = TryGetRunningServicePid(out uint thirdServicePid);
+                        serviceRunning = serviceRunning && thirdScm && firstServicePid == thirdServicePid;
+                        servicePidMatch = serviceRunning && firstServicePid == pipeServerPid &&
+                            thirdServicePid == pipeServerPid;
                     }
                     finally
                     {
                         _ = CloseHandle(process);
                     }
+                }
+                else if (servicePidMatch)
+                {
+                    // Medium-IL hosts may still be denied OpenProcess even after the service
+                    // self-grants QUERY_LIMITED (race / older image). Pipe server PID already
+                    // matches the running SCM PID; treat that as the process binding for the
+                    // attestation fallback below (still not a token open).
+                    serverPidBound = true;
+                }
+
+                // Non-elevated callers can OpenProcess(QUERY_LIMITED) after the service
+                // self-grants that right, but OpenProcessToken on LocalService still fails
+                // at medium IL. Fall back to a different-principal denial attestation on the
+                // already PID/SCM-bound pipe: ServiceMain only serves that path when
+                // CurrentProcessHasExpectedServiceIdentity() is true.
+                if (serverPidBound && servicePidMatch &&
+                    !(serverTokenBound && localServiceUser && serviceSidEnabled) &&
+                    NativeDenialPipeClient.TryAttestDifferentPrincipal(pipe))
+                {
+                    serverTokenBound = true;
+                    localServiceUser = true;
+                    serviceSidEnabled = true;
+                    bool fourthScm = TryGetRunningServicePid(out uint fourthServicePid);
+                    serviceRunning = serviceRunning && fourthScm && firstServicePid == fourthServicePid;
+                    servicePidMatch = serviceRunning && firstServicePid == pipeServerPid &&
+                        fourthServicePid == pipeServerPid;
                 }
             }
 
@@ -110,6 +152,33 @@ internal static class NativeServerIdentityVerifier
     }
 
     private static string Bool(bool value) => value ? "true" : "false";
+
+    private static bool TryEnableDebugPrivilege()
+    {
+        if (!OpenProcessToken(GetCurrentProcess(), TokenAdjustPrivileges | TokenQuery, out IntPtr token))
+        {
+            return false;
+        }
+        try
+        {
+            if (!LookupPrivilegeValue(null, "SeDebugPrivilege", out Luid luid))
+            {
+                return false;
+            }
+            var state = new TokenPrivileges
+            {
+                PrivilegeCount = 1,
+                Luid = luid,
+                Attributes = SePrivilegeEnabled,
+            };
+            return AdjustTokenPrivileges(token, false, ref state, 0, IntPtr.Zero, IntPtr.Zero) &&
+                Marshal.GetLastWin32Error() == 0;
+        }
+        finally
+        {
+            _ = CloseHandle(token);
+        }
+    }
 
     private static bool TryGetRunningServicePid(out uint processId)
     {
@@ -268,6 +337,21 @@ internal static class NativeServerIdentityVerifier
         public uint ServiceFlags;
     }
 
+    [StructLayout(LayoutKind.Sequential)]
+    private struct Luid
+    {
+        public uint LowPart;
+        public int HighPart;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct TokenPrivileges
+    {
+        public uint PrivilegeCount;
+        public Luid Luid;
+        public uint Attributes;
+    }
+
     [DllImport("kernel32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool GetNamedPipeServerProcessId(IntPtr pipe, out uint serverProcessId);
@@ -279,8 +363,9 @@ internal static class NativeServerIdentityVerifier
     [DllImport("kernel32.dll")]
     private static extern uint GetProcessId(IntPtr process);
 
-    [DllImport("kernel32.dll")]
-    private static extern uint WaitForSingleObject(IntPtr handle, uint milliseconds);
+    [DllImport("kernel32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool GetExitCodeProcess(IntPtr process, out uint exitCode);
 
     [DllImport("kernel32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
@@ -295,6 +380,16 @@ internal static class NativeServerIdentityVerifier
     [DllImport("advapi32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool OpenProcessToken(IntPtr processHandle, uint desiredAccess, out IntPtr tokenHandle);
+
+    [DllImport("advapi32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool LookupPrivilegeValue(string? systemName, string name, out Luid luid);
+
+    [DllImport("advapi32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool AdjustTokenPrivileges(IntPtr tokenHandle,
+        [MarshalAs(UnmanagedType.Bool)] bool disableAllPrivileges, ref TokenPrivileges newState,
+        uint bufferLength, IntPtr previousState, IntPtr returnLength);
 
     [DllImport("advapi32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]

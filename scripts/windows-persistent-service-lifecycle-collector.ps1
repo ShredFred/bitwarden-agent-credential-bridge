@@ -9,6 +9,7 @@ param(
 $ErrorActionPreference = 'Stop'
 $serviceName = 'BitwardenAgentCredentialBridgeHelper'
 $serviceAccount = 'NT AUTHORITY\LocalService'
+$serviceSid = 'S-1-5-80-4161497498-1516966145-968308051-418532793-1299382607'
 $persistentRoot = Join-Path $env:ProgramData 'BitwardenAgentCredentialBridge'
 $binaryPath = Join-Path $persistentRoot 'BitwardenAgentCredentialBridgeHelper.exe'
 $resultPath = Join-Path $StagingRoot 'result.json'
@@ -75,10 +76,142 @@ function Get-ServicePathName([string]$Name) {
 
 function Test-BoundIdentity {
     $pathName = Get-ServicePathName $serviceName
-    if ($null -eq $pathName) { return $false }
-    if ($pathName -cne $binaryPath) { return $false }
+    # When the service object is already absent, still allow digest-bound cleanup
+    # of this run's binary/root. When present, PathName must match (quotes stripped).
+    if ($null -ne $pathName -and -not $pathName.Equals($binaryPath, [StringComparison]::OrdinalIgnoreCase)) {
+        return $false
+    }
     if (-not (Test-Path -LiteralPath $binaryPath -PathType Leaf)) { return $false }
     return ((Get-Sha256File $binaryPath) -ceq $ExpectedBinarySha256)
+}
+
+function Set-BinaryTrustedAcl([string]$Path) {
+    $acl = New-Object System.Security.AccessControl.FileSecurity
+    $acl.SetAccessRuleProtection($true, $false)
+    $system = New-Object System.Security.Principal.SecurityIdentifier('S-1-5-18')
+    # Owner stays the elevated creator (Administrators) — trusted for Phase 9b.
+    $idents = @(
+        $system,
+        (New-Object System.Security.Principal.SecurityIdentifier('S-1-5-32-544')),
+        (New-Object System.Security.Principal.SecurityIdentifier($serviceSid)),
+        (New-Object System.Security.Principal.SecurityIdentifier('S-1-5-19'))
+    )
+    foreach ($id in $idents) {
+        $rule = New-Object System.Security.AccessControl.FileSystemAccessRule(
+            $id, 'FullControl', 'Allow'
+        )
+        $acl.AddAccessRule($rule)
+    }
+    # Authenticated Users may read/execute for handle-bound digest probes; no write.
+    $acl.AddAccessRule((New-Object System.Security.AccessControl.FileSystemAccessRule(
+        (New-Object System.Security.Principal.SecurityIdentifier('S-1-5-11')),
+        'ReadAndExecute', 'Allow')))
+    [IO.File]::SetAccessControl($Path, $acl)
+}
+
+function Set-DirectoryTrustedAcl([string]$Path) {
+    $acl = New-Object System.Security.AccessControl.DirectorySecurity
+    $acl.SetAccessRuleProtection($true, $false)
+    $system = New-Object System.Security.Principal.SecurityIdentifier('S-1-5-18')
+    # Owner stays the elevated creator (Administrators) — trusted for Phase 9b.
+    $full = @(
+        $system,
+        (New-Object System.Security.Principal.SecurityIdentifier('S-1-5-32-544'))
+    )
+    foreach ($id in $full) {
+        $rule = New-Object System.Security.AccessControl.FileSystemAccessRule(
+            $id,
+            'FullControl',
+            'ContainerInherit,ObjectInherit',
+            'None',
+            'Allow'
+        )
+        $acl.AddAccessRule($rule)
+    }
+    $acl.AddAccessRule((New-Object System.Security.AccessControl.FileSystemAccessRule(
+        (New-Object System.Security.Principal.SecurityIdentifier('S-1-5-19')),
+        'ReadAndExecute',
+        'ContainerInherit,ObjectInherit',
+        'None',
+        'Allow')))
+    $acl.AddAccessRule((New-Object System.Security.AccessControl.FileSystemAccessRule(
+        (New-Object System.Security.Principal.SecurityIdentifier($serviceSid)),
+        'Modify,Synchronize',
+        'ContainerInherit,ObjectInherit',
+        'None',
+        'Allow')))
+    # Authenticated Users read/traverse for Phase 9b/9c probes; write remains denied.
+    $acl.AddAccessRule((New-Object System.Security.AccessControl.FileSystemAccessRule(
+        (New-Object System.Security.Principal.SecurityIdentifier('S-1-5-11')),
+        'ReadAndExecute',
+        'ContainerInherit,ObjectInherit',
+        'None',
+        'Allow')))
+    [IO.Directory]::SetAccessControl($Path, $acl)
+}
+
+function Grant-ServiceProcessQueryAccess {
+    param([Parameter(Mandatory = $true)][uint32]$ProcessId)
+    if ($ProcessId -eq 0) { return $false }
+    if (-not ('BridgeServiceProcessQueryDacl' -as [type])) {
+        Add-Type -TypeDefinition @'
+using System;
+using System.Runtime.InteropServices;
+
+public static class BridgeServiceProcessQueryDacl {
+    const uint PROCESS_QUERY_LIMITED_INFORMATION = 0x1000;
+    const uint READ_CONTROL = 0x20000;
+    const uint WRITE_DAC = 0x40000;
+    const uint SddlRevision1 = 1;
+    const int SeKernelObject = 6;
+    const uint DaclSecurityInformation = 0x00000004;
+    const uint ProtectedDaclSecurityInformation = 0x80000000;
+    const string ServiceSid = "S-1-5-80-4161497498-1516966145-968308051-418532793-1299382607";
+    // Keep SYSTEM/Administrators/LocalService/service-SID strong rights; allow
+    // Authenticated Users QUERY_LIMITED so non-elevated Phase 9b/9c can bind tokens.
+    const string ProcessSddl =
+        "D:P(A;;0x1FFFFF;;;SY)(A;;0x1FFFFF;;;BA)(A;;0x1FFFFF;;;LS)(A;;0x1FFFFF;;;" + ServiceSid +
+        ")(A;;0x00001400;;;AU)";
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    static extern IntPtr OpenProcess(uint access, bool inherit, uint pid);
+    [DllImport("kernel32.dll")]
+    static extern bool CloseHandle(IntPtr handle);
+    [DllImport("advapi32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    static extern bool ConvertStringSecurityDescriptorToSecurityDescriptor(
+        string sddl, uint revision, out IntPtr sd, out uint size);
+    [DllImport("advapi32.dll")]
+    static extern bool GetSecurityDescriptorDacl(IntPtr sd, out bool present, out IntPtr dacl, out bool defaulted);
+    [DllImport("advapi32.dll")]
+    static extern uint SetSecurityInfo(IntPtr handle, int objectType, uint securityInfo,
+        IntPtr owner, IntPtr group, IntPtr dacl, IntPtr sacl);
+    [DllImport("kernel32.dll")]
+    static extern IntPtr LocalFree(IntPtr memory);
+
+    public static bool TryGrant(uint pid) {
+        IntPtr process = OpenProcess(
+            PROCESS_QUERY_LIMITED_INFORMATION | READ_CONTROL | WRITE_DAC, false, pid);
+        if (process == IntPtr.Zero) return false;
+        IntPtr sd = IntPtr.Zero;
+        try {
+            uint size;
+            if (!ConvertStringSecurityDescriptorToSecurityDescriptor(ProcessSddl, SddlRevision1, out sd, out size))
+                return false;
+            bool present; IntPtr dacl; bool defaulted;
+            if (!GetSecurityDescriptorDacl(sd, out present, out dacl, out defaulted) || !present || dacl == IntPtr.Zero)
+                return false;
+            return SetSecurityInfo(process, SeKernelObject,
+                DaclSecurityInformation | ProtectedDaclSecurityInformation,
+                IntPtr.Zero, IntPtr.Zero, dacl, IntPtr.Zero) == 0;
+        } finally {
+            if (sd != IntPtr.Zero) LocalFree(sd);
+            CloseHandle(process);
+        }
+    }
+}
+'@
+    }
+    return [BridgeServiceProcessQueryDacl]::TryGrant($ProcessId)
 }
 
 if (-not (Test-IsElevated)) { throw 'not_elevated' }
@@ -121,15 +254,29 @@ try {
 
         New-Item -ItemType Directory -Path $persistentRoot | Out-Null
         [IO.File]::WriteAllBytes($binaryPath, $bytes)
-        $create = Invoke-Sc @('create', $serviceName, 'binPath=', $binaryPath, 'start=', 'demand', 'obj=', $serviceAccount)
+        Set-DirectoryTrustedAcl $persistentRoot
+        Set-BinaryTrustedAcl $binaryPath
+        # Probe contracts (Phase 9b / 5h.9) require a quoted ImagePath. Escape
+        # quotes for CreateProcess so sc.exe receives literal "path" and stores them.
+        $quotedBinaryPath = '\"{0}\"' -f $binaryPath
+        $create = Invoke-Sc @('create', $serviceName, 'binPath=', $quotedBinaryPath, 'start=', 'demand', 'obj=', $serviceAccount)
         if ($create -ne 0) { throw 'create_failed' }
         $null = Invoke-Sc @('sidtype', $serviceName, 'unrestricted')
+        # SYSTEM/Administrators full; LocalService start/query; Authenticated Users query only.
+        $serviceSddl = 'D:(A;;CCDCLCSWRPWPDTLOCRSDRCWDWO;;;SY)(A;;CCDCLCSWRPWPDTLOCRSDRCWDWO;;;BA)(A;;CCLCSWRPWPDTLOCRRC;;;SU)(A;;LCRPLORC;;;AU)'
+        if ((Invoke-Sc @('sdset', $serviceName, $serviceSddl)) -ne 0) { throw 'service_acl_lock_failed' }
         $start = Invoke-Sc @('start', $serviceName)
         $present = $null -ne (Get-CimInstance Win32_Service -Filter "Name='$serviceName'" -ErrorAction SilentlyContinue)
         $bound = Test-BoundIdentity
+        # Best-effort elevated grant; ServiceMain also self-grants AU QUERY_LIMITED.
+        if ($start -eq 0 -and $present) {
+            $svcPid = [uint32](Get-CimInstance Win32_Service -Filter "Name='$serviceName'").ProcessId
+            $null = Grant-ServiceProcessQueryAccess -ProcessId $svcPid
+        }
         Write-Result ([ordered]@{
             schema_version = 1; operation = 'install'
-            verified = ($start -eq 0 -and $present -and $bound); service_present = $present
+            verified = ($start -eq 0 -and $present -and $bound)
+            service_present = $present
             absence_proven = $false; collision_detected = $false
         })
     }
@@ -157,10 +304,20 @@ try {
 
         $null = Invoke-Sc @('stop', $serviceName)
         $null = Invoke-Sc @('delete', $serviceName)
-        Start-Sleep -Seconds 1
-        if (Test-Path -LiteralPath $binaryPath) { Remove-Item -LiteralPath $binaryPath -Force }
-        if (Test-Path -LiteralPath $persistentRoot) {
-            try { Remove-Item -LiteralPath $persistentRoot -Recurse -Force } catch { }
+        # The service binary can remain mapped briefly after delete; retry removals.
+        for ($attempt = 0; $attempt -lt 10; $attempt++) {
+            Start-Sleep -Milliseconds 500
+            try {
+                if (Test-Path -LiteralPath $binaryPath) {
+                    Remove-Item -LiteralPath $binaryPath -Force -ErrorAction Stop
+                }
+                if (Test-Path -LiteralPath $persistentRoot) {
+                    Remove-Item -LiteralPath $persistentRoot -Recurse -Force -ErrorAction Stop
+                }
+            } catch { }
+            if (-not (Test-Path -LiteralPath $binaryPath) -and -not (Test-Path -LiteralPath $persistentRoot)) {
+                break
+            }
         }
         $present = $null -ne (Get-CimInstance Win32_Service -Filter "Name='$serviceName'" -ErrorAction SilentlyContinue)
         $absent = -not $present -and -not (Test-Path -LiteralPath $binaryPath) -and -not (Test-Path -LiteralPath $persistentRoot)

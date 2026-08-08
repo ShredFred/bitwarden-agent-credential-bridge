@@ -3,7 +3,8 @@
  * Foreground operational disposable/dev multi-service bridge.
  *
  * Starts the tracked sample bindings with fake vault secrets, smokes each
- * service, then waits for SIGINT/SIGTERM. Never sets authorization_ready.
+ * service, then waits for SIGINT/SIGTERM. authorization_ready comes only from
+ * the Phase 9e wired Phase 9a evaluator (absent evidence → false).
  */
 import process from 'node:process';
 import path from 'node:path';
@@ -13,6 +14,7 @@ import {
   startOperationalBridge,
   OperationalBridgeError,
 } from '../src/operational-bridge.mjs';
+import { absentWindowsOperationalAuthorization } from '../src/windows-operational-authorization.mjs';
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const bindingsPath = process.argv[2] ?? 'samples/operational/bindings.json';
@@ -61,10 +63,12 @@ try {
     smoke,
     harness_ready: bridge.harness_ready === true && allOk,
     disposable_dev_ready: false,
-    authorization_ready: false,
-    personal_vault_forbidden: true,
-    company_vault_forbidden: true,
-    helper_vault_free: true,
+    authorization_ready: bridge.authorization_ready,
+    production_authorization_terminal_code: bridge.production_authorization_terminal_code,
+    operational_authorization_wired: bridge.operational_authorization_wired === true,
+    personal_vault_forbidden: bridge.personal_vault_forbidden === true,
+    company_vault_forbidden: bridge.company_vault_forbidden === true,
+    helper_vault_free: bridge.helper_vault_free === true,
     note: 'Foreground operational profile; press Ctrl+C to stop. DPAPI disposable smoke is a separate live command.',
   });
   if (!allOk) {
@@ -77,7 +81,7 @@ try {
     code,
     harness_ready: false,
     disposable_dev_ready: false,
-    authorization_ready: false,
+    authorization_ready: absentWindowsOperationalAuthorization().authorization_ready,
   });
   await shutdown(1);
 }

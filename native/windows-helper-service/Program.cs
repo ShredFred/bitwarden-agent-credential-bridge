@@ -116,6 +116,9 @@ internal static class Program
             _ = ReportStatus(ServiceStopped, 0, 0, ErrorServiceSpecificError, ServiceIdentityFailure);
             return;
         }
+        // Best-effort: allow non-elevated Phase 9b/9c collectors to bind this token.
+        // Failure must not stop the denial pipe; elevated identity checks may still work.
+        _ = ProcessQueryAcl.TryGrantAuthenticatedUsersQueryLimited();
         if (!ReportStatus(ServiceRunning, ServiceAcceptStop | ServiceAcceptShutdown, 0)) return;
         int pipeResult = DenialPipeProbe.RunServiceLoop(StopEvent);
         if (pipeResult != 0)

@@ -1,5 +1,6 @@
 using System;
 using System.Runtime.InteropServices;
+using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
 
@@ -207,6 +208,25 @@ internal static class NativeDenialPipeClient
         {
             _ = CloseHandle(file);
         }
+    }
+
+    internal static bool TryAttestDifferentPrincipal(IntPtr pipe)
+    {
+        byte[] nonceBytes = new byte[32];
+        RandomNumberGenerator.Fill(nonceBytes);
+        var nonce = Convert.ToHexString(nonceBytes).ToLowerInvariant();
+        if (!WriteExact(pipe, Encoding.ASCII.GetBytes(nonce + "\n")))
+        {
+            return false;
+        }
+        if (!ReadMessage(pipe, 4096, out byte[] serviceResponse) ||
+            !LooksLikeServiceDenial(Encoding.ASCII.GetString(serviceResponse)))
+        {
+            return false;
+        }
+        // Best-effort ack so the service loop can recycle cleanly.
+        _ = WriteExact(pipe, Encoding.ASCII.GetBytes("ack\n"));
+        return true;
     }
 
     private static bool WriteExact(IntPtr pipe, byte[] bytes, uint timeoutMilliseconds = IoTimeoutMilliseconds)

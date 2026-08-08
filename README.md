@@ -60,7 +60,10 @@ research. None of these slices are a production password manager or an
 authorization to use a personal/company Bitwarden vault. OAuth, interactive MFA,
 SMS/email codes, SSH/FTP, and process-env injection remain permanently rejected.
 Day-to-day disposable/dev multi-service use is available via
-`npm run start:operational` (`harness_ready`); `authorization_ready` stays false.
+`npm run start:operational` (`harness_ready`); `authorization_ready` is wired
+through Phase 9e → Phase 9a and stays false unless complete branded production
+evidence is supplied
+(see [docs/phase9e-windows-operational-authorization.md](docs/phase9e-windows-operational-authorization.md)).
 
 ---
 
@@ -565,6 +568,29 @@ AGENTS.md                           experiment rules for agents
   `authorization_ready` remains false until handle-bound production evidence
   exists. Run `npm run live:windows-persistent -- install|uninstall` only under
   operator approval (UAC); leave the machine clean after uninstall.
+- Phase 9a adds the pure Windows production authorization compiler that may
+  return `authorization_ready=true` only for complete branded handle-bound
+  identity + target-ACL + peer five-fact evidence on a persistent ProgramData
+  layout after install-gate eligibility.
+  See [docs/phase9-windows-authorization-ready.md](docs/phase9-windows-authorization-ready.md).
+- Phase 9b collects handle-bound installed-service identity (native 5h.13 pipe/
+  SCM/token verifier + handle-open binary digest/ACL probe). Public reports keep
+  `authorization_ready=false`. A complete positive collection still requires a
+  separately installed running LocalService; see
+  [docs/phase9b-windows-handle-bound-identity.md](docs/phase9b-windows-handle-bound-identity.md).
+- Phase 9c collects the AccessCheck matrix for the five fixed ProgramData helper
+  targets (caller denied / helper allowed / trusted ownership / no reparse).
+  Public reports keep `authorization_ready=false`; see
+  [docs/phase9c-windows-target-acl-matrix.md](docs/phase9c-windows-target-acl-matrix.md).
+- Phase 9d collects a different-principal persistent pipe session into branded
+  Phase 5h.1 peer five-facts. Same-user console hosts remain non-authorizing;
+  see [docs/phase9d-windows-persistent-peer-session.md](docs/phase9d-windows-persistent-peer-session.md).
+- Phase 9e wires operational readiness to the branded Phase 9a report. Default
+  incomplete evidence stays false; see
+  [docs/phase9e-windows-operational-authorization.md](docs/phase9e-windows-operational-authorization.md).
+- Phase 9f package-binds reviewed helper source/toolchain/entrypoint digests and
+  the OneCLI proxy supervisor entrypoint/imports for collector publish paths;
+  see [docs/phase9f-windows-helper-package-binding.md](docs/phase9f-windows-helper-package-binding.md).
 - No browser/website automation, query, cookie, form, process-env,
   SSH, database, RDP, or desktop credential injection.
 - Not a substitute for vault, OS keychain, or production broker hardening.

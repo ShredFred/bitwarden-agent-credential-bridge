@@ -52,6 +52,7 @@ describe('phase8 operational bridge', () => {
     try {
       assert.equal(bridge.harness_ready, true);
       assert.equal(bridge.disposable_dev_ready, false);
+      assert.equal(bridge.operational_authorization_wired, true);
       assert.equal(bridge.authorization_ready, false);
       assert.equal(bridge.services.length, 5);
       const smoke = await bridge.smoke();

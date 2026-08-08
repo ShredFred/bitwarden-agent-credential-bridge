@@ -88,8 +88,10 @@ read Keychain, access Bitwarden, or use network credentials.
 
 Validated on Windows 11 (`win32` 10.0.26200) in a non-elevated PowerShell 7.6.3
 shell with Node.js v24.13.1, npm 11.8.0, and .NET SDK 8.0.423. Only generated
-fake credentials and disposable temporary workspaces were used. No native
-service install, elevation, Bitwarden pairing, or real secret was performed.
+fake credentials and disposable temporary workspaces were used for the
+non-elevated harness suite. A later same-day operator-approved live pass also
+exercised disposable elevated service install/deny/cleanup, persistent
+install/uninstall, and the pinned disposable DPAPI Bitwarden smoke.
 
 Outcome:
 
@@ -106,6 +108,21 @@ Outcome:
   smoke aliases true, `authorization_ready=false`.
 - Portable source-contract tests tolerate Windows `core.autocrlf` via CRLF
   normalization plus a repository `.gitattributes` LF policy.
+
+Operator-approved live gates (same host, UAC consent):
+
+- `npm run live:windows-service`:
+  `live_test_verified=true`, `collector_trust_verified=true`,
+  `terminal_code=live_denial_verified_cleaned`,
+  `authorization_ready=false`, `install_gate_eligible=false`.
+- `npm run live:windows-persistent -- install` then `uninstall`:
+  both `ok=true`, `terminal_code=persistent_lifecycle_verified`,
+  `authorization_ready=false`; host left without the fixed service after
+  uninstall.
+- `npm run live:disposable-bitwarden -- --i-approve-disposable-dev-bitwarden`:
+  `ok=true`, `live_secret_resolved=true`, `broker_smoke_ok=true`,
+  `authorization_ready=false`; personal/company/organization vaults remain
+  forbidden. DPAPI unlock is not MFA.
 
 1. Pull this branch and verify that the worktree is clean before testing.
 2. Use Node.js 20 or newer and run `npm test` in a normal, non-elevated shell.
@@ -143,17 +160,38 @@ Recommended next development order on Windows:
 
 1. ~~Prove `npm run test:phase4c` unchanged in a non-elevated shell and record
    exact OS/Node/npm results in this document.~~ Done on 2026-08-08.
-2. Add Windows CI for Phase 4c and the existing Windows security/service
-   slices; keep real service installation disabled.
-3. Package-bind the fixed supervisor entrypoint, its imports, and Node runtime
-   before introducing any privileged launcher. The privileged component must
-   receive no caller-selected executable, argv, environment, policy path, or
-   token file.
-4. Only behind a separately approved disposable live gate, install/pin OneCLI,
-   create a disposable Bitwarden account/item, pair it, and test with a
-   generated short-lived agent token. Never use Frederik's real vault.
-5. Keep macOS signed/notarized package work deferred until quota/time permits;
-   the current macOS lifecycle code remains denial-only.
+2. ~~Operator-approved elevated disposable service denial, persistent
+   install/uninstall cleanup, and disposable DPAPI Bitwarden smoke.~~ Done on
+   2026-08-08 (`authorization_ready` remains false).
+3. ~~Phase 9a pure production authorization compiler + milestone plan defining
+   the exact evidence required before `authorization_ready` may become true.~~
+   Done on 2026-08-08.
+4. ~~Phase 9b read-only handle-bound identity collector (native 5h.13 + handle
+   binary probe).~~ Done on 2026-08-08; complete positive evidence still needs a
+   running persistent install from a separate elevated gate
+   (`npm run live:windows-handle-bound-identity`).
+5. ~~Phase 9c read-only target-ACL AccessCheck matrix on the five persistent
+   ProgramData targets.~~ Done on 2026-08-08; complete positive evidence needs
+   present root + running LocalService
+   (`npm run live:windows-target-acl-matrix`).
+6. ~~Phase 9d different-principal persistent pipe session → branded Phase 5h.1
+   five-facts.~~ Done on 2026-08-08; complete positive evidence needs running
+   LocalService + complete 9c ACL
+   (`npm run live:windows-persistent-peer-session`).
+7. ~~Phase 9e wire readiness surfaces to the branded Phase 9a report.~~ Done;
+   default incomplete evidence stays false; never hardcode true; mutation stays
+   on a separate apply gate
+   (`docs/phase9e-windows-operational-authorization.md`).
+8. ~~Phase 9f package-bind reviewed helper/supervisor digests and expand pure
+   Windows CI without live service install.~~ Done
+   (`docs/phase9f-windows-helper-package-binding.md`).
+9. Keep personal/company Bitwarden pairing forbidden. macOS/Linux distinct-writer
+   parity remains a separate milestone; do not claim cross-platform
+   `authorization_ready` from Windows-only evidence.
+10. For a real host `authorization_ready=true`, run the operator live sequence
+    (install → 9b/9c/9d collect → compose via 9e → uninstall). No further Phase 9
+    code slices are planned after 9f; remaining work is operator evidence and
+    optional later apply-gate / cross-platform parity milestones.
 
 Cursor should treat a Windows-only skip on macOS as expected, but any failure in
 a pure validator or disposable test as a portability regression. Keep fixes

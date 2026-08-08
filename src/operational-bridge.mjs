@@ -17,6 +17,11 @@ import {
   withLoginOrigin,
   withUpstream,
 } from './policy.js';
+import {
+  absentWindowsOperationalAuthorization,
+  composeWindowsOperationalAuthorization,
+  WindowsOperationalAuthorizationError,
+} from './windows-operational-authorization.mjs';
 
 export class OperationalBridgeError extends Error {
   /**
@@ -121,10 +126,22 @@ export function validateOperationalBindings(raw) {
  * Start an in-process multi-service operational bridge using fake vault secrets.
  * Foreground only: caller must retain the handle and call close(). No PID files.
  *
+ * authorization_ready is taken only from the Phase 9e wired Phase 9a report
+ * (never a hardcoded true). Omitting productionAuthorizationEvidence uses the
+ * incomplete/absent branded evidence path, which evaluates to false on typical
+ * same-user hosts.
+ *
  * @param {{
  *   repoRoot: string,
  *   bindings: unknown,
  *   fetchImpl?: typeof fetch,
+ *   productionAuthorizationEvidence?: {
+ *     installGateReport: object,
+ *     layoutPlan: object,
+ *     handleBoundEvidence: object,
+ *     targetAclEvidence: object,
+ *     peerEvidence: object,
+ *   } | null,
  * }} options
  */
 export async function startOperationalBridge(options) {
@@ -133,6 +150,20 @@ export async function startOperationalBridge(options) {
   }
   const table = validateOperationalBindings(options.bindings);
   const fetchImpl = options.fetchImpl ?? globalThis.fetch;
+
+  let authorizationReport;
+  try {
+    authorizationReport =
+      options.productionAuthorizationEvidence === undefined ||
+      options.productionAuthorizationEvidence === null
+        ? absentWindowsOperationalAuthorization()
+        : composeWindowsOperationalAuthorization(options.productionAuthorizationEvidence);
+  } catch (error) {
+    if (error instanceof WindowsOperationalAuthorizationError) {
+      throw new OperationalBridgeError(error.code);
+    }
+    throw error;
+  }
 
   /** @type {Array<{ kind: string, close: () => Promise<void> }>} */
   const resources = [];
@@ -285,10 +316,14 @@ export async function startOperationalBridge(options) {
     services: Object.freeze(services.map((s) => Object.freeze({ ...s }))),
     harness_ready: true,
     disposable_dev_ready: false,
-    authorization_ready: false,
-    personal_vault_forbidden: true,
-    company_vault_forbidden: true,
-    helper_vault_free: true,
+    // Copied from the wired Phase 9a/9e report only — never a literal true.
+    authorization_ready: authorizationReport.authorization_ready,
+    production_authorization_terminal_code: authorizationReport.terminal_code,
+    operational_authorization_wired:
+      authorizationReport.operational_bridge_unwired === false,
+    personal_vault_forbidden: authorizationReport.personal_vault_forbidden === true,
+    company_vault_forbidden: authorizationReport.company_vault_forbidden === true,
+    helper_vault_free: authorizationReport.helper_vault_free === true,
     async close() {
       await cleanup();
     },

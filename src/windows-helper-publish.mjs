@@ -6,14 +6,21 @@ import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
+import {
+  WINDOWS_HELPER_PACKAGE_DIGEST,
+  WINDOWS_HELPER_TOOLCHAIN_PIN,
+  brandWindowsHelperPublishBinding,
+  verifyWindowsHelperReviewedSources,
+  WindowsHelperPackageBindingError,
+} from './windows-helper-package-binding.mjs';
 
 const execFileAsync = promisify(execFile);
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const SOURCE = path.join(ROOT, 'native', 'windows-helper-service');
-const PROJECT = 'BridgeWindowsHelperService.csproj';
-const EXE = 'BitwardenAgentCredentialBridgeHelper.exe';
-const ILLINK_VERSION = '8.0.29';
-const ILLINK_NUPKG_SHA256 = '5e75b0b31660410b04fbb17614de9ba40bf44976cae45227094b544df085dce2';
+const PROJECT = WINDOWS_HELPER_TOOLCHAIN_PIN.project_file;
+const EXE = WINDOWS_HELPER_TOOLCHAIN_PIN.executable_name;
+const ILLINK_VERSION = WINDOWS_HELPER_TOOLCHAIN_PIN.illink_version;
+const ILLINK_NUPKG_SHA256 = WINDOWS_HELPER_TOOLCHAIN_PIN.illink_nupkg_sha256;
 
 export class WindowsHelperPublishError extends Error {
   constructor(code) {
@@ -24,18 +31,39 @@ export class WindowsHelperPublishError extends Error {
 }
 
 /**
- * Publish the reviewed helper into an OS-temporary workspace and return bytes + digest.
- * Performs no service install and writes nothing under normal user profile roots.
+ * Publish the reviewed helper into an OS-temporary workspace and return a
+ * branded bytes + digest binding. Performs no service install and writes
+ * nothing under normal user profile roots.
+ *
+ * Fail-closed Phase 9f package binding runs before restore/publish.
  */
 export async function publishWindowsHelperServiceBinary() {
   if (process.platform !== 'win32') {
     throw new WindowsHelperPublishError('unsupported_platform');
   }
+
+  let packageReport;
+  try {
+    packageReport = await verifyWindowsHelperReviewedSources(SOURCE);
+  } catch (error) {
+    if (error instanceof WindowsHelperPackageBindingError) {
+      throw new WindowsHelperPublishError(error.code);
+    }
+    throw error;
+  }
+  if (packageReport.package_digest !== WINDOWS_HELPER_PACKAGE_DIGEST ||
+      packageReport.package_binding_verified !== true) {
+    throw new WindowsHelperPublishError('package_binding_mismatch');
+  }
+
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'bridge-service-build-'));
   try {
     const projectDir = path.join(root, 'project');
     const outputDir = path.join(root, 'publish');
     await fs.cp(SOURCE, projectDir, { recursive: true, force: false, errorOnExist: true });
+    // Re-verify the copied tree so publish cannot silently use drifted sources.
+    await verifyWindowsHelperReviewedSources(projectDir);
+
     const cliHome = path.join(root, 'dotnet-home');
     const packages = path.join(root, 'packages');
     const localFeed = path.join(root, 'local-feed');
@@ -96,7 +124,8 @@ export async function publishWindowsHelperServiceBinary() {
     });
     await execFileAsync('dotnet', [
       'publish', PROJECT, '--no-restore', '--configuration', 'Release',
-      '--runtime', 'win-x64', '--output', outputDir, '--nologo',
+      '--runtime', WINDOWS_HELPER_TOOLCHAIN_PIN.runtime_identifier,
+      '--output', outputDir, '--nologo',
       '--disable-build-servers',
     ], {
       cwd: projectDir, env: buildEnv, windowsHide: true, timeout: 180000,
@@ -107,11 +136,14 @@ export async function publishWindowsHelperServiceBinary() {
       throw new WindowsHelperPublishError('unexpected_publish_layout');
     }
     const bytes = await fs.readFile(path.join(outputDir, EXE));
-    return {
+    return brandWindowsHelperPublishBinding({
       bytes,
       sha256: createHash('sha256').update(bytes).digest('hex'),
       byteLength: bytes.byteLength,
-    };
+      package_digest: WINDOWS_HELPER_PACKAGE_DIGEST,
+      package_binding_verified: true,
+      authorization_ready: false,
+    });
   } finally {
     await fs.rm(root, { recursive: true, force: true });
   }

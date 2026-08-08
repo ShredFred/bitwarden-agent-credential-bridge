@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { types as utilTypes } from 'node:util';
 import { publishWindowsHelperServiceBinary } from './windows-helper-publish.mjs';
+import { requireWindowsHelperPublishBinding } from './windows-helper-package-binding.mjs';
 import { buildWindowsServiceBoundaryPlan } from './windows-service-boundary-plan.mjs';
 import { buildWindowsServiceLifecycleGate } from './windows-service-lifecycle-gate.mjs';
 import { evaluateWindowsServiceLifecycleTranscript } from './windows-service-lifecycle-evidence.mjs';
@@ -45,7 +46,9 @@ export async function runOperatorApprovedWindowsServiceLifecycleLiveTest() {
   if (process.platform !== 'win32') {
     throw new WindowsServiceLifecycleLiveError('unsupported_platform');
   }
-  const published = await publishWindowsHelperServiceBinary();
+  const published = requireWindowsHelperPublishBinding(
+    await publishWindowsHelperServiceBinary(),
+  );
   const plan = buildWindowsServiceBoundaryPlan({
     platform: 'win32',
     binarySha256: published.sha256,

@@ -9,7 +9,7 @@ the supported auth contracts. It is **not** company-HQ production authorization.
 |---|---|
 | `harness_ready` | Bound fake policies validated; brokers started; smoke passed |
 | `disposable_dev_ready` | Separate DPAPI disposable smoke passed (`live:disposable-bitwarden`) |
-| `authorization_ready` | Always `false` — same-user isolation is not claimed |
+| `authorization_ready` | From Phase 9e → Phase 9a only; default incomplete evidence stays `false` |
 
 ## Commands
 

@@ -1267,9 +1267,138 @@ Phase 8 may add an in-process operational disposable/dev multi-service bridge:
   aliases with atomic alias/policy/class matching before resolve/start;
 - transactional reverse-order cleanup on startup failure and on SIGINT/SIGTERM;
 - readiness taxonomy with `harness_ready`, optional `disposable_dev_ready`, and
-  structurally false `authorization_ready`;
+  `authorization_ready` (Phase 9e wires the latter from branded Phase 9a; Phase 8
+  alone must not invent true);
 - no PID-file stop, no lease-based remote kill, no company/personal vault pairing,
   and no reuse of the disposable DPAPI account password across multiple aliases.
 
-Phase 8 must not claim production writer isolation, elevate install eligibility,
-or set `authorization_ready=true`.
+Phase 8 must not claim production writer isolation or elevate install eligibility.
+Hardcoded `authorization_ready=true` remains forbidden; Phase 9e may copy the
+flag from a complete branded Phase 9a report only.
+
+## Phase 9 scope
+
+Phase 9 defines the fail-closed Windows path to a legitimate
+`authorization_ready=true` under the repository threat model. Disposable live
+denial, `install_gate_eligible`, persistent install/uninstall, DPAPI smoke, and
+path-based preflight remain individually insufficient.
+
+### Phase 9a
+
+Phase 9a may add only a pure Windows production authorization evidence compiler:
+
+- accept branded Phase 5h.46 install-gate eligibility, a branded persistent
+  ProgramData layout plan, branded handle-bound installed-service identity
+  facts, branded complete target-ACL matrix facts, and exact Phase 5h.1 peer
+  five-facts;
+- set `authorization_ready=true` only when every class is complete and
+  `path_based_preflight_only` is false;
+- keep `mutation_authorized=false`, helper vault-free, and personal/company
+  vault forbidden;
+- reject forged clones, disposable layouts, advisory path-only pretenses, and
+  extra fields;
+- keep pure 9a reports marked `operational_bridge_unwired=true` (Phase 9e wires
+  the operational surface separately).
+
+Phase 9a performs no host I/O, elevation, SCM/pipe mutation, manifest execution,
+or Bitwarden access. Synthetic harness branding may exercise the true path in
+unit tests only. The operational bridge consumes 9a reports only through Phase
+9e.
+
+### Phase 9b
+
+Phase 9b may add a read-only Windows handle-bound installed-service identity
+collector:
+
+- compose the native Phase 5h.13 pipe/SCM/token verifier with a handle-open
+  binary digest and service-object ACL probe (`CreateFile` +
+  `FILE_FLAG_OPEN_REPARSE_POINT` + `ReadFile` hashing; never path `Get-FileHash`);
+- brand the merged exact Phase 9a handle-bound evidence schema;
+- keep `path_based_preflight_only=false` and public collector
+  `authorization_ready=false`;
+- accept a branded Phase 5h.8 boundary plan only; emit value-free reports.
+
+Phase 9b must not elevate, install/start/stop a service, execute a manifest,
+access Bitwarden, or treat Phase 5h.9 path preflight as sufficient. A complete
+positive result requires an already running persistent LocalService install from
+a separate operator-approved gate. Operational `authorization_ready` is decided
+only by Phase 9e over branded 9a composition.
+
+### Phase 9c
+
+Phase 9c may add a read-only AccessCheck matrix over the five fixed persistent
+ProgramData-class targets (config dir/file, install root, bin dir, launcher):
+
+- require a branded persistent Phase 5h.47 layout plan;
+- bind caller and running LocalService helper tokens; finish all five checks
+  before `all_targets_checked=true`;
+- brand the exact Phase 9a target-ACL evidence schema;
+- keep public collector `authorization_ready=false`;
+- emit value-free reports only (no paths, SIDs, usernames, or raw ACL text).
+
+Phase 9c must not elevate, mutate ACLs, install/start/stop a service, execute a
+manifest, or access Bitwarden. Incomplete host state (absent root or non-running
+service) must fail closed as an incomplete branded matrix. Operational
+`authorization_ready` is decided only by Phase 9e.
+
+### Phase 9d
+
+Phase 9d may add a read-only different-principal persistent pipe session that
+feeds branded Phase 5h.1 peer five-facts:
+
+- compose native `service-denial` pipe client, Phase 5h.13 server identity
+  verification, and Phase 9c target-ACL evidence;
+- set `different_principal=true` only when the denial peer is proven LocalService
+  with enabled service SID (never from console same-user denial alone);
+- brand peer five-facts for Phase 9e wiring; keep public collector
+  `authorization_ready=false`;
+- emit value-free reports only.
+
+Phase 9d must not elevate, install/start/stop a service, execute a vault-backed
+apply, or access Bitwarden. Absent pipe or same-principal hosts must fail closed
+as incomplete / `same_principal_rejected`. Operational `authorization_ready` is
+decided only by Phase 9e.
+
+### Phase 9e
+
+Phase 9e may wire operational readiness surfaces to a branded Phase 9a report
+composed from branded Phase 5h.46 install-gate, Phase 5h.47 persistent layout,
+Phase 9b handle-bound, Phase 9c target-ACL, and Phase 9d peer evidence:
+
+- copy `authorization_ready` only from `evaluateWindowsProductionAuthorization`
+  output — never hardcode `true`;
+- default/absent evidence uses incomplete branded fixtures and remains false on
+  typical same-user hosts;
+- fail closed on forged/unbranded evidence;
+- keep personal/company vaults forbidden and the helper vault-free;
+- set `operational_bridge_unwired=false` on the wired report while still
+  evaluating false until every production evidence class is complete.
+
+Phase 9e must not invent live host completeness, leave a persistent service
+installed, pair personal/company Bitwarden, or claim macOS/Linux authorization
+from Windows-only evidence. Synthetic complete fixtures may exercise
+`authorization_ready=true` in unit tests only.
+
+### Phase 9f
+
+Phase 9f may package-bind reviewed helper and supervisor digests used by
+collectors and expand CI for pure Windows slices without live service install:
+
+- pin LF-normalized digests/lengths for the exact
+  `native/windows-helper-service/` tree, the canonical package digest, and the
+  fixed SDK/runtime/ILLink toolchain;
+- bind the helper SCM/console entrypoint argv surface and self-test keys;
+- pin the OneCLI proxy supervisor module, frame helper, and
+  `run-onecli-proxy.mjs` entrypoint digests plus required imports;
+- require publish/collector paths to verify those pins and brand publish
+  bindings fail-closed; forged publish clones are rejected;
+- keep `authorization_ready` evidence-driven via Phase 9e/9a only;
+- do not weaken same-host publish/self-test reproducibility.
+
+Phase 9f must not install/start a service in CI, hardcode
+`authorization_ready=true`, pair personal/company Bitwarden, or place a vault
+client in LocalService.
+
+Phase 9 must not pair personal/company Bitwarden, place a vault client in
+LocalService, implement OAuth/MFA/SMS/SSH/FTP/`env_inject`, or claim macOS/Linux
+authorization from Windows-only evidence.
