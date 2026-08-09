@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import {
   fetchSecretsManagerSecretValue,
+  upsertSecretsManagerSecret,
   SecretsManagerBwsAdapterError,
 } from '../src/secrets-manager-bws-adapter.mjs';
 
@@ -56,5 +57,50 @@ describe('secrets manager bws adapter', () => {
       (error) => error instanceof SecretsManagerBwsAdapterError &&
         error.code === 'secret_not_found',
     );
+  });
+
+  it('creates or updates secrets without returning the value', async () => {
+    const token = '0.deadbeef-token-value-not-for-logs==';
+    const secretValue = 'WRITE-FAKE-SECRET-VALUE-001';
+    const calls = [];
+    const created = await upsertSecretsManagerSecret({
+      accessToken: token,
+      projectId: PROJECT,
+      secretKey: 'mivia_demo_bearer',
+      secretValue,
+      runCommand: async (_exe, args) => {
+        calls.push(args.slice(0, 3).join(' '));
+        if (args[0] === 'secret' && args[1] === 'list') {
+          return JSON.stringify([]);
+        }
+        if (args[0] === 'secret' && args[1] === 'create') {
+          return JSON.stringify({ id: SECRET_ID, key: 'mivia_demo_bearer' });
+        }
+        throw new Error(`unexpected:${args.join(' ')}`);
+      },
+    });
+    assert.deepEqual(created, { ok: true, action: 'created' });
+    assert.equal(JSON.stringify(created).includes(secretValue), false);
+
+    const updated = await upsertSecretsManagerSecret({
+      accessToken: token,
+      projectId: PROJECT,
+      secretKey: 'mivia_demo_bearer',
+      secretValue,
+      runCommand: async (_exe, args) => {
+        if (args[0] === 'secret' && args[1] === 'list') {
+          return JSON.stringify([
+            { id: SECRET_ID, key: 'mivia_demo_bearer', projectId: PROJECT },
+          ]);
+        }
+        if (args[0] === 'secret' && args[1] === 'edit') {
+          return JSON.stringify({ id: SECRET_ID, key: 'mivia_demo_bearer' });
+        }
+        throw new Error(`unexpected:${args.join(' ')}`);
+      },
+    });
+    assert.deepEqual(updated, { ok: true, action: 'updated' });
+    assert.equal(JSON.stringify(updated).includes(secretValue), false);
+    assert.ok(calls.some((c) => c.startsWith('secret list')));
   });
 });

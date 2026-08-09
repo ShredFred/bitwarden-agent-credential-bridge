@@ -1565,3 +1565,10 @@ Phase 14 must not create extra interactive OS user accounts, place a vault
 client in LocalService, implement OAuth/MFA/SMS/SSH/`env_inject`, hardcode
 `authorization_ready=true`, or treat a forged JSON report as authorization
 evidence.
+
+Phase 14 may also add guided local machine setup/uninstall and agent-blind
+SM write (create/update) behind separate CLI flags
+`--i-approve-sm-machine-setup`, `--i-approve-sm-machine-uninstall`, and
+`--i-approve-secrets-manager-machine-write`. Write APIs must never return
+secret values to agent-readable surfaces; setup may accept a token only
+through a local secure prompt/store path.

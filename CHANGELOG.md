@@ -91,6 +91,9 @@ Semantic Versioning while it remains on the experimental 0.x line.
   adapter, `operational_sm_same_user` bindings, `live:sm-machine`, and
   `start:operational:sm`. Default laptop path needs no extra OS user and no
   LocalService vault client; Day-2 LocalService stays optional.
+- Guided SM setup/uninstall and agent-blind write:
+  `npm run setup:sm` (credential window for token), `npm run uninstall:sm`,
+  and `npm run live:sm-write` (stdin value, value-free result only).
 
 ### Fixed
 

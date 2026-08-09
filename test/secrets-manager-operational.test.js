@@ -102,5 +102,23 @@ describe('phase14 secrets manager operational wiring', () => {
     assert.notEqual(ops.code, 0);
     const opsPayload = JSON.parse(ops.stdout.trim().split(/\r?\n/).pop());
     assert.equal(opsPayload.code, 'approval_flag_required');
+
+    const setup = await runNode(
+      path.join(root, 'scripts', 'setup-sm-machine.mjs'),
+    );
+    assert.notEqual(setup.code, 0);
+    assert.equal(JSON.parse(setup.stdout.trim().split(/\r?\n/).pop()).code, 'approval_flag_required');
+
+    const uninstall = await runNode(
+      path.join(root, 'scripts', 'uninstall-sm-machine.mjs'),
+    );
+    assert.notEqual(uninstall.code, 0);
+    assert.equal(JSON.parse(uninstall.stdout.trim().split(/\r?\n/).pop()).code, 'approval_flag_required');
+
+    const write = await runNode(
+      path.join(root, 'scripts', 'run-secrets-manager-write.mjs'),
+    );
+    assert.notEqual(write.code, 0);
+    assert.equal(JSON.parse(write.stdout.trim().split(/\r?\n/).pop()).code, 'approval_flag_required');
   });
 });

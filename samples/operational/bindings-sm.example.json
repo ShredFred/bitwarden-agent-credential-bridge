@@ -6,14 +6,14 @@
       "alias": "mivia_demo_bearer",
       "policy": "policies/sample-fake-service.json",
       "credential_class": "http_bearer",
-      "sm_project_id": "00000000-0000-4000-8000-000000000001",
+      "sm_project_id": "e186495e-8667-436f-9f78-b49800eba251",
       "sm_secret_key": "mivia_demo_bearer"
     },
     {
       "alias": "privatehq_demo_bearer",
       "policy": "policies/sample-fake-service.json",
       "credential_class": "http_bearer",
-      "sm_project_id": "00000000-0000-4000-8000-000000000002",
+      "sm_project_id": "1d9a72dc-75aa-4bf3-a528-b49800ebbf68",
       "sm_secret_key": "privatehq_demo_bearer"
     }
   ]

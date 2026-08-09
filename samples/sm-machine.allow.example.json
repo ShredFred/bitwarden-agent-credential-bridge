@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
-  "machine_id": "REPLACE_WITH_MACHINE_ID",
+  "machine_id": "pc-example",
   "allowed_project_ids": [
-    "00000000-0000-4000-8000-000000000001",
-    "00000000-0000-4000-8000-000000000002"
+    "e186495e-8667-436f-9f78-b49800eba251",
+    "1d9a72dc-75aa-4bf3-a528-b49800ebbf68"
   ]
 }
