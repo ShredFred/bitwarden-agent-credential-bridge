@@ -85,6 +85,12 @@ Semantic Versioning while it remains on the experimental 0.x line.
   `live:windows-laptop-ready`. Secrets stay in the Bridge process;
   LocalService remains vault-free; `authorization_ready` is never set by vault
   unlock.
+- Phase 14 Secrets Manager same-user productive path
+  (`docs/phase14-secrets-manager-same-user.md`): machine-account allowlist,
+  local access-token store (Windows DPAPI / macOS token file), pinned `bws`
+  adapter, `operational_sm_same_user` bindings, `live:sm-machine`, and
+  `start:operational:sm`. Default laptop path needs no extra OS user and no
+  LocalService vault client; Day-2 LocalService stays optional.
 
 ### Fixed
 

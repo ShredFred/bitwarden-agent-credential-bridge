@@ -1536,4 +1536,32 @@ Windows agents without placing a vault client in LocalService:
 Phase 13 must not pair company/organization/privateHQ vaults, place a vault
 client in LocalService, implement OAuth/MFA/SMS/SSH/`env_inject`, hardcode
 `authorization_ready=true`, or treat a forged JSON report as authorization
-evidence. Org/privateHQ resolve requires a later explicit Phase 14 gate.
+evidence. Org/privateHQ Secrets Manager resolve is Phase 14.
+
+## Phase 14 scope
+
+Phase 14 may add an operator-approved Bitwarden **Secrets Manager**
+machine-account resolve path as the productive same-user default:
+
+- allow branded SM resolve only behind the CLI flag
+  `--i-approve-secrets-manager-machine-resolve` (never a library capability);
+- pin allowed project UUIDs in a machine-local schema-fixed allowlist
+  (not free runtime org strings);
+- store the machine access token only in a local secure store (Windows DPAPI
+  or macOS owner-only file / Keychain path); never commit tokens; never place
+  `BWS_ACCESS_TOKEN` on an agent-readable process environment;
+- resolve secret values into short-lived Bridge/broker memory via a pinned
+  upstream `bws` CLI or an injected test adapter; never log or return secrets;
+- keep `helper_vault_free=true` — no vault client and no secrets on the
+  LocalService helper pipe;
+- keep `authorization_ready` evidence-driven (Windows 9e/10c or platform
+  analogs) and never set it true from SM unlock alone;
+- treat LocalService distinct-writer install as optional research, not required
+  for productive same-user SM resolve;
+- expose an `operational_sm_same_user` binding profile mapping aliases to
+  project id + secret key without embedding secret values.
+
+Phase 14 must not create extra interactive OS user accounts, place a vault
+client in LocalService, implement OAuth/MFA/SMS/SSH/`env_inject`, hardcode
+`authorization_ready=true`, or treat a forged JSON report as authorization
+evidence.

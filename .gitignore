@@ -8,3 +8,8 @@ node_modules/
 # Phase 13 personal vault allowlist must stay machine-local (digest only).
 personal-vault.allow.json
 **/personal-vault.allow.json
+# Phase 14 Secrets Manager machine allowlist + local token artifacts.
+sm-machine.allow.json
+**/sm-machine.allow.json
+sm-machine.token
+**/sm-machine.token

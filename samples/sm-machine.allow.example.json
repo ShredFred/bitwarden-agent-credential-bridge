@@ -1,0 +1,8 @@
+{
+  "schema_version": 1,
+  "machine_id": "REPLACE_WITH_MACHINE_ID",
+  "allowed_project_ids": [
+    "00000000-0000-4000-8000-000000000001",
+    "00000000-0000-4000-8000-000000000002"
+  ]
+}

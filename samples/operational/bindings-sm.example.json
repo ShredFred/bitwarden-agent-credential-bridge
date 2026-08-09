@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "profile": "operational_sm_same_user",
+  "bindings": [
+    {
+      "alias": "mivia_demo_bearer",
+      "policy": "policies/sample-fake-service.json",
+      "credential_class": "http_bearer",
+      "sm_project_id": "00000000-0000-4000-8000-000000000001",
+      "sm_secret_key": "mivia_demo_bearer"
+    },
+    {
+      "alias": "privatehq_demo_bearer",
+      "policy": "policies/sample-fake-service.json",
+      "credential_class": "http_bearer",
+      "sm_project_id": "00000000-0000-4000-8000-000000000002",
+      "sm_secret_key": "privatehq_demo_bearer"
+    }
+  ]
+}

@@ -36,6 +36,9 @@ export class OperationalBridgeError extends Error {
 }
 
 const ALIAS_PATTERN = /^[a-z][a-z0-9_]{0,31}$/;
+const UUID =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const SECRET_KEY = /^[a-zA-Z][a-zA-Z0-9_.-]{0,127}$/;
 const OPERATIONAL_CLASSES = new Set([
   ...HTTP_INJECTION_CREDENTIAL_CLASSES,
   'browser_form_login',
@@ -46,11 +49,16 @@ const OPERATIONAL_CLASSES = new Set([
  *   alias: string,
  *   policy: string,
  *   credential_class: string,
+ *   sm_project_id?: string,
+ *   sm_secret_key?: string,
+ *   sm_secret_key_password?: string,
  * }} OperationalBinding
  */
 
 /**
  * Validate a tracked operational binding table (no secrets, no vault refs).
+ * Supports `operational_disposable_dev` (fake vault) and
+ * `operational_sm_same_user` (Secrets Manager keys only).
  * @param {unknown} raw
  * @returns {{ version: 1, profile: string, bindings: OperationalBinding[] }}
  */
@@ -68,7 +76,13 @@ export function validateOperationalBindings(raw) {
   ) {
     throw new OperationalBridgeError('invalid_bindings');
   }
-  if (obj.version !== 1 || obj.profile !== 'operational_disposable_dev') {
+  if (obj.version !== 1) {
+    throw new OperationalBridgeError('invalid_bindings');
+  }
+  if (obj.profile === 'operational_sm_same_user') {
+    return validateSmOperationalBindings(obj);
+  }
+  if (obj.profile !== 'operational_disposable_dev') {
     throw new OperationalBridgeError('invalid_bindings');
   }
   if (!Array.isArray(obj.bindings) || obj.bindings.length < 1 || obj.bindings.length > 16) {
@@ -124,6 +138,86 @@ export function validateOperationalBindings(raw) {
 }
 
 /**
+ * @param {Record<string, unknown>} obj
+ */
+function validateSmOperationalBindings(obj) {
+  if (!Array.isArray(obj.bindings) || obj.bindings.length < 1 || obj.bindings.length > 16) {
+    throw new OperationalBridgeError('invalid_bindings');
+  }
+  /** @type {OperationalBinding[]} */
+  const bindings = [];
+  const aliases = new Set();
+  for (const entry of obj.bindings) {
+    if (entry === null || typeof entry !== 'object' || Array.isArray(entry)) {
+      throw new OperationalBridgeError('invalid_binding');
+    }
+    const e = /** @type {Record<string, unknown>} */ (entry);
+    const entryKeys = Reflect.ownKeys(e);
+    const required = ['alias', 'policy', 'credential_class', 'sm_project_id', 'sm_secret_key'];
+    for (const key of required) {
+      if (!entryKeys.includes(key)) {
+        throw new OperationalBridgeError('invalid_binding');
+      }
+    }
+    for (const key of entryKeys) {
+      if (typeof key !== 'string' ||
+          ![...required, 'sm_secret_key_password'].includes(key)) {
+        throw new OperationalBridgeError('invalid_binding');
+      }
+    }
+    if (typeof e.alias !== 'string' || !ALIAS_PATTERN.test(e.alias)) {
+      throw new OperationalBridgeError('invalid_alias');
+    }
+    if (aliases.has(e.alias)) {
+      throw new OperationalBridgeError('duplicate_alias');
+    }
+    aliases.add(e.alias);
+    if (typeof e.policy !== 'string' || !e.policy.startsWith('policies/') ||
+        e.policy.includes('..') || e.policy.includes('\\') || !e.policy.endsWith('.json')) {
+      throw new OperationalBridgeError('invalid_policy_path');
+    }
+    if (isRejectedCredentialClass(e.credential_class)) {
+      throw new OperationalBridgeError('rejected_credential_class');
+    }
+    if (!isSupportedCredentialClass(e.credential_class) ||
+        !OPERATIONAL_CLASSES.has(e.credential_class)) {
+      throw new OperationalBridgeError('unsupported_credential_class');
+    }
+    if (typeof e.sm_project_id !== 'string' || !UUID.test(e.sm_project_id)) {
+      throw new OperationalBridgeError('invalid_sm_project_id');
+    }
+    if (typeof e.sm_secret_key !== 'string' || !SECRET_KEY.test(e.sm_secret_key)) {
+      throw new OperationalBridgeError('invalid_sm_secret_key');
+    }
+    const needsPassword = e.credential_class === 'http_basic' ||
+      e.credential_class === 'browser_form_login';
+    /** @type {OperationalBinding} */
+    const binding = {
+      alias: e.alias,
+      policy: e.policy,
+      credential_class: e.credential_class,
+      sm_project_id: e.sm_project_id.toLowerCase(),
+      sm_secret_key: e.sm_secret_key,
+    };
+    if (needsPassword) {
+      if (typeof e.sm_secret_key_password !== 'string' ||
+          !SECRET_KEY.test(e.sm_secret_key_password)) {
+        throw new OperationalBridgeError('invalid_sm_secret_key_password');
+      }
+      binding.sm_secret_key_password = e.sm_secret_key_password;
+    } else if (e.sm_secret_key_password !== undefined) {
+      throw new OperationalBridgeError('invalid_binding');
+    }
+    bindings.push(binding);
+  }
+  return {
+    version: 1,
+    profile: 'operational_sm_same_user',
+    bindings,
+  };
+}
+
+/**
  * Start an in-process multi-service operational bridge using fake vault secrets.
  * Foreground only: caller must retain the handle and call close(). No PID files.
  *
@@ -137,6 +231,12 @@ export function validateOperationalBindings(raw) {
  *   bindings: unknown,
  *   fetchImpl?: typeof fetch,
  *   platform?: 'win32' | 'darwin' | 'linux',
+ *   resolveSecret?: (binding: OperationalBinding) => Promise<{
+ *     credential_class: string,
+ *     credential?: string,
+ *     username?: string,
+ *     password?: string,
+ *   }>,
  *   productionAuthorizationEvidence?: {
  *     installGateReport: object,
  *     layoutPlan: object,
@@ -153,6 +253,10 @@ export async function startOperationalBridge(options) {
   const table = validateOperationalBindings(options.bindings);
   const fetchImpl = options.fetchImpl ?? globalThis.fetch;
   const platform = options.platform ?? process.platform;
+  const smMode = table.profile === 'operational_sm_same_user';
+  if (smMode && typeof options.resolveSecret !== 'function') {
+    throw new OperationalBridgeError('sm_resolver_required');
+  }
 
   let authorizationReport;
   try {
@@ -188,7 +292,7 @@ export async function startOperationalBridge(options) {
   for (const binding of table.bindings) {
     aliasMap[binding.alias] = { credential_class: binding.credential_class };
   }
-  const secrets = resolveFakeVaultSecrets(aliasMap);
+  const secrets = smMode ? null : resolveFakeVaultSecrets(aliasMap);
 
   let cleaning = false;
   const cleanup = async () => {
@@ -212,7 +316,9 @@ export async function startOperationalBridge(options) {
       if (policy.credential_class !== binding.credential_class) {
         throw new OperationalBridgeError('binding_class_mismatch');
       }
-      const selected = selectFakeVaultSecret(secrets, binding.alias);
+      const selected = smMode
+        ? await options.resolveSecret(binding)
+        : selectFakeVaultSecret(secrets, binding.alias);
       if (selected.credential_class !== binding.credential_class) {
         throw new OperationalBridgeError('secret_class_mismatch');
       }
@@ -325,6 +431,7 @@ export async function startOperationalBridge(options) {
     services: Object.freeze(services.map((s) => Object.freeze({ ...s }))),
     harness_ready: true,
     disposable_dev_ready: false,
+    secrets_manager_mode: smMode,
     // Copied from the wired Phase 9a/9e report only — never a literal true.
     authorization_ready: authorizationReport.authorization_ready,
     production_authorization_terminal_code: authorizationReport.terminal_code,
