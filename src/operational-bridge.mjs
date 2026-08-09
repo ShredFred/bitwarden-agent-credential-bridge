@@ -18,10 +18,11 @@ import {
   withUpstream,
 } from './policy.js';
 import {
-  absentWindowsOperationalAuthorization,
-  composeWindowsOperationalAuthorization,
-  WindowsOperationalAuthorizationError,
-} from './windows-operational-authorization.mjs';
+  absentOperationalAuthorizationForPlatform,
+  composeOperationalAuthorizationForPlatform,
+  PlatformOperationalAuthorizationError,
+} from './platform-operational-authorization.mjs';
+import process from 'node:process';
 
 export class OperationalBridgeError extends Error {
   /**
@@ -126,15 +127,16 @@ export function validateOperationalBindings(raw) {
  * Start an in-process multi-service operational bridge using fake vault secrets.
  * Foreground only: caller must retain the handle and call close(). No PID files.
  *
- * authorization_ready is taken only from the Phase 9e wired Phase 9a report
- * (never a hardcoded true). Omitting productionAuthorizationEvidence uses the
- * incomplete/absent branded evidence path, which evaluates to false on typical
- * same-user hosts.
+ * authorization_ready is taken only from the platform-scoped production
+ * authorization compiler (Windows 9e / macOS 11j / Linux 12t) — never a
+ * hardcoded true. Omitting productionAuthorizationEvidence uses the incomplete
+ * branded evidence path for the selected platform (default: process.platform).
  *
  * @param {{
  *   repoRoot: string,
  *   bindings: unknown,
  *   fetchImpl?: typeof fetch,
+ *   platform?: 'win32' | 'darwin' | 'linux',
  *   productionAuthorizationEvidence?: {
  *     installGateReport: object,
  *     layoutPlan: object,
@@ -150,16 +152,23 @@ export async function startOperationalBridge(options) {
   }
   const table = validateOperationalBindings(options.bindings);
   const fetchImpl = options.fetchImpl ?? globalThis.fetch;
+  const platform = options.platform ?? process.platform;
 
   let authorizationReport;
   try {
     authorizationReport =
       options.productionAuthorizationEvidence === undefined ||
       options.productionAuthorizationEvidence === null
-        ? absentWindowsOperationalAuthorization()
-        : composeWindowsOperationalAuthorization(options.productionAuthorizationEvidence);
+        ? absentOperationalAuthorizationForPlatform(platform)
+        : composeOperationalAuthorizationForPlatform(
+          platform,
+          options.productionAuthorizationEvidence,
+        );
   } catch (error) {
-    if (error instanceof WindowsOperationalAuthorizationError) {
+    if (error instanceof PlatformOperationalAuthorizationError) {
+      throw new OperationalBridgeError(error.code);
+    }
+    if (error && typeof error === 'object' && typeof error.code === 'string') {
       throw new OperationalBridgeError(error.code);
     }
     throw error;

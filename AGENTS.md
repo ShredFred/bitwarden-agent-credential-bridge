@@ -1482,9 +1482,12 @@ emits no concrete paths and keeps mutation unauthorized.
 
 ### Phase 11c+
 
-Later Phase 11 slices (Mac-host disposable distinct-EUID denial, persistent
-install, 9a–10b analogs) require a macOS host and remain out of Windows-dev
-scope until the handoff in `docs/phase11c-macos-disposable-denial-handoff.md`.
+Later Phase 11 slices require a macOS host for live disposable distinct-EUID
+denial and persistent collectors
+(`docs/phase11c-macos-disposable-denial-handoff.md`). Pure Phase 11e/11j/11l
+production authorization, operational wire-up, and injected bootstrap compilers
+may run on any host; synthetic fixtures may exercise `authorization_ready=true`
+in unit tests only.
 
 ## Phase 12 scope (Linux authorization ladder)
 
@@ -1504,4 +1507,8 @@ access is permitted.
 
 Native helper scaffolds and disposable root lifecycle collectors require a Linux
 host with a real systemd system instance; see
-`docs/phase12n-linux-disposable-denial-handoff.md`.
+`docs/phase12n-linux-disposable-denial-handoff.md`. Pure Phase 12p/12t/12u
+production authorization, operational wire-up, and injected bootstrap compilers
+may run on any host; synthetic fixtures may exercise `authorization_ready=true`
+in unit tests only. Platform reports must never copy Windows readiness onto
+Linux.

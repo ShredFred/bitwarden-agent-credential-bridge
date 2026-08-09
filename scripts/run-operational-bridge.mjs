@@ -14,7 +14,7 @@ import {
   startOperationalBridge,
   OperationalBridgeError,
 } from '../src/operational-bridge.mjs';
-import { absentWindowsOperationalAuthorization } from '../src/windows-operational-authorization.mjs';
+import { absentOperationalAuthorizationForPlatform } from '../src/platform-operational-authorization.mjs';
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const bindingsPath = process.argv[2] ?? 'samples/operational/bindings.json';
@@ -81,7 +81,7 @@ try {
     code,
     harness_ready: false,
     disposable_dev_ready: false,
-    authorization_ready: absentWindowsOperationalAuthorization().authorization_ready,
+    authorization_ready: absentOperationalAuthorizationForPlatform(process.platform).authorization_ready,
   });
   await shutdown(1);
 }

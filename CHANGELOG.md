@@ -71,6 +71,11 @@ Semantic Versioning while it remains on the experimental 0.x line.
   (`docs/phase12-linux-pure-gate-stack.md`): layout, lifecycle gate, transcript,
   collector trust, install gate, and authorize envelope. Native/live denial is a
   Linux-host handoff (`docs/phase12n-linux-disposable-denial-handoff.md`).
+- Cross-platform production authorization compilers and operational wire-up for
+  macOS (11e/11j/11l) and Linux (12p/12t/12u), plus platform dispatch in the
+  operational bridge (`docs/cross-platform-production-authorization.md`).
+  Synthetic fixtures may exercise `authorization_ready=true` in unit tests;
+  live Mac/Linux collectors remain host handoffs.
 
 ### Fixed
 
