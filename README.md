@@ -594,6 +594,13 @@ AGENTS.md                           experiment rules for agents
 - Phase 10a adds a foreground Day-2 evidence refresh loop for an already-installed
   LocalService (`npm run live:windows-authorization-refresh`); see
   [docs/phase10a-windows-authorization-evidence-refresh.md](docs/phase10a-windows-authorization-evidence-refresh.md).
+- Phase 10b adds the operator bootstrap that may exit with
+  `authorization_ready=true` only from branded compose
+  (`npm run live:windows-authorization-ready`); see
+  [docs/phase10b-windows-authorization-ready-bootstrap.md](docs/phase10b-windows-authorization-ready-bootstrap.md).
+- Phase 10c unifies bootstrap + operational bridge + refresh into one Day-2
+  operator session (`npm run live:windows-day2-operator`); see
+  [docs/phase10c-windows-day2-operator.md](docs/phase10c-windows-day2-operator.md).
 - No browser/website automation, query, cookie, form, process-env,
   SSH, database, RDP, or desktop credential injection.
 - Not a substitute for vault, OS keychain, or production broker hardening.

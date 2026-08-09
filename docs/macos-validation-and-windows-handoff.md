@@ -188,10 +188,15 @@ Recommended next development order on Windows:
 9. ~~Phase 10a Day-2 evidence refresh for an already-installed LocalService.~~
    Done (`docs/phase10a-windows-authorization-evidence-refresh.md`;
    `npm run live:windows-authorization-refresh`). Uninstall stays explicit.
-10. Keep personal/company Bitwarden pairing forbidden. macOS/Linux distinct-writer
-    parity remains a separate milestone; do not claim cross-platform
-    `authorization_ready` from Windows-only evidence.
-11. Day-2 refresh does not claim same-user memory isolation; agent-readable
+10. ~~Phase 10b authorization-ready bootstrap + Phase 10c Day-2 operator.~~
+    Done (`docs/phase10b-windows-authorization-ready-bootstrap.md`,
+    `docs/phase10c-windows-day2-operator.md`;
+    `npm run live:windows-authorization-ready`,
+    `npm run live:windows-day2-operator`).
+11. Keep personal/company Bitwarden pairing forbidden. macOS/Linux distinct-writer
+    parity remains a separate milestone (Phase 11 / Phase 12); do not claim
+    cross-platform `authorization_ready` from Windows-only evidence.
+12. Day-2 refresh does not claim same-user memory isolation; agent-readable
     surface non-disclosure remains the exposure-test contract.
 
 Cursor should treat a Windows-only skip on macOS as expected, but any failure in

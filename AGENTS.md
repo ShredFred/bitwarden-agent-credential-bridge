@@ -1440,3 +1440,22 @@ from live or injected collectors:
 Phase 10b must not pair personal/company Bitwarden, implement OAuth/MFA/SSH/
 `env_inject`, place a vault client in LocalService, claim same-user memory
 isolation, or treat a forged JSON report as authorization evidence.
+
+## Phase 10c scope
+
+Phase 10c may add a foreground Windows Day-2 operator session that unifies
+Phase 10b bootstrap, operational-bridge wire-up, and Phase 10a evidence refresh:
+
+- fail closed unless branded compose reports `authorization_ready=true`;
+- replace the operational bridge on each refresh tick from latest branded evidence;
+- emit value-free `authorization_drift` when readiness becomes false and never
+  invent `authorization_ready=true`;
+- leave the persistent LocalService installed by default; uninstall remains an
+  explicit operator flag or separate command;
+- keep `mutation_authorized=false`, helper vault-free, and personal/company
+  vaults forbidden.
+
+Phase 10c must not auto-elevate without an explicit approval flag, pair
+personal/company Bitwarden, implement OAuth/MFA/SSH/`env_inject`, claim
+same-user memory isolation, or treat a forged JSON report as authorization
+evidence.

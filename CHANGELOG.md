@@ -59,6 +59,10 @@ Semantic Versioning while it remains on the experimental 0.x line.
   may exit with `authorization_ready=true` only when branded compose reports it
   after optional persistent install and vault-free first-install apply; never
   hardcodes the boolean; personal/company vaults stay forbidden.
+- Phase 10c Windows Day-2 operator session
+  (`docs/phase10c-windows-day2-operator.md`): unifies bootstrap, operational
+  bridge, and evidence refresh with fail-closed drift handling; uninstall stays
+  explicit.
 
 ### Fixed
 
