@@ -1421,3 +1421,22 @@ Phase 10a may add a foreground Windows Day-2 authorization evidence refresh:
 Phase 10a must not auto-elevate, auto-install, implement OAuth/MFA/SSH/
 `env_inject`, pair personal/company Bitwarden, claim same-user memory isolation,
 or leave a persistent service installed after CI.
+
+## Phase 10b scope
+
+Phase 10b may add an operator bootstrap that exits with
+`authorization_ready=true` only when branded Phase 9e compose reports that value
+from live or injected collectors:
+
+- optional elevated persistent LocalService install behind an explicit approval
+  flag (not a library capability);
+- one vault-free first-install apply when target-ACL evidence is incomplete;
+- re-collect and recompose; never hardcode `authorization_ready=true`;
+- optional operational-bridge wire-up and Phase 10a refresh keep-alive;
+- optional uninstall-after cleanup;
+- keep `mutation_authorized=false`, helper vault-free, and personal/company
+  vaults forbidden.
+
+Phase 10b must not pair personal/company Bitwarden, implement OAuth/MFA/SSH/
+`env_inject`, place a vault client in LocalService, claim same-user memory
+isolation, or treat a forged JSON report as authorization evidence.

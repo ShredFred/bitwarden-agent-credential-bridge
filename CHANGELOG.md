@@ -54,6 +54,11 @@ Semantic Versioning while it remains on the experimental 0.x line.
   re-collects branded 9b/9c/9d evidence and recomposes Phase 9e readiness for an
   already-installed LocalService; optional operational-bridge restart; uninstall
   stays explicit. Does not claim same-user memory isolation.
+- Phase 10b authorization-ready bootstrap
+  (`docs/phase10b-windows-authorization-ready-bootstrap.md`): operator path that
+  may exit with `authorization_ready=true` only when branded compose reports it
+  after optional persistent install and vault-free first-install apply; never
+  hardcodes the boolean; personal/company vaults stay forbidden.
 
 ### Fixed
 
