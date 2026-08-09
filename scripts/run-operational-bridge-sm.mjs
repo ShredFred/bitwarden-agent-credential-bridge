@@ -98,11 +98,13 @@ if (!process.argv.includes(APPROVAL_FLAG)) {
                 accessToken: bundle.accessToken,
                 projectId: request.project_id,
                 secretKey: request.secret_key,
+                allowConfig: bundle.allow,
               });
               const password = await fetchSecretsManagerSecretValue({
                 accessToken: bundle.accessToken,
                 projectId: request.project_id,
                 secretKey: request.secret_key_password,
+                allowConfig: bundle.allow,
               });
               return { username, password };
             },
@@ -126,6 +128,7 @@ if (!process.argv.includes(APPROVAL_FLAG)) {
               accessToken: bundle.accessToken,
               projectId: request.project_id,
               secretKey: request.secret_key,
+              allowConfig: bundle.allow,
             });
             return { credential };
           },

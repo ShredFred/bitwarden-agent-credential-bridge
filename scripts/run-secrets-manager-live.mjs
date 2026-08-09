@@ -95,6 +95,7 @@ if (!process.argv.includes(APPROVAL_FLAG)) {
             accessToken,
             projectId: request.project_id,
             secretKey: request.secret_key,
+            allowConfig: allow,
           });
           return { credential };
         },

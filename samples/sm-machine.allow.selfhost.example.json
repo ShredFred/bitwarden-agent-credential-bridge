@@ -1,0 +1,9 @@
+{
+  "schema_version": 1,
+  "machine_id": "pc-example",
+  "allowed_project_ids": [
+    "e186495e-8667-436f-9f78-b49800eba251",
+    "1d9a72dc-75aa-4bf3-a528-b49800ebbf68"
+  ],
+  "server_url": "https://vault.example.invalid"
+}

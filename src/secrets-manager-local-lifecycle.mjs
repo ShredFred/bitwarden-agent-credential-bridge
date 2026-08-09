@@ -33,7 +33,13 @@ export function defaultWindowsTokenStorePath() {
 }
 
 /**
- * @param {{ machine_id: string, allowed_project_ids?: string[] }} input
+ * @param {{
+ *   machine_id: string,
+ *   allowed_project_ids?: string[],
+ *   server_url?: string,
+ *   api_url?: string,
+ *   identity_url?: string,
+ * }} input
  * @param {{ allowPath?: string }} [options]
  */
 export async function writeSecretsManagerAllowConfig(input, options = {}) {
@@ -47,15 +53,39 @@ export async function writeSecretsManagerAllowConfig(input, options = {}) {
   if (projectIds.length < 1 || projectIds.length > 16) {
     throw new SecretsManagerLifecycleError('invalid_project_ids');
   }
-  const allowPath = options.allowPath ?? defaultSecretsManagerAllowPath();
-  await fs.mkdir(path.dirname(allowPath), { recursive: true });
-  const body = `${JSON.stringify({
+  /** @type {Record<string, unknown>} */
+  const payload = {
     schema_version: 1,
     machine_id: input.machine_id,
     allowed_project_ids: projectIds.map((id) => id.toLowerCase()),
-  }, null, 2)}\n`;
+  };
+  if (typeof input.server_url === 'string' && input.server_url.length > 0) {
+    payload.server_url = input.server_url;
+  }
+  if (typeof input.api_url === 'string' && typeof input.identity_url === 'string') {
+    payload.api_url = input.api_url;
+    payload.identity_url = input.identity_url;
+  } else if (input.api_url !== undefined || input.identity_url !== undefined) {
+    throw new SecretsManagerLifecycleError('invalid_endpoints');
+  }
+  // Validate by round-tripping through loader rules via JSON write + parse path.
+  const allowPath = options.allowPath ?? defaultSecretsManagerAllowPath();
+  await fs.mkdir(path.dirname(allowPath), { recursive: true });
+  const body = `${JSON.stringify(payload, null, 2)}\n`;
   await fs.writeFile(allowPath, body, { encoding: 'utf8', mode: 0o600 });
-  return { path: allowPath, machine_id: input.machine_id, project_count: projectIds.length };
+  try {
+    const { loadSecretsManagerAllowConfig } = await import('./secrets-manager-allow-config.mjs');
+    await loadSecretsManagerAllowConfig(allowPath);
+  } catch {
+    await fs.unlink(allowPath).catch(() => {});
+    throw new SecretsManagerLifecycleError('invalid_endpoints');
+  }
+  return {
+    path: allowPath,
+    machine_id: input.machine_id,
+    project_count: projectIds.length,
+    cloud_default: payload.server_url === undefined && payload.api_url === undefined,
+  };
 }
 
 /**

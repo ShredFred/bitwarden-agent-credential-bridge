@@ -1572,3 +1572,30 @@ SM write (create/update) behind separate CLI flags
 `--i-approve-secrets-manager-machine-write`. Write APIs must never return
 secret values to agent-readable surfaces; setup may accept a token only
 through a local secure prompt/store path.
+
+## Phase 15 scope
+
+Phase 15 may add a Windows **product installer** for the same-user Secrets
+Manager path:
+
+- ship an Inno Setup installer from GitHub Releases with Start Menu entries
+  and an Apps & Features uninstaller;
+- first-run guided setup may collect the machine access token via a local
+  secure prompt and write the machine allowlist (default MiViA + private-hq);
+- Bitwarden SM **cloud is the default**; optional self-hosted `server_url`
+  and/or `api_url` + `identity_url` may be stored in the local allowlist and
+  passed only to short-lived `bws` child processes — never as agent
+  `process.env`;
+- do **not** bundle Codex or the Bitwarden desktop app; agent/user docs may
+  instruct installing those separately on request;
+- uninstall must remove installed app files and best-effort clear local SM
+  token/allowlist state;
+- keep `helper_vault_free=true`, no LocalService vault client, and never set
+  `authorization_ready=true` from installer or SM unlock;
+- provide [`docs/agent-windows-install.md`](docs/agent-windows-install.md) so
+  agents pointed at this repo can run a guided install without requiring the
+  user to be a terminal expert.
+
+Phase 15 must not create macOS installers in this slice, auto-create Bitwarden
+machine accounts, place secrets on agent-readable surfaces, or treat the
+installer as LocalService authorization evidence.

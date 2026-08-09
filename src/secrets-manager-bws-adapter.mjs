@@ -1,15 +1,14 @@
 import { execFile } from 'node:child_process';
 import process from 'node:process';
 import { promisify } from 'node:util';
+import { resolveBwsServerOptions } from './secrets-manager-allow-config.mjs';
 
 const execFileAsync = promisify(execFile);
 
 /**
- * Phase 14: bounded bws CLI adapter for Secrets Manager.
+ * Phase 14/15: bounded bws CLI adapter for Secrets Manager.
  * Access token is passed only as --access-token argv to the child, never via
- * agent-readable process environment mutation on the Bridge parent beyond the
- * ephemeral child env below (child env omits BWS_ACCESS_TOKEN inheritance tricks
- * by setting a minimal env without that key).
+ * agent-readable process environment. Optional --server-url for self-host.
  */
 
 export class SecretsManagerBwsAdapterError extends Error {
@@ -24,15 +23,34 @@ const SECRET_KEY = /^[a-zA-Z][a-zA-Z0-9_.-]{0,127}$/;
 const UUID =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
+function withServerArgs(args, serverUrl) {
+  if (typeof serverUrl === 'string' && serverUrl.length > 0) {
+    return [...args, '--server-url', serverUrl];
+  }
+  return args;
+}
+
+function serverUrlFromOptions(options) {
+  if (typeof options.serverUrl === 'string' && options.serverUrl.length > 0) {
+    return options.serverUrl;
+  }
+  if (options.allowConfig) {
+    return resolveBwsServerOptions(options.allowConfig).serverUrlArg;
+  }
+  return null;
+}
+
 /**
  * @param {{
  *   accessToken: string,
  *   projectId: string,
  *   secretKey: string,
  *   bwsPath?: string,
+ *   serverUrl?: string,
+ *   allowConfig?: object,
  *   runCommand?: typeof defaultRunCommand,
  * }} options
- * @returns {Promise<string>} secret value
+ * @returns {Promise<string>}
  */
 export async function fetchSecretsManagerSecretValue(options) {
   if (typeof options.accessToken !== 'string' ||
@@ -53,17 +71,14 @@ export async function fetchSecretsManagerSecretValue(options) {
   const bwsPath = typeof options.bwsPath === 'string' && options.bwsPath.length > 0
     ? options.bwsPath
     : 'bws';
+  const serverUrl = serverUrlFromOptions(options);
 
-  const listed = await run(bwsPath, [
-    'secret',
-    'list',
-    '--project-id',
-    options.projectId.toLowerCase(),
-    '--output',
-    'json',
-    '--access-token',
-    options.accessToken,
-  ]);
+  const listed = await run(bwsPath, withServerArgs([
+    'secret', 'list',
+    '--project-id', options.projectId.toLowerCase(),
+    '--output', 'json',
+    '--access-token', options.accessToken,
+  ], serverUrl));
 
   let secrets;
   try {
@@ -89,15 +104,11 @@ export async function fetchSecretsManagerSecretValue(options) {
     );
   }
 
-  const got = await run(bwsPath, [
-    'secret',
-    'get',
-    matches[0].id,
-    '--output',
-    'json',
-    '--access-token',
-    options.accessToken,
-  ]);
+  const got = await run(bwsPath, withServerArgs([
+    'secret', 'get', matches[0].id,
+    '--output', 'json',
+    '--access-token', options.accessToken,
+  ], serverUrl));
 
   let secret;
   try {
@@ -118,9 +129,6 @@ export async function fetchSecretsManagerSecretValue(options) {
 }
 
 /**
- * Create or update one SM secret. Returns only value-free result codes.
- * Never returns the secret value to the caller.
- *
  * @param {{
  *   accessToken: string,
  *   projectId: string,
@@ -128,9 +136,10 @@ export async function fetchSecretsManagerSecretValue(options) {
  *   secretValue: string,
  *   note?: string,
  *   bwsPath?: string,
+ *   serverUrl?: string,
+ *   allowConfig?: object,
  *   runCommand?: typeof defaultRunCommand,
  * }} options
- * @returns {Promise<{ ok: true, action: 'created' | 'updated' }>}
  */
 export async function upsertSecretsManagerSecret(options) {
   if (typeof options.accessToken !== 'string' ||
@@ -161,13 +170,14 @@ export async function upsertSecretsManagerSecret(options) {
     ? options.bwsPath
     : 'bws';
   const projectId = options.projectId.toLowerCase();
+  const serverUrl = serverUrlFromOptions(options);
 
-  const listed = await run(bwsPath, [
+  const listed = await run(bwsPath, withServerArgs([
     'secret', 'list',
     '--project-id', projectId,
     '--output', 'json',
     '--access-token', options.accessToken,
-  ]);
+  ], serverUrl));
   let secrets;
   try {
     secrets = JSON.parse(listed);
@@ -200,27 +210,21 @@ export async function upsertSecretsManagerSecret(options) {
     if (typeof options.note === 'string') {
       editArgs.splice(6, 0, '--note', options.note);
     }
-    await run(bwsPath, editArgs);
+    await run(bwsPath, withServerArgs(editArgs, serverUrl));
     return Object.freeze({ ok: true, action: 'updated' });
   }
 
-  // bws secret create <key> <value> <project-id>
-  await run(bwsPath, [
+  await run(bwsPath, withServerArgs([
     'secret', 'create',
     options.secretKey,
     options.secretValue,
     projectId,
     '--output', 'json',
     '--access-token', options.accessToken,
-  ]);
+  ], serverUrl));
   return Object.freeze({ ok: true, action: 'created' });
 }
 
-/**
- * @param {string} executable
- * @param {string[]} args
- * @returns {Promise<string>}
- */
 async function defaultRunCommand(executable, args) {
   let stdout = '';
   let stderr = '';
@@ -232,7 +236,6 @@ async function defaultRunCommand(executable, args) {
       maxBuffer: 1024 * 1024,
       encoding: 'utf8',
       env: {
-        // Minimal child env: no inherited BWS_ACCESS_TOKEN, no agent secrets.
         PATH: process.env.PATH,
         SystemRoot: process.env.SystemRoot,
         windir: process.env.windir,

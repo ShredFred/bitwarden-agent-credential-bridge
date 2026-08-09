@@ -404,6 +404,10 @@ AGENTS.md                           experiment rules for agents
   flag into the same-user Bridge process (`docs/phase14-secrets-manager-same-user.md`).
   Phase 13 may resolve a **personal** PM credential under a separate flag.
   `authorization_ready` is never set by vault/SM unlock alone.
+- Windows product installer (Phase 15): GitHub Release Setup EXE, Start Menu
+  setup/start, Apps & Features uninstall — see
+  [docs/phase15-windows-installer.md](docs/phase15-windows-installer.md) and
+  [docs/agent-windows-install.md](docs/agent-windows-install.md).
 - See [docs/phase6-browser-form-login.md](docs/phase6-browser-form-login.md),
   [docs/phase7-hq-operational-readiness.md](docs/phase7-hq-operational-readiness.md),
   and [docs/windows-laptop-onboarding.md](docs/windows-laptop-onboarding.md).

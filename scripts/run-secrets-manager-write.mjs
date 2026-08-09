@@ -102,6 +102,7 @@ if (!process.argv.includes(SM_WRITE_APPROVAL_FLAG)) {
           projectId,
           secretKey: key,
           secretValue,
+          allowConfig: bundle.allow,
         });
         emit({
           ok: true,

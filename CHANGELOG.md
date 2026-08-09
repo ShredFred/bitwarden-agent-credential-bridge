@@ -94,6 +94,11 @@ Semantic Versioning while it remains on the experimental 0.x line.
 - Guided SM setup/uninstall and agent-blind write:
   `npm run setup:sm` (credential window for token), `npm run uninstall:sm`,
   and `npm run live:sm-write` (stdin value, value-free result only).
+- Phase 15 Windows product installer (Inno Setup): Start Menu Setup/Start,
+  Apps & Features uninstall with local SM cleanup, optional self-host
+  `server_url` in allowlist, WinForms wizard (`setup:sm:wizard`), agent
+  install doc (`docs/agent-windows-install.md`), and tag release workflow
+  for `BitwardenAgentCredentialBridge-Setup-*.exe`.
 
 ### Fixed
 

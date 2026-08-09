@@ -1,57 +1,31 @@
-# Phase 14: Secrets Manager — einfach
+# Phase 14/15: Secrets Manager — einfach
 
-Du brauchst **keinen** Extra-Windows-User und **keinen** LocalService.
-Ein Machine-Access-Token einmal einfügen reicht.
+Kein Extra-Windows-User. Kein LocalService nötig. Token einmal einfügen.
+
+**Agenten:** [`agent-windows-install.md`](agent-windows-install.md)  
+**Installer:** GitHub Releases → `BitwardenAgentCredentialBridge-Setup-*.exe`
 
 ## Was ist `bws`?
 
-Das Bitwarden-Secrets-Manager-Kommandozeilen-Tool. Die Bridge nutzt es im
-Hintergrund. Du musst es nur einmal installieren und auf `PATH` haben.
+Bitwarden Secrets Manager CLI. Bridge nutzt sie im Hintergrund; muss auf PATH
+liegen (Installer prüft / weist hin).
 
-## Einmal-Setup (geführt)
-
-1. In Bitwarden SM: Machine Account für diesen PC anlegen  
-2. Projekte **MiViA** + **private-hq** dem Machine Account geben  
-3. Access Token erzeugen und bereithalten  
-4. Hier:
+## Setup
 
 ```powershell
 npm run setup:sm -- --i-approve-sm-machine-setup
 ```
 
-- Windows öffnet ein **Kennwort-Fenster** → Token als Passwort einfügen  
-- MiViA + private-hq sind schon vorausgewählt  
-- Token landet nur lokal (DPAPI), nie im Git
+Windows: Kennwort-Fenster → Access Token einfügen.  
+Cloud ist Default. Self-Host nur wenn du Custom-URLs setzt (Allowlist /
+Wizard).
 
-## Starten (lesen / Agent ohne Klartext)
+## Start / Write / Uninstall
 
 ```powershell
 npm run start:operational:sm -- --i-approve-secrets-manager-machine-resolve
-```
-
-## Schreiben (ohne dass der Agent den Wert sieht)
-
-Wert nur über stdin, Ausgabe nur `ok` / `created|updated`:
-
-```powershell
-# Beispiel: Secret anlegen/aktualisieren
-"mein-geheimes-passwort" | npm run live:sm-write -- --i-approve-secrets-manager-machine-write --project mivia --key mivia_demo_bearer
-```
-
-`--project` darf `mivia`, `private-hq` oder eine UUID sein.
-
-## Deinstallieren (lokal, nahtlos)
-
-```powershell
+"value" | npm run live:sm-write -- --i-approve-secrets-manager-machine-write --project mivia --key my_key
 npm run uninstall:sm -- --i-approve-sm-machine-uninstall
 ```
 
-Löscht Allowlist + Token-Store auf diesem PC.  
-Token in Bitwarden SM zusätzlich **revoke**, wenn der PC keinen Zugriff mehr haben soll.
-
-## Hard rules
-
-- Approval-Flags nur an der CLI  
-- Kein `BWS_ACCESS_TOKEN` in Agent-Umgebungen  
-- Helper/LocalService bleibt vault-free  
-- `authorization_ready` wird durch SM nicht auf true gesetzt  
+Produkt-Deinstall: Windows **Apps & Features**.

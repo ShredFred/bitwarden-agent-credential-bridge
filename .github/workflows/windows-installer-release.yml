@@ -1,0 +1,45 @@
+name: Windows installer release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build-installer:
+    name: Build Inno Setup EXE
+    runs-on: windows-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install Inno Setup
+        shell: pwsh
+        run: |
+          choco install innosetup -y --no-progress
+      - name: Patch installer version from tag
+        shell: pwsh
+        run: |
+          $tag = $env:GITHUB_REF_NAME
+          if ($tag -match '^v(.+)$') { $ver = $Matches[1] } else { $ver = '0.0.0-dev' }
+          $iss = 'installer/windows/bridge-sm.iss'
+          (Get-Content $iss) -replace '#define MyAppVersion ".*"', "#define MyAppVersion `"$ver`"" |
+            Set-Content $iss
+          New-Item -ItemType Directory -Force -Path dist/installer | Out-Null
+      - name: Compile installer
+        shell: pwsh
+        run: |
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" installer\windows\bridge-sm.iss
+      - name: Upload release asset
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/installer/BitwardenAgentCredentialBridge-Setup-*.exe
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

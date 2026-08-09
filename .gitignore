@@ -13,3 +13,5 @@ sm-machine.allow.json
 **/sm-machine.allow.json
 sm-machine.token
 **/sm-machine.token
+# Installer build output
+/dist/
