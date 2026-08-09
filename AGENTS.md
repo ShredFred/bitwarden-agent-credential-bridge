@@ -1459,3 +1459,49 @@ Phase 10c must not auto-elevate without an explicit approval flag, pair
 personal/company Bitwarden, implement OAuth/MFA/SSH/`env_inject`, claim
 same-user memory isolation, or treat a forged JSON report as authorization
 evidence.
+
+## Phase 11 scope (macOS authorization ladder)
+
+Phase 11 climbs the macOS path toward platform-scoped `authorization_ready`
+without reusing Windows `5h.44–54` numbers. It builds on Phase 5h.18–5h.43.
+
+### Phase 11a
+
+Phase 11a may add only pure macOS collector-trust and install-gate compilers
+over branded Phase 5h.22 gates, Phase 5h.23 transcripts, and an exact live-report
+schema. Synthetic provenance may satisfy the trust schema in tests;
+`live_test_verified` and `authorization_ready` stay false. No sudo, launchd,
+Mach, Keychain, or vault I/O is permitted.
+
+### Phase 11b
+
+Phase 11b may add only a pure macOS helper layout plan for disposable and
+persistent LaunchDaemon artifacts under PrivilegedHelperTools / LaunchDaemons
+class roots. Application Support and home writer roots are forbidden. The plan
+emits no concrete paths and keeps mutation unauthorized.
+
+### Phase 11c+
+
+Later Phase 11 slices (Mac-host disposable distinct-EUID denial, persistent
+install, 9a–10b analogs) require a macOS host and remain out of Windows-dev
+scope until the handoff in `docs/phase11c-macos-disposable-denial-handoff.md`.
+
+## Phase 12 scope (Linux authorization ladder)
+
+Phase 12 climbs the Linux systemd system-instance path toward platform-scoped
+`authorization_ready`, building on Phase 5h.3 and 5h.17.
+
+### Phase 12a–12f
+
+These slices may add only pure layout, lifecycle gate, transcript state machine,
+collector-trust, install-gate, and vault-free authorize-envelope compilers.
+`DynamicUser=`, systemd user managers, abstract sockets, and home/XDG writer
+roots remain forbidden. Every report keeps `authorization_ready=false` and
+`mutation_authorized=false`. No host I/O, account/unit mutation, or Bitwarden
+access is permitted.
+
+### Phase 12g+
+
+Native helper scaffolds and disposable root lifecycle collectors require a Linux
+host with a real systemd system instance; see
+`docs/phase12n-linux-disposable-denial-handoff.md`.

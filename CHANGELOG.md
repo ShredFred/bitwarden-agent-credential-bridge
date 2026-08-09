@@ -63,6 +63,14 @@ Semantic Versioning while it remains on the experimental 0.x line.
   (`docs/phase10c-windows-day2-operator.md`): unifies bootstrap, operational
   bridge, and evidence refresh with fail-closed drift handling; uninstall stays
   explicit.
+- Phase 11a/11b macOS pure install-gate, collector-trust, and helper layout
+  (`docs/phase11a-macos-install-gate.md`, `docs/phase11b-macos-helper-layout.md`).
+  Live distinct-EUID denial remains a Mac-host handoff
+  (`docs/phase11c-macos-disposable-denial-handoff.md`).
+- Phase 12a–12f Linux pure gate stack
+  (`docs/phase12-linux-pure-gate-stack.md`): layout, lifecycle gate, transcript,
+  collector trust, install gate, and authorize envelope. Native/live denial is a
+  Linux-host handoff (`docs/phase12n-linux-disposable-denial-handoff.md`).
 
 ### Fixed
 
