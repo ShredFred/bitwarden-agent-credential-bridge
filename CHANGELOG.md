@@ -76,6 +76,9 @@ Semantic Versioning while it remains on the experimental 0.x line.
   operational bridge (`docs/cross-platform-production-authorization.md`).
   Synthetic fixtures may exercise `authorization_ready=true` in unit tests;
   live Mac/Linux collectors remain host handoffs.
+- Windows laptop operator onboarding runbook
+  (`docs/windows-laptop-onboarding.md`) for harness + Day-2 setup without
+  personal/company vault pairing.
 
 ### Fixed
 
