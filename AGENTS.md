@@ -1512,3 +1512,28 @@ production authorization, operational wire-up, and injected bootstrap compilers
 may run on any host; synthetic fixtures may exercise `authorization_ready=true`
 in unit tests only. Platform reports must never copy Windows readiness onto
 Linux.
+
+## Phase 13 scope
+
+Phase 13 may add an operator-approved **personal** Bitwarden resolve path for
+Windows agents without placing a vault client in LocalService:
+
+- allow branded personal-vault resolve only behind the CLI flag
+  `--i-approve-personal-bitwarden-agent-resolve` (never a library capability);
+- pin the account identity as a SHA-256 digest from a machine-local,
+  schema-fixed allowlist config (not a free runtime email string);
+- keep `company_vault_forbidden=true` and `organization_vault_forbidden=true`;
+- keep `helper_vault_free=true` — secrets unlock and resolve only in the
+  Bridge/broker process under the interactive Windows user; never on the
+  helper pipe;
+- never log or return secrets; exposure tests must fail if a sentinel appears
+  on an agent-readable surface;
+- keep `authorization_ready` evidence-driven (Windows 9e/10c) and never set it
+  true from vault unlock alone;
+- provide optional laptop-ready operator entry that separates Day-2
+  authorization from personal resolve.
+
+Phase 13 must not pair company/organization/privateHQ vaults, place a vault
+client in LocalService, implement OAuth/MFA/SMS/SSH/`env_inject`, hardcode
+`authorization_ready=true`, or treat a forged JSON report as authorization
+evidence. Org/privateHQ resolve requires a later explicit Phase 14 gate.

@@ -5,3 +5,6 @@ node_modules/
 .env.*
 .agent-broker/
 /reports/review/
+# Phase 13 personal vault allowlist must stay machine-local (digest only).
+personal-vault.allow.json
+**/personal-vault.allow.json

@@ -399,9 +399,14 @@ AGENTS.md                           experiment rules for agents
   MFA/CAPTCHA/login failure are fail-closed and value-free.
 - Sample policy uses port `0` for bind/upstream placeholders; runtime code supplies the concrete upstream origin after the fake API listens.
 - No TLS for the fake harness bind path, no persistence, no multi-writer coordination beyond “one writer at a time” for this repo.
-- Not a personal/company Bitwarden password manager; `authorization_ready` stays false.
+- Not a company/org Bitwarden password manager. Phase 13 may resolve a
+  **personal** vault under an explicit CLI approval flag with secrets confined
+  to the Bridge process; LocalService stays vault-free and
+  `authorization_ready` is never set by vault unlock alone. See
+  [docs/phase13-personal-bitwarden.md](docs/phase13-personal-bitwarden.md).
 - See [docs/phase6-browser-form-login.md](docs/phase6-browser-form-login.md) and
   [docs/phase7-hq-operational-readiness.md](docs/phase7-hq-operational-readiness.md).
+  Laptop operator steps: [docs/windows-laptop-onboarding.md](docs/windows-laptop-onboarding.md).
 - The disposable executor does not isolate against a malicious concurrent process
   running as the same OS user; production use requires a separate identity or
   equivalent sandbox. Phase 5h.1 defines its fail-closed wire contract, but the

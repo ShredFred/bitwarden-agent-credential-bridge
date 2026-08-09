@@ -77,8 +77,14 @@ Semantic Versioning while it remains on the experimental 0.x line.
   Synthetic fixtures may exercise `authorization_ready=true` in unit tests;
   live Mac/Linux collectors remain host handoffs.
 - Windows laptop operator onboarding runbook
-  (`docs/windows-laptop-onboarding.md`) for harness + Day-2 setup without
-  personal/company vault pairing.
+  (`docs/windows-laptop-onboarding.md`) for harness + Day-2 setup, with optional
+  Phase 13 personal Bitwarden resolve (company/org still forbidden).
+- Phase 13 personal Bitwarden → agent path
+  (`docs/phase13-personal-bitwarden.md`): branded live gate, digest allowlist,
+  DPAPI collector, resolver, `live:personal-bitwarden`, and
+  `live:windows-laptop-ready`. Secrets stay in the Bridge process;
+  LocalService remains vault-free; `authorization_ready` is never set by vault
+  unlock.
 
 ### Fixed
 
