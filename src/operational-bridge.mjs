@@ -2,6 +2,8 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { startBroker } from './broker.js';
 import { startBrowserSessionBroker } from './browser-session-broker.mjs';
+import { startSshSessionBroker } from './ssh-session-broker.mjs';
+import { startFtpSessionBroker } from './ftp-session-broker.mjs';
 import {
   HTTP_INJECTION_CREDENTIAL_CLASSES,
   isRejectedCredentialClass,
@@ -10,11 +12,14 @@ import {
 import { resolveFakeVaultSecrets, selectFakeVaultSecret } from './fake-vault-resolver.mjs';
 import { startFakeApi } from './fake-api.js';
 import { startFakeLoginSite } from './fake-login-site.mjs';
+import { startFakeSshServer } from './fake-ssh-server.mjs';
+import { startFakeFtpServer } from './fake-ftp-server.mjs';
 import {
   loadPolicy,
   validatePolicy,
   withBind,
   withLoginOrigin,
+  withSessionTarget,
   withUpstream,
 } from './policy.js';
 import {
@@ -42,6 +47,8 @@ const SECRET_KEY = /^[a-zA-Z][a-zA-Z0-9_.-]{0,127}$/;
 const OPERATIONAL_CLASSES = new Set([
   ...HTTP_INJECTION_CREDENTIAL_CLASSES,
   'browser_form_login',
+  'ssh',
+  'ftp',
 ]);
 
 /**
@@ -190,7 +197,9 @@ function validateSmOperationalBindings(obj) {
       throw new OperationalBridgeError('invalid_sm_secret_key');
     }
     const needsPassword = e.credential_class === 'http_basic' ||
-      e.credential_class === 'browser_form_login';
+      e.credential_class === 'browser_form_login' ||
+      e.credential_class === 'ssh' ||
+      e.credential_class === 'ftp';
     /** @type {OperationalBinding} */
     const binding = {
       alias: e.alias,
@@ -346,6 +355,63 @@ export async function startOperationalBridge(options) {
           fetchImpl,
         });
         resources.push({ kind: 'browser_broker', close: () => broker.close() });
+        services.push({
+          alias: binding.alias,
+          credential_class: binding.credential_class,
+          baseUrl: broker.baseUrl,
+          replayUrl: broker.replayUrl,
+        });
+        continue;
+      }
+
+      if (binding.credential_class === 'ssh') {
+        const fake = await startFakeSshServer({
+          credentials: {
+            username: selected.username,
+            password: selected.password,
+          },
+          allowedCommands: [...policy.allowed_commands],
+        });
+        resources.push({ kind: 'ssh_server', close: () => fake.close() });
+        const broker = await startSshSessionBroker({
+          policy: withSessionTarget(
+            withBind(policy, 'http://127.0.0.1:0'),
+            { host: fake.host, port: fake.port },
+          ),
+          credentials: {
+            username: selected.username,
+            password: selected.password,
+          },
+        });
+        resources.push({ kind: 'ssh_broker', close: () => broker.close() });
+        services.push({
+          alias: binding.alias,
+          credential_class: binding.credential_class,
+          baseUrl: broker.baseUrl,
+          replayUrl: broker.replayUrl,
+        });
+        continue;
+      }
+
+      if (binding.credential_class === 'ftp') {
+        const fake = await startFakeFtpServer({
+          credentials: {
+            username: selected.username,
+            password: selected.password,
+          },
+        });
+        resources.push({ kind: 'ftp_server', close: () => fake.close() });
+        const broker = await startFtpSessionBroker({
+          policy: withSessionTarget(
+            withBind(policy, 'http://127.0.0.1:0'),
+            { host: fake.host, port: fake.port },
+          ),
+          credentials: {
+            username: selected.username,
+            password: selected.password,
+          },
+        });
+        resources.push({ kind: 'ftp_broker', close: () => broker.close() });
         services.push({
           alias: binding.alias,
           credential_class: binding.credential_class,

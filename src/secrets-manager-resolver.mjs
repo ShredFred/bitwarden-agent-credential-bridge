@@ -127,8 +127,7 @@ export async function resolveSecretsManagerSecret(gate, adapter, request) {
     throw new SecretsManagerResolverError('invalid_request');
   }
 
-  const needsPasswordKey = req.credential_class === 'http_basic' ||
-    req.credential_class === 'browser_form_login';
+  const needsPasswordKey = BASIC_SHAPED_CREDENTIAL_CLASSES.includes(req.credential_class);
   if (needsPasswordKey) {
     if (typeof req.secret_key_password !== 'string' ||
         !SECRET_KEY.test(req.secret_key_password)) {
@@ -154,7 +153,7 @@ function sanitizeResolvedSecret(resolved, credentialClass) {
       utilTypes.isProxy(resolved) || Object.getPrototypeOf(resolved) !== Object.prototype) {
     throw new SecretsManagerResolverError('invalid_secret');
   }
-  if (credentialClass === 'http_basic' || credentialClass === 'browser_form_login') {
+  if (BASIC_SHAPED_CREDENTIAL_CLASSES.includes(credentialClass)) {
     const keys = Reflect.ownKeys(resolved);
     if (keys.length !== 2 || !keys.includes('username') || !keys.includes('password')) {
       throw new SecretsManagerResolverError('invalid_secret');

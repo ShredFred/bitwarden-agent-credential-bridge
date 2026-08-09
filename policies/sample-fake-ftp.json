@@ -1,0 +1,14 @@
+{
+  "version": 8,
+  "service": "fake-ftp",
+  "credential_class": "ftp",
+  "bind": "http://127.0.0.1:0",
+  "target_host": "127.0.0.1",
+  "target_port": 0,
+  "allowed_ops": ["list", "retr"],
+  "allowed_paths": ["/readme.txt", "/data/ok.txt"],
+  "username_value": "{{username}}",
+  "password_value": "{{password}}",
+  "session_ttl_ms": 60000,
+  "idle_ttl_ms": 30000
+}

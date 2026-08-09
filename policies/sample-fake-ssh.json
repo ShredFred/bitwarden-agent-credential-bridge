@@ -1,0 +1,13 @@
+{
+  "version": 7,
+  "service": "fake-ssh",
+  "credential_class": "ssh",
+  "bind": "http://127.0.0.1:0",
+  "target_host": "127.0.0.1",
+  "target_port": 0,
+  "allowed_commands": ["uname", "whoami"],
+  "username_value": "{{username}}",
+  "password_value": "{{password}}",
+  "session_ttl_ms": 60000,
+  "idle_ttl_ms": 30000
+}

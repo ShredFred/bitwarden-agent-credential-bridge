@@ -73,9 +73,10 @@ export async function fetchSecretsManagerSecretValue(options) {
     : 'bws';
   const serverUrl = serverUrlFromOptions(options);
 
+  // bws 2.x: PROJECT_ID is a positional argument (not --project-id).
   const listed = await run(bwsPath, withServerArgs([
     'secret', 'list',
-    '--project-id', options.projectId.toLowerCase(),
+    options.projectId.toLowerCase(),
     '--output', 'json',
     '--access-token', options.accessToken,
   ], serverUrl));
@@ -174,7 +175,7 @@ export async function upsertSecretsManagerSecret(options) {
 
   const listed = await run(bwsPath, withServerArgs([
     'secret', 'list',
-    '--project-id', projectId,
+    projectId,
     '--output', 'json',
     '--access-token', options.accessToken,
   ], serverUrl));
@@ -236,11 +237,13 @@ async function defaultRunCommand(executable, args) {
       maxBuffer: 1024 * 1024,
       encoding: 'utf8',
       env: {
-        PATH: process.env.PATH,
+        Path: process.env.Path || process.env.PATH,
+        PATH: process.env.PATH || process.env.Path,
         SystemRoot: process.env.SystemRoot,
         windir: process.env.windir,
         HOME: process.env.HOME,
         USERPROFILE: process.env.USERPROFILE,
+        LOCALAPPDATA: process.env.LOCALAPPDATA,
         TMP: process.env.TMP,
         TEMP: process.env.TEMP,
         TMPDIR: process.env.TMPDIR,

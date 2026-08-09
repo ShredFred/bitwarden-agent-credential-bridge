@@ -268,6 +268,18 @@ export async function startBroker(options) {
       { code: 'wrong_broker' },
     );
   }
+  if (suppliedClass === 'ssh') {
+    throw new BrokerError(
+      'ssh requires the dedicated ssh session broker',
+      { code: 'wrong_broker' },
+    );
+  }
+  if (suppliedClass === 'ftp') {
+    throw new BrokerError(
+      'ftp requires the dedicated ftp session broker',
+      { code: 'wrong_broker' },
+    );
+  }
   if (!HTTP_INJECTION_CREDENTIAL_CLASSES.includes(suppliedClass)) {
     throw new BrokerError(
       'credential_class requires a dedicated broker',

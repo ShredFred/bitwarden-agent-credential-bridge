@@ -82,6 +82,38 @@ const VERSION_5_POLICY_FIELDS = new Set([
   'session_ttl_ms',
   'idle_ttl_ms',
 ]);
+const VERSION_7_POLICY_FIELDS = new Set([
+  'version',
+  'service',
+  'credential_class',
+  'bind',
+  'target_host',
+  'target_port',
+  'allowed_commands',
+  'username_value',
+  'password_value',
+  'session_ttl_ms',
+  'idle_ttl_ms',
+]);
+const VERSION_8_POLICY_FIELDS = new Set([
+  'version',
+  'service',
+  'credential_class',
+  'bind',
+  'target_host',
+  'target_port',
+  'allowed_ops',
+  'allowed_paths',
+  'username_value',
+  'password_value',
+  'session_ttl_ms',
+  'idle_ttl_ms',
+]);
+const SSH_COMMAND_NAME = /^[a-z][a-z0-9_-]{0,31}$/;
+const MAX_SSH_COMMANDS = 8;
+const MAX_FTP_PATHS = 16;
+const FTP_OPS = new Set(['list', 'retr']);
+const LOOPBACK_TARGET_HOSTS = new Set(['127.0.0.1', 'localhost']);
 const FIELD_NAME = /^[A-Za-z][A-Za-z0-9_-]{0,63}$/;
 const MAX_HIDDEN_FIELDS = 16;
 const MAX_ALLOWED_PATHS = 32;
@@ -180,8 +212,9 @@ export function validatePolicy(raw) {
   const obj = /** @type {Record<string, unknown>} */ (raw);
 
   if (obj.version !== 1 && obj.version !== 2 && obj.version !== 3 &&
-      obj.version !== 4 && obj.version !== 5 && obj.version !== 6) {
-    throw new PolicyValidationError('policy.version must be 1, 2, 3, 4, 5, or 6');
+      obj.version !== 4 && obj.version !== 5 && obj.version !== 6 &&
+      obj.version !== 7 && obj.version !== 8) {
+    throw new PolicyValidationError('policy.version must be 1, 2, 3, 4, 5, 6, 7, or 8');
   }
 
   const allowedFields =
@@ -195,7 +228,11 @@ export function validatePolicy(raw) {
             ? VERSION_4_POLICY_FIELDS
             : obj.version === 5
               ? VERSION_5_POLICY_FIELDS
-              : VERSION_6_POLICY_FIELDS;
+              : obj.version === 6
+                ? VERSION_6_POLICY_FIELDS
+                : obj.version === 7
+                  ? VERSION_7_POLICY_FIELDS
+                  : VERSION_8_POLICY_FIELDS;
   validateExactFields(
     obj,
     allowedFields,
@@ -229,7 +266,7 @@ export function validatePolicy(raw) {
 
   const expectedClass =
     CREDENTIAL_CLASS_BY_VERSION[
-      /** @type {1|2|3|4|5|6} */ (obj.version)
+      /** @type {1|2|3|4|5|6|7|8} */ (obj.version)
     ];
   if (obj.credential_class !== expectedClass) {
     throw new PolicyValidationError(
@@ -238,12 +275,19 @@ export function validatePolicy(raw) {
   }
 
   const bind = parseLoopbackHttpUrl(obj.bind, 'policy.bind');
-  const upstream = obj.version === 4 || obj.version === 5
+  const upstream = obj.version === 4 || obj.version === 5 ||
+    obj.version === 7 || obj.version === 8
     ? null
     : parseLoopbackHttpUrl(obj.upstream, 'policy.upstream');
 
   if (obj.version === 5) {
     return validateBrowserFormLoginPolicy(obj, bind);
+  }
+  if (obj.version === 7) {
+    return validateSshSessionPolicy(obj, bind);
+  }
+  if (obj.version === 8) {
+    return validateFtpSessionPolicy(obj, bind);
   }
 
   if (typeof obj.method !== 'string' || !HTTP_METHODS.has(obj.method)) {
@@ -474,6 +518,124 @@ function validateBrowserFormLoginPolicy(obj, bind) {
   return buildBrowserFormLoginPolicy(obj, bind, loginOrigin);
 }
 
+/**
+ * @param {Record<string, unknown>} obj
+ * @param {URL} bind
+ */
+function validateSshSessionPolicy(obj, bind) {
+  const target = parseLoopbackTarget(obj.target_host, obj.target_port);
+  if (!Array.isArray(obj.allowed_commands) || obj.allowed_commands.length < 1 ||
+      obj.allowed_commands.length > MAX_SSH_COMMANDS) {
+    throw new PolicyValidationError('policy.allowed_commands must be a non-empty bounded array');
+  }
+  const allowedCommands = [];
+  for (const command of obj.allowed_commands) {
+    if (typeof command !== 'string' || !SSH_COMMAND_NAME.test(command)) {
+      throw new PolicyValidationError('policy.allowed_commands entries must be exact lowercase command names');
+    }
+    if (allowedCommands.includes(command)) {
+      throw new PolicyValidationError('policy.allowed_commands must not contain duplicates');
+    }
+    allowedCommands.push(command);
+  }
+  validateSessionTtls(obj);
+  validateExactPlaceholder(obj.username_value, USERNAME_PLACEHOLDER, 'policy.username_value');
+  validateExactPlaceholder(obj.password_value, PASSWORD_PLACEHOLDER, 'policy.password_value');
+  return {
+    version: 7,
+    service: /** @type {string} */ (obj.service),
+    credential_class: 'ssh',
+    bind: bind.href.replace(/\/$/, ''),
+    target_host: target.host,
+    target_port: target.port,
+    allowed_commands: Object.freeze([...allowedCommands]),
+    username_value: USERNAME_PLACEHOLDER,
+    password_value: PASSWORD_PLACEHOLDER,
+    session_ttl_ms: /** @type {number} */ (obj.session_ttl_ms),
+    idle_ttl_ms: /** @type {number} */ (obj.idle_ttl_ms),
+  };
+}
+
+/**
+ * @param {Record<string, unknown>} obj
+ * @param {URL} bind
+ */
+function validateFtpSessionPolicy(obj, bind) {
+  const target = parseLoopbackTarget(obj.target_host, obj.target_port);
+  if (!Array.isArray(obj.allowed_ops) || obj.allowed_ops.length < 1 ||
+      obj.allowed_ops.length > FTP_OPS.size) {
+    throw new PolicyValidationError('policy.allowed_ops must be a non-empty subset of list,retr');
+  }
+  const allowedOps = [];
+  for (const op of obj.allowed_ops) {
+    if (typeof op !== 'string' || !FTP_OPS.has(op)) {
+      throw new PolicyValidationError('policy.allowed_ops entries must be list or retr');
+    }
+    if (allowedOps.includes(op)) {
+      throw new PolicyValidationError('policy.allowed_ops must not contain duplicates');
+    }
+    allowedOps.push(op);
+  }
+  if (!Array.isArray(obj.allowed_paths) || obj.allowed_paths.length < 1 ||
+      obj.allowed_paths.length > MAX_FTP_PATHS) {
+    throw new PolicyValidationError('policy.allowed_paths must be a non-empty bounded path array');
+  }
+  const allowedPaths = [];
+  for (const pathValue of obj.allowed_paths) {
+    const path = requireOriginPath(pathValue, 'policy.allowed_paths');
+    if (allowedPaths.includes(path)) {
+      throw new PolicyValidationError('policy.allowed_paths must not contain duplicates');
+    }
+    allowedPaths.push(path);
+  }
+  validateSessionTtls(obj);
+  validateExactPlaceholder(obj.username_value, USERNAME_PLACEHOLDER, 'policy.username_value');
+  validateExactPlaceholder(obj.password_value, PASSWORD_PLACEHOLDER, 'policy.password_value');
+  return {
+    version: 8,
+    service: /** @type {string} */ (obj.service),
+    credential_class: 'ftp',
+    bind: bind.href.replace(/\/$/, ''),
+    target_host: target.host,
+    target_port: target.port,
+    allowed_ops: Object.freeze([...allowedOps]),
+    allowed_paths: Object.freeze([...allowedPaths]),
+    username_value: USERNAME_PLACEHOLDER,
+    password_value: PASSWORD_PLACEHOLDER,
+    session_ttl_ms: /** @type {number} */ (obj.session_ttl_ms),
+    idle_ttl_ms: /** @type {number} */ (obj.idle_ttl_ms),
+  };
+}
+
+/**
+ * @param {Record<string, unknown>} obj
+ */
+function validateSessionTtls(obj) {
+  if (typeof obj.session_ttl_ms !== 'number' || !Number.isInteger(obj.session_ttl_ms) ||
+      obj.session_ttl_ms < 1000 || obj.session_ttl_ms > 300000) {
+    throw new PolicyValidationError('policy.session_ttl_ms must be an integer 1000–300000');
+  }
+  if (typeof obj.idle_ttl_ms !== 'number' || !Number.isInteger(obj.idle_ttl_ms) ||
+      obj.idle_ttl_ms < 1000 || obj.idle_ttl_ms > obj.session_ttl_ms) {
+    throw new PolicyValidationError('policy.idle_ttl_ms must be an integer 1000–session_ttl_ms');
+  }
+}
+
+/**
+ * @param {unknown} host
+ * @param {unknown} port
+ * @returns {{ host: string, port: number }}
+ */
+function parseLoopbackTarget(host, port) {
+  if (typeof host !== 'string' || !LOOPBACK_TARGET_HOSTS.has(host)) {
+    throw new PolicyValidationError('policy.target_host must be 127.0.0.1 or localhost');
+  }
+  if (typeof port !== 'number' || !Number.isInteger(port) || port < 0 || port > 65535) {
+    throw new PolicyValidationError('policy.target_port must be an integer 0–65535');
+  }
+  return { host, port };
+}
+
 function requireOriginPath(value, fieldName) {
   if (
     typeof value !== 'string' ||
@@ -564,6 +726,33 @@ export function withLoginOrigin(policy, loginOriginUrl) {
     hidden_fields: [...policy.hidden_fields],
     allowed_paths: [...policy.allowed_paths],
   });
+}
+
+/**
+ * Bind a concrete loopback SSH/FTP target port after the fake server starts.
+ * @param {object} policy
+ * @param {{ host?: string, port: number }} target
+ */
+export function withSessionTarget(policy, target) {
+  if (policy?.version !== 7 && policy?.version !== 8) {
+    throw new PolicyValidationError('withSessionTarget requires a version-7 or version-8 policy');
+  }
+  const host = typeof target?.host === 'string' ? target.host : policy.target_host;
+  const port = target?.port;
+  const payload = {
+    ...policy,
+    target_host: host,
+    target_port: port,
+    username_value: USERNAME_PLACEHOLDER,
+    password_value: PASSWORD_PLACEHOLDER,
+  };
+  if (policy.version === 7) {
+    payload.allowed_commands = [...policy.allowed_commands];
+  } else {
+    payload.allowed_ops = [...policy.allowed_ops];
+    payload.allowed_paths = [...policy.allowed_paths];
+  }
+  return validatePolicy(payload);
 }
 
 /**

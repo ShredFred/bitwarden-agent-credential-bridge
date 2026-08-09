@@ -89,7 +89,9 @@ if (!process.argv.includes(APPROVAL_FLAG)) {
       bindings,
       resolveSecret: async (binding) => {
         const needsPair = binding.credential_class === 'http_basic' ||
-          binding.credential_class === 'browser_form_login';
+          binding.credential_class === 'browser_form_login' ||
+          binding.credential_class === 'ssh' ||
+          binding.credential_class === 'ftp';
         if (needsPair) {
           const resolved = await resolveSecretsManagerSecret(
             resolverGate,

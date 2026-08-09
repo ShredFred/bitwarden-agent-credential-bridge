@@ -26,6 +26,16 @@
       "alias": "demo_browser",
       "policy": "policies/sample-fake-browser-login.json",
       "credential_class": "browser_form_login"
+    },
+    {
+      "alias": "demo_ssh",
+      "policy": "policies/sample-fake-ssh.json",
+      "credential_class": "ssh"
+    },
+    {
+      "alias": "demo_ftp",
+      "policy": "policies/sample-fake-ftp.json",
+      "credential_class": "ftp"
     }
   ]
 }

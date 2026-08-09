@@ -7,6 +7,10 @@ Semantic Versioning while it remains on the experimental 0.x line.
 
 ### Added
 
+- Phase 16 fake-loopback SSH/FTP session brokers (policy versions 7/8), private-hq
+  multi-class SM matrix coverage, and operator docs
+  (`docs/phase16-ssh-ftp-session-brokers.md`). `env_inject` remains rejected;
+  `authorization_ready` stays false.
 - Public-facing project documentation, contributor guidance, security policy,
   support routing, issue forms, pull-request template, and CI workflow.
 - A documented public/private/local repository boundary and release process.

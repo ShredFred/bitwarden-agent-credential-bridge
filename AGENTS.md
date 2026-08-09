@@ -1240,8 +1240,9 @@ Phase 7 may add HQ operational readiness for disposable/dev secrets only:
   Base64url forms; scan redirect `Location` headers before fail-closed denial;
 - printable-ASCII runtime sentinels only (8–4096 bytes) for query class;
 - permanently reject named classes `oauth`, `mfa_interactive`, `sms`, `email`,
-  `ssh`, `ftp`, and `env_inject` with stable codes at policy/resolver/broker
-  boundaries (unknown classes stay default-denied); DPAPI unlock is not MFA;
+  and `env_inject` with stable codes at policy/resolver/broker boundaries
+  (unknown classes stay default-denied; Phase 16 adds dedicated `ssh`/`ftp`
+  session brokers — still never via `env_inject`); DPAPI unlock is not MFA;
 - one concurrent multi-class loopback matrix across bearer, API-key header,
   Basic, API-key query, and browser form-login with unique secrets and
   cross-contamination checks;
@@ -1599,3 +1600,28 @@ Manager path:
 Phase 15 must not create macOS installers in this slice, auto-create Bitwarden
 machine accounts, place secrets on agent-readable surfaces, or treat the
 installer as LocalService authorization evidence.
+
+## Phase 16 scope
+
+Phase 16 may add fake-loopback **SSH** and **FTP** session brokers (policy
+versions 7 and 8) for disposable/dev Secrets Manager secrets only:
+
+- move `ssh` and `ftp` from the permanent reject list into supported classes
+  with dedicated session brokers (never `startBroker` HTTP header injection,
+  never `env_inject` / process-environment secrets);
+- exact `{{username}}` / `{{password}}` placeholders only; credentials stay in
+  broker memory after SM/DPAPI resolve;
+- loopback-only fake SSH/FTP protocol servers; agent surfaces expose opaque
+  session ids plus allow-listed ops (`exec` with exact command allow-list;
+  FTP `list`/`retr` on exact virtual paths);
+- one session writer at a time; destroy session state on close; bound I/O;
+  recursive sensitive-variant redaction on logs/errors/responses;
+- wire SM operational bindings and private-hq matrix coverage for bearer,
+  API-key header/query, Basic, browser form-login, SSH, and FTP;
+- keep `oauth`, `mfa_interactive`, `sms`, `email`, and `env_inject` rejected;
+- keep `authorization_ready=false`, helper vault-free, and no personal/company
+  vault pairing.
+
+Phase 16 must not open non-loopback SSH/FTP without a later explicit live gate,
+implement OpenSSH/FTP wire compatibility, place credentials in agent env, or
+treat session success as production writer isolation.

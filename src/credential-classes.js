@@ -11,19 +11,20 @@ export const SUPPORTED_CREDENTIAL_CLASSES = Object.freeze([
   'onecli_proxy',
   'browser_form_login',
   'http_api_key_query',
+  'ssh',
+  'ftp',
 ]);
 
 /**
  * Named HQ auth shapes that are permanently rejected (stable codes).
  * Unknown names remain default-denied via the supported allow-list.
+ * Phase 16 moved ssh/ftp into dedicated session brokers (not env_inject).
  */
 export const REJECTED_CREDENTIAL_CLASSES = Object.freeze([
   'oauth',
   'mfa_interactive',
   'sms',
   'email',
-  'ssh',
-  'ftp',
   'env_inject',
 ]);
 
@@ -35,6 +36,8 @@ export const CREDENTIAL_CLASS_BY_VERSION = Object.freeze({
   4: 'onecli_proxy',
   5: 'browser_form_login',
   6: 'http_api_key_query',
+  7: 'ssh',
+  8: 'ftp',
 });
 
 /** Classes accepted by startBroker (HTTP header/query/basic injection). */
@@ -56,6 +59,15 @@ export const SENTINEL_CREDENTIAL_CLASSES = Object.freeze([
 export const BASIC_SHAPED_CREDENTIAL_CLASSES = Object.freeze([
   'http_basic',
   'browser_form_login',
+  'ssh',
+  'ftp',
+]);
+
+/** Classes that use dedicated session brokers (not startBroker HTTP injection). */
+export const SESSION_BROKER_CREDENTIAL_CLASSES = Object.freeze([
+  'browser_form_login',
+  'ssh',
+  'ftp',
 ]);
 
 /**
