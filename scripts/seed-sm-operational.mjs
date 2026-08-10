@@ -142,11 +142,15 @@ if (!process.argv.includes(SM_WRITE_APPROVAL_FLAG)) {
 
     for (const [projectId, keys] of byProject.entries()) {
       for (const key of keys) {
+        const secretValue = values[key];
+        // Manifest-only inventory keys stay in byProject for prune keep-sets;
+        // they are never seeded with harness fakes.
+        if (typeof secretValue !== 'string') continue;
         await upsertSecretsManagerSecret({
           accessToken: bundle.accessToken,
           projectId,
           secretKey: key,
-          secretValue: values[key],
+          secretValue,
           allowConfig: bundle.allow,
           note: 'bridge-operational-seed',
         });
