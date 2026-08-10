@@ -408,6 +408,9 @@ AGENTS.md                           experiment rules for agents
   setup/start, Apps & Features uninstall — see
   [docs/phase15-windows-installer.md](docs/phase15-windows-installer.md) and
   [docs/agent-windows-install.md](docs/agent-windows-install.md).
+- SM onboarding/import (MiViA + private-hq key naming, seed/prune, real site
+  attach): [docs/sm-onboarding-and-import.md](docs/sm-onboarding-and-import.md)
+  and [docs/sm-operational-key-naming.md](docs/sm-operational-key-naming.md).
 - See [docs/phase6-browser-form-login.md](docs/phase6-browser-form-login.md),
   [docs/phase7-hq-operational-readiness.md](docs/phase7-hq-operational-readiness.md),
   and [docs/windows-laptop-onboarding.md](docs/windows-laptop-onboarding.md).

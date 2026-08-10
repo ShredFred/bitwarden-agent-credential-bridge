@@ -15,10 +15,12 @@ import {
 import {
   startSshSessionBroker,
   SshSessionBrokerError,
+  MAX_SSH_SESSION_BROKERS,
 } from '../src/ssh-session-broker.mjs';
 import {
   startFtpSessionBroker,
   FtpSessionBrokerError,
+  MAX_FTP_SESSION_BROKERS,
 } from '../src/ftp-session-broker.mjs';
 import { BrokerError, startBroker } from '../src/broker.js';
 
@@ -120,7 +122,7 @@ describe('phase16 ssh session broker', () => {
     }
   });
 
-  it('rejects concurrent writers and bad passwords', async () => {
+  it('rejects when the session cap is exceeded', async () => {
     const username = 'user_sshlock';
     const password = generateFakeSentinel();
     const fake = await startFakeSshServer({ credentials: { username, password } });
@@ -128,11 +130,14 @@ describe('phase16 ssh session broker', () => {
       withBind(await loadPolicy(path.join(root, 'sample-fake-ssh.json')), 'http://127.0.0.1:0'),
       { host: fake.host, port: fake.port },
     );
-    const first = await startSshSessionBroker({
-      policy,
-      credentials: { username, password },
-    });
+    const brokers = [];
     try {
+      for (let i = 0; i < MAX_SSH_SESSION_BROKERS; i += 1) {
+        brokers.push(await startSshSessionBroker({
+          policy,
+          credentials: { username, password },
+        }));
+      }
       await assert.rejects(
         () => startSshSessionBroker({
           policy,
@@ -142,7 +147,7 @@ describe('phase16 ssh session broker', () => {
           error.code === 'concurrent_session_forbidden',
       );
     } finally {
-      await first.close();
+      for (const broker of brokers) await broker.close();
       await fake.close();
     }
 
@@ -212,7 +217,7 @@ describe('phase16 ftp session broker', () => {
     }
   });
 
-  it('rejects concurrent writers', async () => {
+  it('rejects when the session cap is exceeded', async () => {
     const username = 'user_ftplock';
     const password = generateFakeSentinel();
     const fake = await startFakeFtpServer({ credentials: { username, password } });
@@ -220,11 +225,14 @@ describe('phase16 ftp session broker', () => {
       withBind(await loadPolicy(path.join(root, 'sample-fake-ftp.json')), 'http://127.0.0.1:0'),
       { host: fake.host, port: fake.port },
     );
-    const first = await startFtpSessionBroker({
-      policy,
-      credentials: { username, password },
-    });
+    const brokers = [];
     try {
+      for (let i = 0; i < MAX_FTP_SESSION_BROKERS; i += 1) {
+        brokers.push(await startFtpSessionBroker({
+          policy,
+          credentials: { username, password },
+        }));
+      }
       await assert.rejects(
         () => startFtpSessionBroker({
           policy,
@@ -234,7 +242,7 @@ describe('phase16 ftp session broker', () => {
           error.code === 'concurrent_session_forbidden',
       );
     } finally {
-      await first.close();
+      for (const broker of brokers) await broker.close();
       await fake.close();
     }
   });

@@ -1,0 +1,482 @@
+{
+  "version": 1,
+  "entries": [
+    {
+      "id": "mivia_brightdata_api_key",
+      "project": "mivia",
+      "sm_secret_key": "mivia_brightdata_api_key",
+      "source": {
+        "kind": "clixml",
+        "basename": "mivia-brightdata-api-key.credential.xml",
+        "extract": "api_key_password",
+        "expected_purpose": "brightdata-leadgen-research-api"
+      }
+    },
+    {
+      "id": "mivia_clay_api_key",
+      "project": "mivia",
+      "sm_secret_key": "mivia_clay_api_key",
+      "source": {
+        "kind": "clixml",
+        "basename": "mivia-clay-api-key.credential.xml",
+        "extract": "api_key_password",
+        "expected_purpose": "clay-leadgen-enrichment-orchestration-api"
+      }
+    },
+    {
+      "id": "mivia_clickup_api_key",
+      "project": "mivia",
+      "sm_secret_key": "mivia_clickup_api_key",
+      "source": {
+        "kind": "clixml",
+        "basename": "mivia-clickup-api.credential.xml",
+        "extract": "top_password"
+      }
+    },
+    {
+      "id": "mivia_close_api_key",
+      "project": "mivia",
+      "sm_secret_key": "mivia_close_api_key",
+      "source": {
+        "kind": "clixml",
+        "basename": "mivia-close-api.credential.xml",
+        "extract": "top_password"
+      }
+    },
+    {
+      "id": "mivia_demio_account_user",
+      "project": "mivia",
+      "sm_secret_key": "mivia_demio_account_user",
+      "source": {
+        "kind": "clixml",
+        "basename": "mivia-demio-account.credential.xml",
+        "extract": "account_username",
+        "expected_purpose": "demio-webinar-account-login"
+      }
+    },
+    {
+      "id": "mivia_demio_account_pass",
+      "project": "mivia",
+      "sm_secret_key": "mivia_demio_account_pass",
+      "source": {
+        "kind": "clixml",
+        "basename": "mivia-demio-account.credential.xml",
+        "extract": "account_password",
+        "expected_purpose": "demio-webinar-account-login"
+      }
+    },
+    {
+      "id": "mivia_demio_api_key",
+      "project": "mivia",
+      "sm_secret_key": "mivia_demio_api_key",
+      "source": {
+        "kind": "clixml",
+        "basename": "mivia-demio-api.credential.xml",
+        "extract": "api_key_password",
+        "expected_purpose": "demio-api"
+      }
+    },
+    {
+      "id": "mivia_demio_api_secret",
+      "project": "mivia",
+      "sm_secret_key": "mivia_demio_api_secret",
+      "source": {
+        "kind": "clixml",
+        "basename": "mivia-demio-api.credential.xml",
+        "extract": "api_secret_password",
+        "expected_purpose": "demio-api"
+      }
+    },
+    {
+      "id": "mivia_descript_api_key",
+      "project": "mivia",
+      "sm_secret_key": "mivia_descript_api_key",
+      "source": {
+        "kind": "clixml",
+        "basename": "mivia-descript-api.credential.xml",
+        "extract": "top_password"
+      }
+    },
+    {
+      "id": "mivia_exa_api_key",
+      "project": "mivia",
+      "sm_secret_key": "mivia_exa_api_key",
+      "source": {
+        "kind": "clixml",
+        "basename": "mivia-exa-api.credential.xml",
+        "extract": "top_password"
+      }
+    },
+    {
+      "id": "mivia_firecrawl_api_key",
+      "project": "mivia",
+      "sm_secret_key": "mivia_firecrawl_api_key",
+      "source": {
+        "kind": "clixml",
+        "basename": "mivia-firecrawl-api-key.credential.xml",
+        "extract": "api_key_password",
+        "expected_purpose": "firecrawl-leadgen-research-api"
+      }
+    },
+    {
+      "id": "mivia_fullenrich_api_key",
+      "project": "mivia",
+      "sm_secret_key": "mivia_fullenrich_api_key",
+      "source": {
+        "kind": "clixml",
+        "basename": "mivia-fullenrich-api.credential.xml",
+        "extract": "top_password"
+      }
+    },
+    {
+      "id": "mivia_handelsregister_ai_api_key",
+      "project": "mivia",
+      "sm_secret_key": "mivia_handelsregister_ai_api_key",
+      "source": {
+        "kind": "clixml",
+        "basename": "mivia-handelsregister-ai-api-key.credential.xml",
+        "extract": "api_key_password",
+        "expected_purpose": "handelsregister-ai-leadgen-existence-status-and-insolvency-api"
+      }
+    },
+    {
+      "id": "mivia_implisense_api_key",
+      "project": "mivia",
+      "sm_secret_key": "mivia_implisense_api_key",
+      "source": {
+        "kind": "clixml",
+        "basename": "mivia-implisense-api-key.credential.xml",
+        "extract": "api_key_password",
+        "expected_purpose": "implisense-leadgen-existence-and-identity-api"
+      }
+    },
+    {
+      "id": "mivia_insolvenz_radar_api_key",
+      "project": "mivia",
+      "sm_secret_key": "mivia_insolvenz_radar_api_key",
+      "source": {
+        "kind": "clixml",
+        "basename": "mivia-insolvenz-radar-api-key.credential.xml",
+        "extract": "api_key_password",
+        "expected_purpose": "insolvenz-radar-leadgen-insolvency-monitoring-api"
+      }
+    },
+    {
+      "id": "mivia_jina_api_key",
+      "project": "mivia",
+      "sm_secret_key": "mivia_jina_api_key",
+      "source": {
+        "kind": "clixml",
+        "basename": "mivia-jina-api.credential.xml",
+        "extract": "top_password"
+      }
+    },
+    {
+      "id": "mivia_linkup_api_key",
+      "project": "mivia",
+      "sm_secret_key": "mivia_linkup_api_key",
+      "source": {
+        "kind": "clixml",
+        "basename": "mivia-linkup-api-key.credential.xml",
+        "extract": "api_key_password",
+        "expected_purpose": "linkup-leadgen-research-api"
+      }
+    },
+    {
+      "id": "mivia_make_api_token",
+      "project": "mivia",
+      "sm_secret_key": "mivia_make_api_token",
+      "source": {
+        "kind": "clixml",
+        "basename": "mivia-make-api-token.credential.xml",
+        "extract": "top_password"
+      }
+    },
+    {
+      "id": "mivia_onepage_api_key",
+      "project": "mivia",
+      "sm_secret_key": "mivia_onepage_api_key",
+      "source": {
+        "kind": "clixml",
+        "basename": "mivia-onepage-api.credential.xml",
+        "extract": "top_password"
+      }
+    },
+    {
+      "id": "mivia_openregister_api_key",
+      "project": "mivia",
+      "sm_secret_key": "mivia_openregister_api_key",
+      "source": {
+        "kind": "clixml",
+        "basename": "mivia-openregister-api-key.credential.xml",
+        "extract": "api_key_password",
+        "expected_purpose": "openregister-leadgen-existence-insolvency-and-contact-api"
+      }
+    },
+    {
+      "id": "mivia_parallel_api_key",
+      "project": "mivia",
+      "sm_secret_key": "mivia_parallel_api_key",
+      "source": {
+        "kind": "clixml",
+        "basename": "mivia-parallel-api-key.credential.xml",
+        "extract": "api_key_password",
+        "expected_purpose": "parallel-leadgen-research-api"
+      }
+    },
+    {
+      "id": "mivia_reviewer_adapter_token",
+      "project": "mivia",
+      "sm_secret_key": "mivia_reviewer_adapter_token",
+      "source": {
+        "kind": "clixml",
+        "basename": "mivia-reviewer-adapter-token.credential.xml",
+        "extract": "top_password"
+      }
+    },
+    {
+      "id": "mivia_reviewer_pass",
+      "project": "mivia",
+      "sm_secret_key": "mivia_reviewer_pass",
+      "source": {
+        "kind": "clixml",
+        "basename": "mivia-reviewer.credential.xml",
+        "extract": "top_password"
+      }
+    },
+    {
+      "id": "mivia_reviewer_user",
+      "project": "mivia",
+      "sm_secret_key": "mivia_reviewer_user",
+      "source": {
+        "kind": "clixml",
+        "basename": "mivia-reviewer.credential.xml",
+        "extract": "top_username"
+      }
+    },
+    {
+      "id": "mivia_scraperapi_api_key",
+      "project": "mivia",
+      "sm_secret_key": "mivia_scraperapi_api_key",
+      "source": {
+        "kind": "clixml",
+        "basename": "mivia-scraperapi-api-key.credential.xml",
+        "extract": "api_key_password",
+        "expected_purpose": "scraperapi-leadgen-unblocking-and-rendered-extraction"
+      }
+    },
+    {
+      "id": "mivia_search_console_adc",
+      "project": "mivia",
+      "sm_secret_key": "mivia_search_console_adc",
+      "source": {
+        "kind": "clixml",
+        "basename": "mivia-search-console-adc.credential.xml",
+        "extract": "top_password"
+      }
+    },
+    {
+      "id": "mivia_searlo_api_key",
+      "project": "mivia",
+      "sm_secret_key": "mivia_searlo_api_key",
+      "source": {
+        "kind": "clixml",
+        "basename": "mivia-searlo-api-key.credential.xml",
+        "extract": "api_key_password",
+        "expected_purpose": "searlo-leadgen-research-api"
+      }
+    },
+    {
+      "id": "mivia_serpapi_api_key",
+      "project": "mivia",
+      "sm_secret_key": "mivia_serpapi_api_key",
+      "source": {
+        "kind": "clixml",
+        "basename": "mivia-serpapi-api-key.credential.xml",
+        "extract": "api_key_password",
+        "expected_purpose": "serpapi-leadgen-research-api"
+      }
+    },
+    {
+      "id": "mivia_serper_api_key",
+      "project": "mivia",
+      "sm_secret_key": "mivia_serper_api_key",
+      "source": {
+        "kind": "clixml",
+        "basename": "mivia-serper-api-key.credential.xml",
+        "extract": "api_key_password",
+        "expected_purpose": "serper-leadgen-places-phone-crosscheck"
+      }
+    },
+    {
+      "id": "mivia_tavily_api_key",
+      "project": "mivia",
+      "sm_secret_key": "mivia_tavily_api_key",
+      "source": {
+        "kind": "clixml",
+        "basename": "mivia-tavily-api.credential.xml",
+        "extract": "top_password"
+      }
+    },
+    {
+      "id": "mivia_wistia_api_key",
+      "project": "mivia",
+      "sm_secret_key": "mivia_wistia_api_key",
+      "source": {
+        "kind": "clixml",
+        "basename": "mivia-wistia-api.credential.xml",
+        "extract": "top_password"
+      }
+    },
+    {
+      "id": "mivia_wp_db_user",
+      "project": "mivia",
+      "sm_secret_key": "mivia_wp_db_user",
+      "source": {
+        "kind": "clixml",
+        "basename": "mivia-wp-db.credential.xml",
+        "extract": "nested_username"
+      }
+    },
+    {
+      "id": "mivia_wp_db_pass",
+      "project": "mivia",
+      "sm_secret_key": "mivia_wp_db_pass",
+      "source": {
+        "kind": "clixml",
+        "basename": "mivia-wp-db.credential.xml",
+        "extract": "nested_password"
+      }
+    },
+    {
+      "id": "mivia_wp_ftp_user",
+      "project": "mivia",
+      "sm_secret_key": "mivia_wp_ftp_user",
+      "source": {
+        "kind": "clixml",
+        "basename": "mivia-wp-ftp.credential.xml",
+        "extract": "nested_username"
+      }
+    },
+    {
+      "id": "mivia_wp_ftp_pass",
+      "project": "mivia",
+      "sm_secret_key": "mivia_wp_ftp_pass",
+      "source": {
+        "kind": "clixml",
+        "basename": "mivia-wp-ftp.credential.xml",
+        "extract": "nested_password"
+      }
+    },
+    {
+      "id": "mivia_wp_rest_user",
+      "project": "mivia",
+      "sm_secret_key": "mivia_wp_rest_user",
+      "source": {
+        "kind": "clixml",
+        "basename": "mivia-wp-rest.credential.xml",
+        "extract": "top_username"
+      }
+    },
+    {
+      "id": "mivia_wp_rest_pass",
+      "project": "mivia",
+      "sm_secret_key": "mivia_wp_rest_pass",
+      "source": {
+        "kind": "clixml",
+        "basename": "mivia-wp-rest.credential.xml",
+        "extract": "top_password"
+      }
+    },
+    {
+      "id": "mivia_wp_staging_db_user",
+      "project": "mivia",
+      "sm_secret_key": "mivia_wp_staging_db_user",
+      "source": {
+        "kind": "clixml",
+        "basename": "mivia-wp-staging-db.credential.xml",
+        "extract": "nested_username"
+      }
+    },
+    {
+      "id": "mivia_wp_staging_db_pass",
+      "project": "mivia",
+      "sm_secret_key": "mivia_wp_staging_db_pass",
+      "source": {
+        "kind": "clixml",
+        "basename": "mivia-wp-staging-db.credential.xml",
+        "extract": "nested_password"
+      }
+    },
+    {
+      "id": "mivia_wp_staging_ftp_user",
+      "project": "mivia",
+      "sm_secret_key": "mivia_wp_staging_ftp_user",
+      "source": {
+        "kind": "clixml",
+        "basename": "mivia-wp-staging-ftp.credential.xml",
+        "extract": "nested_username"
+      }
+    },
+    {
+      "id": "mivia_wp_staging_ftp_pass",
+      "project": "mivia",
+      "sm_secret_key": "mivia_wp_staging_ftp_pass",
+      "source": {
+        "kind": "clixml",
+        "basename": "mivia-wp-staging-ftp.credential.xml",
+        "extract": "nested_password"
+      }
+    },
+    {
+      "id": "mivia_wp_staging_http_user",
+      "project": "mivia",
+      "sm_secret_key": "mivia_wp_staging_http_user",
+      "source": {
+        "kind": "clixml",
+        "basename": "mivia-wp-staging-http.credential.xml",
+        "extract": "top_username"
+      }
+    },
+    {
+      "id": "mivia_wp_staging_http_pass",
+      "project": "mivia",
+      "sm_secret_key": "mivia_wp_staging_http_pass",
+      "source": {
+        "kind": "clixml",
+        "basename": "mivia-wp-staging-http.credential.xml",
+        "extract": "top_password"
+      }
+    },
+    {
+      "id": "phq_brave_api_key",
+      "project": "private-hq",
+      "sm_secret_key": "phq_brave_api_key",
+      "source": {
+        "kind": "secure_string_file",
+        "basename": "personal-hq-brave-api-key.dpapi",
+        "extract": "secure_string_file"
+      }
+    },
+    {
+      "id": "phq_brave_answer_api_key",
+      "project": "private-hq",
+      "sm_secret_key": "phq_brave_answer_api_key",
+      "source": {
+        "kind": "secure_string_file",
+        "basename": "personal-hq-brave-answer-api-key.dpapi",
+        "extract": "secure_string_file"
+      }
+    },
+    {
+      "id": "phq_context7_api_key",
+      "project": "private-hq",
+      "sm_secret_key": "phq_context7_api_key",
+      "source": {
+        "kind": "secure_string_file",
+        "basename": "personal-hq-context7-api-key.dpapi",
+        "extract": "secure_string_file"
+      }
+    }
+  ]
+}

@@ -14,8 +14,11 @@ export class FtpSessionBrokerError extends Error {
   }
 }
 
-/** @type {boolean} */
-let writerBusy = false;
+export const MAX_FTP_SESSION_BROKERS = 8;
+
+/** @type {number} */
+let activeSessions = 0;
+const MAX_ACTIVE_SESSIONS = MAX_FTP_SESSION_BROKERS;
 
 /**
  * Dedicated FTP session broker over a fake loopback target.
@@ -27,7 +30,7 @@ let writerBusy = false;
  * }} options
  */
 export async function startFtpSessionBroker(options) {
-  if (writerBusy) {
+  if (activeSessions >= MAX_ACTIVE_SESSIONS) {
     throw new FtpSessionBrokerError('concurrent_session_forbidden');
   }
 
@@ -55,7 +58,7 @@ export async function startFtpSessionBroker(options) {
     throw new FtpSessionBrokerError('invalid_credentials');
   }
 
-  writerBusy = true;
+  activeSessions += 1;
   const sensitive = buildSensitive(credentials);
   const logs = [];
   const rawLog = options.log ?? ((entry) => { logs.push(entry); });
@@ -85,7 +88,7 @@ export async function startFtpSessionBroker(options) {
       throw new FtpSessionBrokerError('auth_failed');
     }
   } catch (error) {
-    writerBusy = false;
+    activeSessions = Math.max(0, activeSessions - 1);
     sensitive.clear();
     if (error instanceof FtpSessionBrokerError) throw error;
     throw new FtpSessionBrokerError('auth_failed');
@@ -110,7 +113,7 @@ export async function startFtpSessionBroker(options) {
     await listenHttp(server, bindUrl);
   } catch {
     closed = true;
-    writerBusy = false;
+    activeSessions = Math.max(0, activeSessions - 1);
     sensitive.clear();
     throw new FtpSessionBrokerError('bind_failed');
   }
@@ -118,7 +121,7 @@ export async function startFtpSessionBroker(options) {
   const address = server.address();
   if (address === null || typeof address === 'string') {
     closed = true;
-    writerBusy = false;
+    activeSessions = Math.max(0, activeSessions - 1);
     sensitive.clear();
     await closeHttp(server);
     throw new FtpSessionBrokerError('bind_failed');
@@ -137,7 +140,7 @@ export async function startFtpSessionBroker(options) {
       if (closed) return;
       closed = true;
       sensitive.clear();
-      writerBusy = false;
+      activeSessions = Math.max(0, activeSessions - 1);
       await closeHttp(server);
     },
   };

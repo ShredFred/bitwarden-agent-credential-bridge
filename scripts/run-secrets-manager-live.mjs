@@ -27,7 +27,7 @@ import { loadOperationalBindingsFile } from '../src/operational-bridge.mjs';
 
 const APPROVAL_FLAG = '--i-approve-secrets-manager-machine-resolve';
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
-const bindingsPath = 'samples/operational/bindings-sm.example.json';
+const bindingsPath = 'samples/operational/bindings-sm.json';
 
 function emit(payload, code = 0) {
   process.stdout.write(`${JSON.stringify(payload)}\n`);

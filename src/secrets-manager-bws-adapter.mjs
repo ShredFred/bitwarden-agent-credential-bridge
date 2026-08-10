@@ -226,7 +226,97 @@ export async function upsertSecretsManagerSecret(options) {
   return Object.freeze({ ok: true, action: 'created' });
 }
 
-async function defaultRunCommand(executable, args) {
+/**
+ * List secret keys (and ids) for one project. Never returns secret values.
+ * @param {{
+ *   accessToken: string,
+ *   projectId: string,
+ *   bwsPath?: string,
+ *   serverUrl?: string,
+ *   allowConfig?: object,
+ *   runCommand?: typeof defaultRunCommand,
+ * }} options
+ * @returns {Promise<Array<{ id: string, key: string }>>}
+ */
+export async function listSecretsManagerSecretKeys(options) {
+  if (typeof options.accessToken !== 'string' ||
+      options.accessToken.length < 16 ||
+      options.accessToken.length > 8192) {
+    throw new SecretsManagerBwsAdapterError('invalid_token');
+  }
+  if (typeof options.projectId !== 'string' || !UUID.test(options.projectId)) {
+    throw new SecretsManagerBwsAdapterError('invalid_project_id');
+  }
+  const run = typeof options.runCommand === 'function'
+    ? options.runCommand
+    : defaultRunCommand;
+  const bwsPath = typeof options.bwsPath === 'string' && options.bwsPath.length > 0
+    ? options.bwsPath
+    : 'bws';
+  const serverUrl = serverUrlFromOptions(options);
+  const listed = await run(bwsPath, withServerArgs([
+    'secret', 'list',
+    options.projectId.toLowerCase(),
+    '--output', 'json',
+    '--access-token', options.accessToken,
+  ], serverUrl));
+  let secrets;
+  try {
+    secrets = JSON.parse(listed);
+  } catch {
+    throw new SecretsManagerBwsAdapterError('list_parse_failed');
+  }
+  if (!Array.isArray(secrets)) {
+    throw new SecretsManagerBwsAdapterError('list_parse_failed');
+  }
+  /** @type {Array<{ id: string, key: string }>} */
+  const out = [];
+  for (const entry of secrets) {
+    if (entry === null || typeof entry !== 'object') continue;
+    if (typeof entry.id !== 'string' || !UUID.test(entry.id)) continue;
+    if (typeof entry.key !== 'string' || !SECRET_KEY.test(entry.key)) continue;
+    out.push({ id: entry.id.toLowerCase(), key: entry.key });
+  }
+  return out;
+}
+
+/**
+ * Delete one secret by id. Value-free.
+ * @param {{
+ *   accessToken: string,
+ *   secretId: string,
+ *   bwsPath?: string,
+ *   serverUrl?: string,
+ *   allowConfig?: object,
+ *   runCommand?: typeof defaultRunCommand,
+ * }} options
+ */
+export async function deleteSecretsManagerSecret(options) {
+  if (typeof options.accessToken !== 'string' ||
+      options.accessToken.length < 16 ||
+      options.accessToken.length > 8192) {
+    throw new SecretsManagerBwsAdapterError('invalid_token');
+  }
+  if (typeof options.secretId !== 'string' || !UUID.test(options.secretId)) {
+    throw new SecretsManagerBwsAdapterError('invalid_secret_id');
+  }
+  const run = typeof options.runCommand === 'function'
+    ? options.runCommand
+    : defaultRunCommand;
+  const bwsPath = typeof options.bwsPath === 'string' && options.bwsPath.length > 0
+    ? options.bwsPath
+    : 'bws';
+  const serverUrl = serverUrlFromOptions(options);
+  await run(bwsPath, withServerArgs([
+    'secret', 'delete',
+    options.secretId.toLowerCase(),
+    '--output', 'none',
+    '--access-token', options.accessToken,
+  ], serverUrl), { allowEmptyStdout: true });
+  return Object.freeze({ ok: true, action: 'deleted' });
+}
+
+async function defaultRunCommand(executable, args, runOptions = {}) {
   let stdout = '';
   let stderr = '';
   let code = 1;
@@ -262,6 +352,12 @@ async function defaultRunCommand(executable, args) {
   }
   if (typeof stderr === 'string' && stderr.trim().length > 0) {
     throw new SecretsManagerBwsAdapterError('bws_stderr');
+  }
+  if (runOptions.allowEmptyStdout === true) {
+    if (typeof stdout !== 'string' || stdout.length > 1024 * 1024) {
+      throw new SecretsManagerBwsAdapterError('bws_output_invalid');
+    }
+    return stdout;
   }
   if (typeof stdout !== 'string' || stdout.length < 2 || stdout.length > 1024 * 1024) {
     throw new SecretsManagerBwsAdapterError('bws_output_invalid');

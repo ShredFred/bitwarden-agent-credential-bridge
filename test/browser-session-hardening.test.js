@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { generateFakeSentinel } from '../src/constants.js';
 import {
   BrowserSessionBrokerError,
+  MAX_BROWSER_SESSION_BROKERS,
   startBrowserSessionBroker,
 } from '../src/browser-session-broker.mjs';
 import { startFakeLoginSite } from '../src/fake-login-site.mjs';
@@ -49,25 +50,25 @@ describe('browser session broker hardening', () => {
     }
   });
 
-  it('rejects a second concurrent session writer', async () => {
+  it('rejects sessions beyond the active cap', async () => {
     const credentials = { username: 'user_abcdefgh', password: generateFakeSentinel() };
     const site = await startFakeLoginSite({
       credentials,
       hiddenFields: { csrf: 'token-1' },
     });
-    const first = await startBrowserSessionBroker({
-      policy: await basePolicy(site.baseUrl),
-      credentials,
-    });
+    const brokers = [];
     try {
       const policy = await basePolicy(site.baseUrl);
+      for (let i = 0; i < MAX_BROWSER_SESSION_BROKERS; i += 1) {
+        brokers.push(await startBrowserSessionBroker({ policy, credentials }));
+      }
       await assert.rejects(
         () => startBrowserSessionBroker({ policy, credentials }),
         (error) => error instanceof BrowserSessionBrokerError &&
           error.code === 'concurrent_session_forbidden',
       );
     } finally {
-      await first.close();
+      for (const broker of brokers) await broker.close();
       await site.close();
     }
   });

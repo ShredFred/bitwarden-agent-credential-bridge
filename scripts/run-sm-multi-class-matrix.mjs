@@ -1,14 +1,13 @@
 #!/usr/bin/env node
 /**
- * Live multi-class matrix: all operational SM credential classes.
+ * Live multi-class matrix over the canonical SM bindings (MiViA + private-hq).
  *
- * Upserts unique fake secrets into private-hq, starts the operational bridge,
- * smokes every alias, and asserts secrets never appear on agent-readable
- * surfaces. Also checks rejected / out-of-scope classes fail closed.
+ * Assumes `npm run seed:sm` has populated keys. Resolves via DPAPI/bws into
+ * broker memory, smokes every alias, and asserts secrets never appear on
+ * agent-readable surfaces.
  *
  * Requires: --i-approve-secrets-manager-machine-resolve
  */
-import crypto from 'node:crypto';
 import process from 'node:process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -32,15 +31,15 @@ import {
   resolveSecretsManagerSecret,
   SecretsManagerResolverError,
 } from '../src/secrets-manager-resolver.mjs';
+import { fetchSecretsManagerSecretValue } from '../src/secrets-manager-bws-adapter.mjs';
 import {
-  fetchSecretsManagerSecretValue,
-  upsertSecretsManagerSecret,
-} from '../src/secrets-manager-bws-adapter.mjs';
+  SM_DEFAULT_PROJECTS,
+  SM_OPERATIONAL_BINDINGS_PATH,
+  SM_RESOLVE_APPROVAL_FLAG,
+} from '../src/secrets-manager-defaults.mjs';
 
-const APPROVAL_FLAG = '--i-approve-secrets-manager-machine-resolve';
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
-const bindingsPath = 'samples/operational/bindings-sm-matrix.json';
-const PROJECT = '1d9a72dc-75aa-4bf3-a528-b49800ebbf68';
+const bindingsPath = SM_OPERATIONAL_BINDINGS_PATH;
 
 function emit(payload, code = 0) {
   process.stdout.write(`${JSON.stringify(payload)}\n`);
@@ -57,19 +56,11 @@ function assertNoSecret(surface, value, secrets) {
   }
 }
 
-function sentinel(label) {
-  return `SM-FAKE-${label}-${crypto.randomBytes(8).toString('hex')}`;
-}
-
-function user(label) {
-  return `user_${label}_${crypto.randomBytes(3).toString('hex')}`;
-}
-
-if (!process.argv.includes(APPROVAL_FLAG)) {
+if (!process.argv.includes(SM_RESOLVE_APPROVAL_FLAG)) {
   emit({
     ok: false,
     code: 'approval_flag_required',
-    required_flag: APPROVAL_FLAG,
+    required_flag: SM_RESOLVE_APPROVAL_FLAG,
     authorization_ready: false,
   }, 1);
 } else if (process.platform !== 'win32' && process.platform !== 'darwin') {
@@ -85,34 +76,62 @@ if (!process.argv.includes(APPROVAL_FLAG)) {
     accessToken = bundle.accessToken;
     sensitive.push(accessToken);
 
-    const material = {
-      matrix_bearer: sentinel('BEARER'),
-      matrix_api_header: sentinel('HDR'),
-      matrix_api_query: sentinel('QUERY'),
-      matrix_basic_user: user('basic'),
-      matrix_basic_pass: sentinel('BASICPASS'),
-      matrix_browser_user: user('browser'),
-      matrix_browser_pass: sentinel('BROWSERPASS'),
-      matrix_ssh_user: user('ssh'),
-      matrix_ssh_pass: sentinel('SSHPASS'),
-      matrix_ftp_user: user('ftp'),
-      matrix_ftp_pass: sentinel('FTPPASS'),
-    };
-    for (const value of Object.values(material)) {
-      sensitive.push(value);
-    }
-    for (const [key, value] of Object.entries(material)) {
-      await upsertSecretsManagerSecret({
-        accessToken,
-        projectId: PROJECT,
-        secretKey: key,
-        secretValue: value,
-        allowConfig: bundle.allow,
-      });
-    }
-
     const resolverGate = buildSecretsManagerResolverGate(scope, bundle.allow);
     const bindings = await loadOperationalBindingsFile(root, bindingsPath);
+
+    // Pre-resolve for exposure scanning only (never printed).
+    for (const binding of bindings.bindings) {
+      const needsPair = binding.credential_class === 'http_basic' ||
+        binding.credential_class === 'browser_form_login' ||
+        binding.credential_class === 'ssh' ||
+        binding.credential_class === 'ftp';
+      if (needsPair) {
+        const resolved = await resolveSecretsManagerSecret(
+          resolverGate,
+          async (request) => {
+            const username = await fetchSecretsManagerSecretValue({
+              accessToken,
+              projectId: request.project_id,
+              secretKey: request.secret_key,
+              allowConfig: bundle.allow,
+            });
+            const password = await fetchSecretsManagerSecretValue({
+              accessToken,
+              projectId: request.project_id,
+              secretKey: request.secret_key_password,
+              allowConfig: bundle.allow,
+            });
+            return { username, password };
+          },
+          {
+            project_id: binding.sm_project_id,
+            secret_key: binding.sm_secret_key,
+            credential_class: binding.credential_class,
+            secret_key_password: binding.sm_secret_key_password,
+          },
+        );
+        sensitive.push(resolved.username, resolved.password);
+      } else {
+        const resolved = await resolveSecretsManagerSecret(
+          resolverGate,
+          async (request) => {
+            const credential = await fetchSecretsManagerSecretValue({
+              accessToken,
+              projectId: request.project_id,
+              secretKey: request.secret_key,
+              allowConfig: bundle.allow,
+            });
+            return { credential };
+          },
+          {
+            project_id: binding.sm_project_id,
+            secret_key: binding.sm_secret_key,
+            credential_class: binding.credential_class,
+          },
+        );
+        sensitive.push(resolved.credential);
+      }
+    }
 
     bridge = await startOperationalBridge({
       repoRoot: root,
@@ -209,10 +228,16 @@ if (!process.argv.includes(APPROVAL_FLAG)) {
         assertNoSecret(`ftp_list:${service.alias}`, listBody, sensitive);
         opOk = list.status === 200;
       }
-      classes[service.credential_class] = {
+      classes[service.credential_class] = classes[service.credential_class] ?? {
+        smoke_ok: true,
+        replay_http: 200,
+        secret_absent: true,
+      };
+      classes[`${service.alias}`] = {
         smoke_ok: smoke[service.alias] === true && opOk,
         replay_http: response.status,
         secret_absent: true,
+        credential_class: service.credential_class,
       };
       agentBlob[service.alias] = {
         status: response.status,
@@ -224,7 +249,6 @@ if (!process.argv.includes(APPROVAL_FLAG)) {
     }
     assertNoSecret('agent_blob', agentBlob, sensitive);
 
-    // Rejected classes must fail closed at the operational binding boundary.
     /** @type {Record<string, boolean>} */
     const rejected_fail_closed = {};
     for (const rejected of REJECTED_CREDENTIAL_CLASSES) {
@@ -236,8 +260,8 @@ if (!process.argv.includes(APPROVAL_FLAG)) {
             alias: 'bad_reject',
             policy: 'policies/sample-fake-service.json',
             credential_class: rejected,
-            sm_project_id: PROJECT,
-            sm_secret_key: 'matrix_bearer',
+            sm_project_id: SM_DEFAULT_PROJECTS.private_hq,
+            sm_secret_key: 'phq_api_bearer',
           }],
         });
         rejected_fail_closed[rejected] = false;
@@ -250,15 +274,14 @@ if (!process.argv.includes(APPROVAL_FLAG)) {
       }
     }
 
-    // onecli_proxy is supported elsewhere but out of SM operational profile.
     let onecli_proxy_sm_rejected = false;
     try {
       await resolveSecretsManagerSecret(
         resolverGate,
         async () => ({ credential: 'should-not-run' }),
         {
-          project_id: PROJECT,
-          secret_key: 'matrix_bearer',
+          project_id: SM_DEFAULT_PROJECTS.private_hq,
+          secret_key: 'phq_api_bearer',
           credential_class: 'onecli_proxy',
         },
       );
@@ -266,19 +289,20 @@ if (!process.argv.includes(APPROVAL_FLAG)) {
       onecli_proxy_sm_rejected = error instanceof SecretsManagerResolverError;
     }
 
-    const allSmoke = Object.values(classes).every(
-      (c) => c.smoke_ok && c.replay_http === 200 && c.secret_absent,
-    );
+    const aliasResults = Object.entries(classes)
+      .filter(([k]) => k.startsWith('mivia_') || k.startsWith('phq_'));
+    const allSmoke = aliasResults.every(([, c]) =>
+      c.smoke_ok && c.replay_http === 200 && c.secret_absent);
     const allRejected = Object.values(rejected_fail_closed).every(Boolean);
 
     emit({
       ok: allSmoke && allRejected && onecli_proxy_sm_rejected,
       demo: 'sm_multi_class_matrix',
-      project: 'private-hq',
+      bindings: bindingsPath,
       machine_id: bundle.machine_id,
       supported_classes: [...SUPPORTED_CREDENTIAL_CLASSES],
-      operational_classes_tested: Object.keys(classes),
-      classes,
+      alias_count: aliasResults.length,
+      aliases: Object.fromEntries(aliasResults),
       rejected_fail_closed,
       onecli_proxy_sm_rejected,
       secrets_absent_from_agent_surfaces: true,

@@ -1572,7 +1572,9 @@ SM write (create/update) behind separate CLI flags
 `--i-approve-sm-machine-setup`, `--i-approve-sm-machine-uninstall`, and
 `--i-approve-secrets-manager-machine-write`. Write APIs must never return
 secret values to agent-readable surfaces; setup may accept a token only
-through a local secure prompt/store path.
+through a local secure prompt/store path. Phase 14 may also add agent-blind
+local DPAPI / ConvertFrom-SecureString / `.env` → SM import (dry-run default;
+apply behind the write flag; local purge remains a later explicit gate).
 
 ## Phase 15 scope
 
@@ -1595,7 +1597,11 @@ Manager path:
   `authorization_ready=true` from installer or SM unlock;
 - provide [`docs/agent-windows-install.md`](docs/agent-windows-install.md) so
   agents pointed at this repo can run a guided install without requiring the
-  user to be a terminal expert.
+  user to be a terminal expert;
+- keep onboarding/import docs current:
+  [`docs/sm-onboarding-and-import.md`](docs/sm-onboarding-and-import.md) and
+  [`docs/sm-operational-key-naming.md`](docs/sm-operational-key-naming.md)
+  (bindings in `samples/operational/bindings-sm.json`, seed via `npm run seed:sm`).
 
 Phase 15 must not create macOS installers in this slice, auto-create Bitwarden
 machine accounts, place secrets on agent-readable surfaces, or treat the

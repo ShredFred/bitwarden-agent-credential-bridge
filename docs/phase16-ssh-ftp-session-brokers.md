@@ -14,11 +14,18 @@ ops — never passwords, never `process.env` injection.
 - Operational SM matrix over private-hq for bearer, API-key header/query,
   Basic, browser form-login, SSH, and FTP
 
+Canonical bindings and naming: [`samples/operational/bindings-sm.json`](../samples/operational/bindings-sm.json),
+[`docs/sm-operational-key-naming.md`](sm-operational-key-naming.md),
+[`docs/sm-onboarding-and-import.md`](sm-onboarding-and-import.md).
+
 ## Commands
 
 ```bash
 npm run test:phase16
+# One-time / refresh: seed canonical MiViA+private-hq keys, prune leftovers, smoke
+npm run seed:sm -- --i-approve-secrets-manager-machine-write --prune --smoke --i-approve-secrets-manager-machine-resolve
 npm run live:sm-matrix -- --i-approve-secrets-manager-machine-resolve
+npm run start:operational:sm -- --i-approve-secrets-manager-machine-resolve
 ```
 
 ## Non-claims

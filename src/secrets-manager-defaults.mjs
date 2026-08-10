@@ -16,3 +16,6 @@ export const SM_SETUP_APPROVAL_FLAG = '--i-approve-sm-machine-setup';
 export const SM_UNINSTALL_APPROVAL_FLAG = '--i-approve-sm-machine-uninstall';
 export const SM_WRITE_APPROVAL_FLAG = '--i-approve-secrets-manager-machine-write';
 export const SM_RESOLVE_APPROVAL_FLAG = '--i-approve-secrets-manager-machine-resolve';
+
+/** Canonical tracked operational SM bindings (MiViA + private-hq). */
+export const SM_OPERATIONAL_BINDINGS_PATH = 'samples/operational/bindings-sm.json';

@@ -30,7 +30,7 @@ import { fetchSecretsManagerSecretValue } from '../src/secrets-manager-bws-adapt
 const APPROVAL_FLAG = '--i-approve-secrets-manager-machine-resolve';
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const bindingsPath = process.argv.find((a) => a.startsWith('samples/')) ??
-  'samples/operational/bindings-sm.example.json';
+  'samples/operational/bindings-sm.json';
 
 function emit(payload) {
   process.stdout.write(`${JSON.stringify(payload)}\n`);

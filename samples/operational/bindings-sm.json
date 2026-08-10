@@ -1,0 +1,112 @@
+{
+  "version": 1,
+  "profile": "operational_sm_same_user",
+  "bindings": [
+    {
+      "alias": "mivia_api",
+      "policy": "policies/sample-fake-service.json",
+      "credential_class": "http_bearer",
+      "sm_project_id": "e186495e-8667-436f-9f78-b49800eba251",
+      "sm_secret_key": "mivia_api_bearer"
+    },
+    {
+      "alias": "mivia_api_header",
+      "policy": "policies/sample-fake-api-key-service.json",
+      "credential_class": "http_api_key_header",
+      "sm_project_id": "e186495e-8667-436f-9f78-b49800eba251",
+      "sm_secret_key": "mivia_api_header"
+    },
+    {
+      "alias": "mivia_admin",
+      "policy": "policies/sample-fake-basic-service.json",
+      "credential_class": "http_basic",
+      "sm_project_id": "e186495e-8667-436f-9f78-b49800eba251",
+      "sm_secret_key": "mivia_admin_user",
+      "sm_secret_key_password": "mivia_admin_pass"
+    },
+    {
+      "alias": "mivia_api_query",
+      "policy": "policies/sample-fake-api-key-query-service.json",
+      "credential_class": "http_api_key_query",
+      "sm_project_id": "e186495e-8667-436f-9f78-b49800eba251",
+      "sm_secret_key": "mivia_api_query"
+    },
+    {
+      "alias": "mivia_web",
+      "policy": "policies/sample-fake-browser-login.json",
+      "credential_class": "browser_form_login",
+      "sm_project_id": "e186495e-8667-436f-9f78-b49800eba251",
+      "sm_secret_key": "mivia_web_user",
+      "sm_secret_key_password": "mivia_web_pass"
+    },
+    {
+      "alias": "mivia_ssh",
+      "policy": "policies/sample-fake-ssh.json",
+      "credential_class": "ssh",
+      "sm_project_id": "e186495e-8667-436f-9f78-b49800eba251",
+      "sm_secret_key": "mivia_ssh_user",
+      "sm_secret_key_password": "mivia_ssh_pass"
+    },
+    {
+      "alias": "mivia_ftp",
+      "policy": "policies/sample-fake-ftp.json",
+      "credential_class": "ftp",
+      "sm_project_id": "e186495e-8667-436f-9f78-b49800eba251",
+      "sm_secret_key": "mivia_ftp_user",
+      "sm_secret_key_password": "mivia_ftp_pass"
+    },
+    {
+      "alias": "phq_api",
+      "policy": "policies/sample-fake-service.json",
+      "credential_class": "http_bearer",
+      "sm_project_id": "1d9a72dc-75aa-4bf3-a528-b49800ebbf68",
+      "sm_secret_key": "phq_api_bearer"
+    },
+    {
+      "alias": "phq_api_header",
+      "policy": "policies/sample-fake-api-key-service.json",
+      "credential_class": "http_api_key_header",
+      "sm_project_id": "1d9a72dc-75aa-4bf3-a528-b49800ebbf68",
+      "sm_secret_key": "phq_api_header"
+    },
+    {
+      "alias": "phq_admin",
+      "policy": "policies/sample-fake-basic-service.json",
+      "credential_class": "http_basic",
+      "sm_project_id": "1d9a72dc-75aa-4bf3-a528-b49800ebbf68",
+      "sm_secret_key": "phq_admin_user",
+      "sm_secret_key_password": "phq_admin_pass"
+    },
+    {
+      "alias": "phq_api_query",
+      "policy": "policies/sample-fake-api-key-query-service.json",
+      "credential_class": "http_api_key_query",
+      "sm_project_id": "1d9a72dc-75aa-4bf3-a528-b49800ebbf68",
+      "sm_secret_key": "phq_api_query"
+    },
+    {
+      "alias": "phq_web",
+      "policy": "policies/sample-fake-browser-login.json",
+      "credential_class": "browser_form_login",
+      "sm_project_id": "1d9a72dc-75aa-4bf3-a528-b49800ebbf68",
+      "sm_secret_key": "phq_web_user",
+      "sm_secret_key_password": "phq_web_pass"
+    },
+    {
+      "alias": "phq_ssh",
+      "policy": "policies/sample-fake-ssh.json",
+      "credential_class": "ssh",
+      "sm_project_id": "1d9a72dc-75aa-4bf3-a528-b49800ebbf68",
+      "sm_secret_key": "phq_ssh_user",
+      "sm_secret_key_password": "phq_ssh_pass"
+    },
+    {
+      "alias": "phq_ftp",
+      "policy": "policies/sample-fake-ftp.json",
+      "credential_class": "ftp",
+      "sm_project_id": "1d9a72dc-75aa-4bf3-a528-b49800ebbf68",
+      "sm_secret_key": "phq_ftp_user",
+      "sm_secret_key_password": "phq_ftp_pass"
+    }
+  ]
+}
