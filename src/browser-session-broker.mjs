@@ -18,8 +18,11 @@ export class BrowserSessionBrokerError extends Error {
   }
 }
 
-/** @type {boolean} */
-let writerBusy = false;
+export const MAX_BROWSER_SESSION_BROKERS = 8;
+
+/** @type {number} */
+let activeSessions = 0;
+const MAX_ACTIVE_SESSIONS = MAX_BROWSER_SESSION_BROKERS;
 
 const MFA_HINT = /\b(mfa|2fa|totp|otp|one[-\s]?time)|mfa_required|otp_required\b/i;
 const CAPTCHA_HINT = /\b(captcha|recaptcha|hcaptcha|bot[-\s]?check)\b/i;
@@ -39,7 +42,7 @@ export const MAX_BROWSER_RESPONSE_BODY_BYTES = 1 * 1024 * 1024;
  * }} options
  */
 export async function startBrowserSessionBroker(options) {
-  if (writerBusy) {
+  if (activeSessions >= MAX_ACTIVE_SESSIONS) {
     throw new BrowserSessionBrokerError('concurrent_session_forbidden');
   }
 
@@ -85,7 +88,7 @@ export async function startBrowserSessionBroker(options) {
     });
   };
 
-  writerBusy = true;
+  activeSessions += 1;
   /** @type {Map<string, string>} */
   const jar = new Map();
   const createdAt = Date.now();
@@ -102,7 +105,7 @@ export async function startBrowserSessionBroker(options) {
       log,
     });
   } catch (error) {
-    writerBusy = false;
+    activeSessions = Math.max(0, activeSessions - 1);
     jar.clear();
     throw error;
   }
@@ -134,7 +137,7 @@ export async function startBrowserSessionBroker(options) {
     });
   } catch {
     closed = true;
-    writerBusy = false;
+    activeSessions = Math.max(0, activeSessions - 1);
     jar.clear();
     await closeServer(server).catch(() => {});
     throw new BrowserSessionBrokerError('bind_failed');
@@ -143,7 +146,7 @@ export async function startBrowserSessionBroker(options) {
   const address = server.address();
   if (address === null || typeof address === 'string') {
     closed = true;
-    writerBusy = false;
+    activeSessions = Math.max(0, activeSessions - 1);
     jar.clear();
     await closeServer(server);
     throw new BrowserSessionBrokerError('bind_failed');
@@ -164,7 +167,7 @@ export async function startBrowserSessionBroker(options) {
       closed = true;
       jar.clear();
       sensitive.clear();
-      writerBusy = false;
+      activeSessions = Math.max(0, activeSessions - 1);
       await closeServer(server);
     },
   };

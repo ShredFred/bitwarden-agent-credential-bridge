@@ -3,18 +3,18 @@
   "profile": "operational_sm_same_user",
   "bindings": [
     {
-      "alias": "mivia_demo_bearer",
+      "alias": "mivia_api",
       "policy": "policies/sample-fake-service.json",
       "credential_class": "http_bearer",
       "sm_project_id": "e186495e-8667-436f-9f78-b49800eba251",
-      "sm_secret_key": "mivia_demo_bearer"
+      "sm_secret_key": "mivia_api_bearer"
     },
     {
-      "alias": "privatehq_demo_bearer",
+      "alias": "phq_api",
       "policy": "policies/sample-fake-service.json",
       "credential_class": "http_bearer",
       "sm_project_id": "1d9a72dc-75aa-4bf3-a528-b49800ebbf68",
-      "sm_secret_key": "privatehq_demo_bearer"
+      "sm_secret_key": "phq_api_bearer"
     }
   ]
 }

@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "profile": "operational_sm_same_user",
+  "bindings": [
+    {
+      "alias": "privatehq_demo_browser",
+      "policy": "policies/sample-fake-browser-login.json",
+      "credential_class": "browser_form_login",
+      "sm_project_id": "1d9a72dc-75aa-4bf3-a528-b49800ebbf68",
+      "sm_secret_key": "privatehq_demo_login_user",
+      "sm_secret_key_password": "privatehq_demo_login_pass"
+    }
+  ]
+}

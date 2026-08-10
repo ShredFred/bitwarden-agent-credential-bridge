@@ -37,6 +37,9 @@ describe('secrets manager bws adapter', () => {
     });
     assert.equal(value, 'SM-FAKE-SENTINEL-VALUE-001');
     assert.equal(calls.length, 2);
+    assert.equal(calls[0][0], 'secret');
+    assert.equal(calls[0][1], 'list');
+    assert.equal(calls[0][2], PROJECT);
     assert.ok(calls[0].includes('--access-token'));
     assert.ok(calls[0].includes(token));
     const surface = JSON.stringify({ calls: calls.map((a) => a.filter((x) => x !== token)) });

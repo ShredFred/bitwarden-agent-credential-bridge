@@ -3,10 +3,15 @@
 Use this when the user says roughly: **clone this repo and install it** /
 **make this PC ready for Bitwarden Secrets Manager agents**.
 
+**Full onboarding + import (keys, naming, seed):**  
+[`sm-onboarding-and-import.md`](sm-onboarding-and-import.md)  
+**Key naming:** [`sm-operational-key-naming.md`](sm-operational-key-naming.md)
+
 ## Goals
 
 - Same-user Secrets Manager path (MiViA + private-hq by default)
 - User ideally only pastes a **machine access token** once
+- Repo bindings define which SM project/account each key belongs to
 - No LocalService required for productive SM use
 - Do **not** put tokens/secrets in chat logs or agent-visible env
 
@@ -22,7 +27,7 @@ Use this when the user says roughly: **clone this repo and install it** /
 3. Run the Setup EXE (UAC if prompted).
 4. From Start Menu run **Bitwarden Agent Bridge Setup** (token window).
 5. Cloud is default. Only if the user asks for self-host: enter custom server URLs in the wizard.
-6. Start **Bitwarden Agent Bridge** from the Start Menu.
+6. From a checkout (or installed scripts), seed/import operational keys from the repo bindings, then start the bridge — see [`sm-onboarding-and-import.md`](sm-onboarding-and-import.md).
 7. Uninstall later via Windows **Apps & features** (not only terminal).
 
 ## From-source path (dev / no Release yet)
@@ -33,7 +38,9 @@ cd bitwarden-agent-credential-bridge
 git checkout main
 npm ci
 # Ensure Bitwarden Secrets Manager CLI `bws` is on PATH (pin per docs).
-npm run setup:sm -- --i-approve-sm-machine-setup
+npm run setup:sm:wizard
+# Import keys named from samples/operational/bindings-sm.json into MiViA + private-hq
+npm run seed:sm -- --i-approve-secrets-manager-machine-write --prune --smoke --i-approve-secrets-manager-machine-resolve
 npm run start:operational:sm -- --i-approve-secrets-manager-machine-resolve
 ```
 
@@ -61,3 +68,4 @@ Also revoke the machine token in Bitwarden SM if the PC should lose access.
 - Never set `BWS_ACCESS_TOKEN` in the user/agent environment for general use.
 - Never claim `authorization_ready=true` from SM setup alone.
 - LocalService Day-2 install is optional and separate.
+- Follow [`sm-onboarding-and-import.md`](sm-onboarding-and-import.md) when adding or importing service keys.

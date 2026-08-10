@@ -30,7 +30,7 @@ import { fetchSecretsManagerSecretValue } from '../src/secrets-manager-bws-adapt
 const APPROVAL_FLAG = '--i-approve-secrets-manager-machine-resolve';
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const bindingsPath = process.argv.find((a) => a.startsWith('samples/')) ??
-  'samples/operational/bindings-sm.example.json';
+  'samples/operational/bindings-sm.json';
 
 function emit(payload) {
   process.stdout.write(`${JSON.stringify(payload)}\n`);
@@ -89,7 +89,9 @@ if (!process.argv.includes(APPROVAL_FLAG)) {
       bindings,
       resolveSecret: async (binding) => {
         const needsPair = binding.credential_class === 'http_basic' ||
-          binding.credential_class === 'browser_form_login';
+          binding.credential_class === 'browser_form_login' ||
+          binding.credential_class === 'ssh' ||
+          binding.credential_class === 'ftp';
         if (needsPair) {
           const resolved = await resolveSecretsManagerSecret(
             resolverGate,

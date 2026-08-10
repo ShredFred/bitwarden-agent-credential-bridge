@@ -26,6 +26,16 @@ if (process.platform !== 'win32') {
     'v1.0',
     'powershell.exe',
   );
+  const localBwsDir = path.join(
+    process.env.LOCALAPPDATA || '',
+    'Programs',
+    'Bitwarden',
+  );
+  const env = { ...process.env };
+  if (localBwsDir && !String(env.Path || env.PATH || '').toLowerCase().includes(localBwsDir.toLowerCase())) {
+    const current = env.Path || env.PATH || '';
+    env.Path = `${localBwsDir};${current}`;
+  }
   const child = spawn(powershell, [
     '-NoLogo', '-NoProfile', '-ExecutionPolicy', 'Bypass',
     '-File', script,
@@ -34,7 +44,7 @@ if (process.platform !== 'win32') {
     cwd: root,
     windowsHide: false,
     stdio: ['ignore', 'pipe', 'pipe'],
-    env: process.env,
+    env,
   });
   let stdout = '';
   let stderr = '';

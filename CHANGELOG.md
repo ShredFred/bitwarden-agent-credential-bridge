@@ -7,6 +7,21 @@ Semantic Versioning while it remains on the experimental 0.x line.
 
 ### Added
 
+- Phase 16 fake-loopback SSH/FTP session brokers (policy versions 7/8), private-hq
+  multi-class SM matrix coverage, and operator docs
+  (`docs/phase16-ssh-ftp-session-brokers.md`). `env_inject` remains rejected;
+  `authorization_ready` stays false.
+- Agent-blind local DPAPI / `.env` → Secrets Manager import
+  (`npm run import:local-to-sm`, default dry-run; apply behind write approval;
+  local purge disabled). Manifest covers MiViA CliXml inventory + private-hq
+  personal-hq `.dpapi` keys.
+- Canonical MiViA + private-hq operational SM bindings
+  (`samples/operational/bindings-sm.json`) with idempotent seed/prune
+  (`npm run seed:sm`) over the DPAPI machine token.
+- Operator/agent onboarding + import guide
+  (`docs/sm-onboarding-and-import.md`) and service-oriented key naming
+  (`docs/sm-operational-key-naming.md`), wired into Windows install/onboarding
+  docs.
 - Public-facing project documentation, contributor guidance, security policy,
   support routing, issue forms, pull-request template, and CI workflow.
 - A documented public/private/local repository boundary and release process.

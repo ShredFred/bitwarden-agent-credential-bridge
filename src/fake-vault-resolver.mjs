@@ -41,10 +41,13 @@ export function resolveFakeVaultSecrets(aliasMap) {
         credential_class: credentialClass,
         credential: generateFakeSentinel(),
       });
-    } else if (credentialClass === 'http_basic' || credentialClass === 'browser_form_login') {
+    } else if (credentialClass === 'http_basic' ||
+        credentialClass === 'browser_form_login' ||
+        credentialClass === 'ssh' ||
+        credentialClass === 'ftp') {
       secrets[alias] = Object.freeze({
         credential_class: credentialClass,
-        username: `user_${alias}`,
+        username: `user_${alias}`.padEnd(8, '0').slice(0, 32),
         password: generateFakeSentinel(),
       });
     } else {

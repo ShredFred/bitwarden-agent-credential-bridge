@@ -27,7 +27,7 @@ import { loadOperationalBindingsFile } from '../src/operational-bridge.mjs';
 
 const APPROVAL_FLAG = '--i-approve-secrets-manager-machine-resolve';
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
-const bindingsPath = 'samples/operational/bindings-sm.example.json';
+const bindingsPath = 'samples/operational/bindings-sm.json';
 
 function emit(payload, code = 0) {
   process.stdout.write(`${JSON.stringify(payload)}\n`);
@@ -84,7 +84,22 @@ if (!process.argv.includes(APPROVAL_FLAG)) {
   if (bundle) {
     const { allow, accessToken, evidence, machine_id } = bundle;
     const table = await loadOperationalBindingsFile(root, bindingsPath);
-    const binding = table.bindings[0];
+    const aliasFlagIdx = process.argv.indexOf('--alias');
+    const wantedAlias = aliasFlagIdx >= 0 ? process.argv[aliasFlagIdx + 1] : null;
+    const binding = wantedAlias
+      ? table.bindings.find((b) => b.alias === wantedAlias)
+      : table.bindings.find((b) => b.alias === 'privatehq_demo_bearer')
+        || table.bindings[0];
+    if (!binding) {
+      emit({
+        ok: false,
+        code: 'binding_alias_absent',
+        live_secret_resolved: false,
+        authorization_ready: false,
+        helper_vault_free: true,
+        machine_id,
+      }, 1);
+    } else {
     const resolverGate = buildSecretsManagerResolverGate(scope, allow);
     let resolved;
     try {
@@ -154,6 +169,7 @@ if (!process.argv.includes(APPROVAL_FLAG)) {
           broker_smoke_ok: ok,
           sm_preflight_passed: evidence.sm_preflight_passed,
           machine_id,
+          alias: binding.alias,
           allowed_project_count: allow.allowed_project_ids.length,
           authorization_ready: false,
           helper_vault_free: true,
@@ -174,6 +190,7 @@ if (!process.argv.includes(APPROVAL_FLAG)) {
         if (broker) await broker.close().catch(() => {});
         await api.close().catch(() => {});
       }
+    }
     }
   }
 }

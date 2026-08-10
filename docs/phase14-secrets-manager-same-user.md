@@ -2,8 +2,11 @@
 
 Kein Extra-Windows-User. Kein LocalService nötig. Token einmal einfügen.
 
+**Onboarding + Import (Keys, Naming, Seed):**  
+[`sm-onboarding-and-import.md`](sm-onboarding-and-import.md)  
 **Agenten:** [`agent-windows-install.md`](agent-windows-install.md)  
-**Installer:** GitHub Releases → `BitwardenAgentCredentialBridge-Setup-*.exe`
+**Installer:** GitHub Releases → `BitwardenAgentCredentialBridge-Setup-*.exe`  
+**Key-Namen:** [`sm-operational-key-naming.md`](sm-operational-key-naming.md)
 
 ## Was ist `bws`?
 
@@ -13,18 +16,28 @@ liegen (Installer prüft / weist hin).
 ## Setup
 
 ```powershell
-npm run setup:sm -- --i-approve-sm-machine-setup
+npm run setup:sm:wizard
+# oder: npm run setup:sm -- --i-approve-sm-machine-setup
 ```
 
-Windows: Kennwort-Fenster → Access Token einfügen.  
+Windows: Token-Fenster → Access Token einfügen.  
 Cloud ist Default. Self-Host nur wenn du Custom-URLs setzt (Allowlist /
 Wizard).
+
+## Import (Repo → MiViA + private-hq)
+
+Bindings: `samples/operational/bindings-sm.json`  
+Jeder Eintrag sagt klar: welches SM-Projekt + welche Key-Namen + welche Klasse.
+
+```powershell
+npm run seed:sm -- --i-approve-secrets-manager-machine-write --prune --smoke --i-approve-secrets-manager-machine-resolve
+```
 
 ## Start / Write / Uninstall
 
 ```powershell
 npm run start:operational:sm -- --i-approve-secrets-manager-machine-resolve
-"value" | npm run live:sm-write -- --i-approve-secrets-manager-machine-write --project mivia --key my_key
+"value" | npm run live:sm-write -- --i-approve-secrets-manager-machine-write --project private-hq --key phq_api_bearer
 npm run uninstall:sm -- --i-approve-sm-machine-uninstall
 ```
 

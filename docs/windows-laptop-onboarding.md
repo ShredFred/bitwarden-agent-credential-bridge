@@ -3,7 +3,10 @@
 **Default:** Windows Setup EXE or guided `setup:sm` → Secrets Manager same-user
 (MiViA + private-hq). No extra OS account. LocalService optional.
 
-Agents: follow [`agent-windows-install.md`](agent-windows-install.md).
+**Agents / full import flow:**  
+[`agent-windows-install.md`](agent-windows-install.md) ·  
+[`sm-onboarding-and-import.md`](sm-onboarding-and-import.md) ·  
+[`sm-operational-key-naming.md`](sm-operational-key-naming.md)
 
 ## Schnellstart (Nutzer)
 
@@ -13,11 +16,15 @@ Agents: follow [`agent-windows-install.md`](agent-windows-install.md).
 
 ```powershell
 npm ci
-npm run setup:sm -- --i-approve-sm-machine-setup
+npm run setup:sm:wizard
+npm run seed:sm -- --i-approve-secrets-manager-machine-write --prune --smoke --i-approve-secrets-manager-machine-resolve
 npm run start:operational:sm -- --i-approve-secrets-manager-machine-resolve
 ```
 
 Self-Host-URLs nur wenn nötig (nicht Default) — siehe Phase-14-Doku / Setup-Wizard.
+
+Keys liegen im passenden SM-Projekt und heißen `{projekt}_{dienst}_{rolle}`
+(z.B. `phq_web_user`). Details: Onboarding-/Import-Doku oben.
 
 ## Deinstallieren
 
@@ -29,5 +36,6 @@ Self-Host-URLs nur wenn nötig (nicht Default) — siehe Phase-14-Doku / Setup-W
 | Befehl | Zweck |
 |---|---|
 | `npm run start:operational` | Fake-Harness |
+| `npm run live:sm-matrix` | Alle SM-Aliase smoke + Exposure |
 | `npm run live:windows-day2-operator -- --i-approve-persistent-install` | LocalService-Grenze |
 | `npm run live:sm-write -- …` | Agent-blind SM write |

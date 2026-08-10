@@ -15,7 +15,7 @@ const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 describe('phase8 operational bridge', () => {
   it('validates the sample binding table and rejects bad paths/classes', async () => {
     const table = await loadOperationalBindingsFile(root, 'samples/operational/bindings.json');
-    assert.equal(table.bindings.length, 5);
+    assert.equal(table.bindings.length, 7);
     assert.throws(
       () => validateOperationalBindings({
         version: 1,
@@ -54,7 +54,7 @@ describe('phase8 operational bridge', () => {
       assert.equal(bridge.disposable_dev_ready, false);
       assert.equal(bridge.operational_authorization_wired, true);
       assert.equal(bridge.authorization_ready, false);
-      assert.equal(bridge.services.length, 5);
+      assert.equal(bridge.services.length, 7);
       const smoke = await bridge.smoke();
       assert.deepEqual(smoke, {
         demo_bearer: true,
@@ -62,6 +62,8 @@ describe('phase8 operational bridge', () => {
         demo_basic: true,
         demo_api_key_query: true,
         demo_browser: true,
+        demo_ssh: true,
+        demo_ftp: true,
       });
     } finally {
       await bridge.close();

@@ -16,7 +16,16 @@ if ($null -eq $node) {
     Write-Result @{ ok = $false; code = 'node_missing'; hint = 'Install Node.js 20+ and reopen Setup' } 1
 }
 
+# Prefer PATH, then the default Bitwarden Local Programs install location.
 $bws = Get-Command bws -ErrorAction SilentlyContinue
+if ($null -eq $bws) {
+    $localBws = Join-Path $env:LOCALAPPDATA 'Programs\Bitwarden\bws.exe'
+    if (Test-Path -LiteralPath $localBws) {
+        $bitwardenDir = Split-Path -Parent $localBws
+        $env:Path = "$bitwardenDir;$env:Path"
+        $bws = Get-Command bws -ErrorAction SilentlyContinue
+    }
+}
 $bwsOk = $null -ne $bws
 
 $form = New-Object System.Windows.Forms.Form
