@@ -14,7 +14,10 @@ Semantic Versioning while it remains on the experimental 0.x line.
 - Agent-blind local DPAPI / `.env` → Secrets Manager import
   (`npm run import:local-to-sm`, default dry-run; apply behind write approval;
   local purge disabled). Manifest covers MiViA CliXml inventory + private-hq
-  personal-hq `.dpapi` keys.
+  personal-hq `.dpapi` keys and cleartext `.env` / provider-lab secrets.
+  HQ resolve helpers + value-free parity verifier
+  (`npm run verify:hq-sm-parity`, `resolve:sm-secret`); purge deferred
+  (`docs/sm-local-purge-later.md`).
 - Canonical MiViA + private-hq operational SM bindings
   (`samples/operational/bindings-sm.json`) with idempotent seed/prune
   (`npm run seed:sm`) over the DPAPI machine token.

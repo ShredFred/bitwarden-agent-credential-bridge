@@ -46,6 +46,7 @@ function argValue(name) {
 const apply = process.argv.includes('--apply');
 const purgeRequested = process.argv.includes('--purge-local');
 const manifestPath = argValue('--manifest') ?? DEFAULT_MANIFEST;
+const envRoot = argValue('--env-root');
 
 if (purgeRequested) {
   emit({
@@ -78,10 +79,12 @@ if (purgeRequested) {
       const report = await runLocalToSmImport({
         manifest,
         mode: 'dry_run',
+        envRoot: envRoot ?? undefined,
       });
       emit({
         ...report,
         manifest: path.relative(root, manifestPath).replaceAll('\\', '/'),
+        env_root: envRoot,
         note: 'Dry-run only: local sources checked; SM not written; local files not deleted.',
       }, report.ok ? 0 : 1);
     } else {
@@ -92,12 +95,14 @@ if (purgeRequested) {
         mode: 'apply',
         accessToken: bundle.accessToken,
         allowConfig: bundle.allow,
+        envRoot: envRoot ?? undefined,
       });
       emit({
         ...report,
         manifest: path.relative(root, manifestPath).replaceAll('\\', '/'),
+        env_root: envRoot,
         machine_id: bundle.allow?.machine_id ?? null,
-        note: 'Apply complete: values never printed; local DPAPI files kept (purge disabled).',
+        note: 'Apply complete: values never printed; local DPAPI/.env files kept (purge disabled).',
       }, report.ok ? 0 : 1);
     }
   } catch (error) {
