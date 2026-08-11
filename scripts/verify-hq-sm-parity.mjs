@@ -103,8 +103,9 @@ if (!process.argv.includes(SM_RESOLVE_APPROVAL_FLAG)) {
       results.push(Object.freeze(row));
     }
 
+    const ok = failed === 0 && results.length > 0;
     emit({
-      ok: failed === 0,
+      ok,
       mode: 'hq_sm_parity',
       checked: results.length,
       matched,
@@ -115,7 +116,7 @@ if (!process.argv.includes(SM_RESOLVE_APPROVAL_FLAG)) {
       helper_vault_free: true,
       agent_secret_visible: false,
       results,
-    }, failed === 0 ? 0 : 1);
+    }, ok ? 0 : 1);
   } catch (error) {
     const code =
       error instanceof LocalSecretToSmError ||
