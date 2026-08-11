@@ -116,6 +116,8 @@
     "live:sm-matrix": "node scripts/run-sm-multi-class-matrix.mjs",
     "seed:sm": "node scripts/seed-sm-operational.mjs",
     "import:local-to-sm": "node scripts/run-local-to-sm-import.mjs",
+    "resolve:sm-secret": "node scripts/resolve-sm-secret.mjs",
+    "verify:hq-sm-parity": "node scripts/verify-hq-sm-parity.mjs",
     "test:phase2": "node --test test/onecli-audit.test.js test/onecli-artifacts.test.js test/onecli-preflight.test.js",
     "test:phase3": "node --test test/supply-chain-audit.test.js test/phase3-artifacts.test.js",
     "preflight:onecli": "node scripts/preflight-onecli.mjs",

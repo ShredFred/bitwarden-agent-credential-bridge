@@ -191,7 +191,12 @@ export function resolveLocalSecretSourcePath(entry, options = {}) {
     ? options.secretsDir
     : defaultSecretsDir();
   if (entry.source.kind === 'env_file') {
-    return path.resolve(entry.source.path);
+    const raw = entry.source.path;
+    if (path.isAbsolute(raw)) return path.normalize(raw);
+    const envRoot = typeof options.envRoot === 'string' && options.envRoot.length > 0
+      ? options.envRoot
+      : process.cwd();
+    return path.resolve(envRoot, raw);
   }
   return path.join(secretsDir, entry.source.basename);
 }
@@ -326,6 +331,7 @@ function sha256Hex(value) {
  *   accessToken?: string,
  *   allowConfig?: object,
  *   secretsDir?: string,
+ *   envRoot?: string,
  *   extractValue?: typeof extractLocalSecretValue,
  *   upsertSecret?: typeof upsertSecretsManagerSecret,
  *   fetchSecret?: typeof fetchSecretsManagerSecretValue,
@@ -368,16 +374,18 @@ export async function runLocalToSmImport(options) {
   let failed = 0;
 
   for (const entry of options.manifest.entries) {
-    const storePath = resolveLocalSecretSourcePath(entry, {
+    const pathOpts = {
       secretsDir: options.secretsDir,
-    });
+      envRoot: options.envRoot,
+    };
+    const storePath = resolveLocalSecretSourcePath(entry, pathOpts);
     /** @type {Record<string, unknown>} */
     const row = {
       id: entry.id,
       project: entry.project,
       sm_secret_key: entry.sm_secret_key,
       source_kind: entry.source.kind,
-      source_basename: entry.source.basename ?? null,
+      source_basename: entry.source.basename ?? entry.source.path ?? null,
       source_present: false,
       extract_ok: false,
       would_write: false,
@@ -400,7 +408,7 @@ export async function runLocalToSmImport(options) {
 
     let value;
     try {
-      value = await extract(entry, { secretsDir: options.secretsDir });
+      value = await extract(entry, pathOpts);
       row.extract_ok = true;
       row.would_write = true;
     } catch (error) {

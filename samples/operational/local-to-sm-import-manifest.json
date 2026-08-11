@@ -477,6 +477,380 @@
         "basename": "personal-hq-context7-api-key.dpapi",
         "extract": "secure_string_file"
       }
+    },
+    {
+      "id": "phq_groq_api_key",
+      "project": "private-hq",
+      "sm_secret_key": "phq_groq_api_key",
+      "source": {
+        "kind": "env_file",
+        "path": ".env",
+        "extract": "env_var",
+        "var": "GROQ_API_KEY"
+      }
+    },
+    {
+      "id": "phq_jina_api_key",
+      "project": "private-hq",
+      "sm_secret_key": "phq_jina_api_key",
+      "source": {
+        "kind": "env_file",
+        "path": ".env",
+        "extract": "env_var",
+        "var": "JINA_API_KEY"
+      }
+    },
+    {
+      "id": "phq_cloudflare_api_token",
+      "project": "private-hq",
+      "sm_secret_key": "phq_cloudflare_api_token",
+      "source": {
+        "kind": "env_file",
+        "path": ".env",
+        "extract": "env_var",
+        "var": "CLOUDFLARE_API_TOKEN"
+      }
+    },
+    {
+      "id": "phq_cloudflare_tunnel_token",
+      "project": "private-hq",
+      "sm_secret_key": "phq_cloudflare_tunnel_token",
+      "source": {
+        "kind": "env_file",
+        "path": ".env",
+        "extract": "env_var",
+        "var": "CLOUDFLARE_TUNNEL_TOKEN"
+      }
+    },
+    {
+      "id": "phq_n8n_encryption_key",
+      "project": "private-hq",
+      "sm_secret_key": "phq_n8n_encryption_key",
+      "source": {
+        "kind": "env_file",
+        "path": ".env",
+        "extract": "env_var",
+        "var": "N8N_ENCRYPTION_KEY"
+      }
+    },
+    {
+      "id": "phq_n8n_login_user",
+      "project": "private-hq",
+      "sm_secret_key": "phq_n8n_login_user",
+      "source": {
+        "kind": "env_file",
+        "path": ".env",
+        "extract": "env_var",
+        "var": "N8N_LOGIN_EMAIL"
+      }
+    },
+    {
+      "id": "phq_n8n_login_pass",
+      "project": "private-hq",
+      "sm_secret_key": "phq_n8n_login_pass",
+      "source": {
+        "kind": "env_file",
+        "path": ".env",
+        "extract": "env_var",
+        "var": "N8N_LOGIN_PASSWORD"
+      }
+    },
+    {
+      "id": "phq_replicate_api_token",
+      "project": "private-hq",
+      "sm_secret_key": "phq_replicate_api_token",
+      "source": {
+        "kind": "env_file",
+        "path": ".env",
+        "extract": "env_var",
+        "var": "REPLICATE_API_TOKEN"
+      }
+    },
+    {
+      "id": "phq_openrouter_api_key",
+      "project": "private-hq",
+      "sm_secret_key": "phq_openrouter_api_key",
+      "source": {
+        "kind": "env_file",
+        "path": ".env",
+        "extract": "env_var",
+        "var": "OPENROUTER_API_KEY"
+      }
+    },
+    {
+      "id": "phq_brave_search_api_key",
+      "project": "private-hq",
+      "sm_secret_key": "phq_brave_search_api_key",
+      "source": {
+        "kind": "env_file",
+        "path": ".env",
+        "extract": "env_var",
+        "var": "BRAVE_SEARCH_API_KEY"
+      }
+    },
+    {
+      "id": "phq_brave_answers_api_key",
+      "project": "private-hq",
+      "sm_secret_key": "phq_brave_answers_api_key",
+      "source": {
+        "kind": "env_file",
+        "path": ".env",
+        "extract": "env_var",
+        "var": "BRAVE_ANSWERS_API_KEY"
+      }
+    },
+    {
+      "id": "phq_brave_spellcheck_api_key",
+      "project": "private-hq",
+      "sm_secret_key": "phq_brave_spellcheck_api_key",
+      "source": {
+        "kind": "env_file",
+        "path": ".env",
+        "extract": "env_var",
+        "var": "BRAVE_SPELLCHECK_API_KEY"
+      }
+    },
+    {
+      "id": "phq_brave_autosuggest_api_key",
+      "project": "private-hq",
+      "sm_secret_key": "phq_brave_autosuggest_api_key",
+      "source": {
+        "kind": "env_file",
+        "path": ".env",
+        "extract": "env_var",
+        "var": "BRAVE_AUTOSUGGEST_API_KEY"
+      }
+    },
+    {
+      "id": "phq_tavily_api_key",
+      "project": "private-hq",
+      "sm_secret_key": "phq_tavily_api_key",
+      "source": {
+        "kind": "env_file",
+        "path": ".env",
+        "extract": "env_var",
+        "var": "TAVILY_API_KEY"
+      }
+    },
+    {
+      "id": "phq_adzuna_app_id",
+      "project": "private-hq",
+      "sm_secret_key": "phq_adzuna_app_id",
+      "source": {
+        "kind": "env_file",
+        "path": ".env",
+        "extract": "env_var",
+        "var": "ADZUNA_APP_ID"
+      }
+    },
+    {
+      "id": "phq_adzuna_app_key",
+      "project": "private-hq",
+      "sm_secret_key": "phq_adzuna_app_key",
+      "source": {
+        "kind": "env_file",
+        "path": ".env",
+        "extract": "env_var",
+        "var": "ADZUNA_APP_KEY"
+      }
+    },
+    {
+      "id": "phq_jooble_api_key",
+      "project": "private-hq",
+      "sm_secret_key": "phq_jooble_api_key",
+      "source": {
+        "kind": "env_file",
+        "path": ".env",
+        "extract": "env_var",
+        "var": "JOOBLE_API_KEY"
+      }
+    },
+    {
+      "id": "phq_careerjet_api_key",
+      "project": "private-hq",
+      "sm_secret_key": "phq_careerjet_api_key",
+      "source": {
+        "kind": "env_file",
+        "path": ".env",
+        "extract": "env_var",
+        "var": "CAREERJET_API_KEY"
+      }
+    },
+    {
+      "id": "phq_gemini_api_key",
+      "project": "private-hq",
+      "sm_secret_key": "phq_gemini_api_key",
+      "source": {
+        "kind": "env_file",
+        "path": ".env",
+        "extract": "env_var",
+        "var": "GEMINI_API_KEY"
+      }
+    },
+    {
+      "id": "phq_ollama_api_key",
+      "project": "private-hq",
+      "sm_secret_key": "phq_ollama_api_key",
+      "source": {
+        "kind": "env_file",
+        "path": ".env",
+        "extract": "env_var",
+        "var": "OLLAMA_API_KEY"
+      }
+    },
+    {
+      "id": "phq_nvidia_api_key",
+      "project": "private-hq",
+      "sm_secret_key": "phq_nvidia_api_key",
+      "source": {
+        "kind": "env_file",
+        "path": ".env",
+        "extract": "env_var",
+        "var": "NVIDIA_API_KEY"
+      }
+    },
+    {
+      "id": "phq_plaid_client_id",
+      "project": "private-hq",
+      "sm_secret_key": "phq_plaid_client_id",
+      "source": {
+        "kind": "env_file",
+        "path": ".env",
+        "extract": "env_var",
+        "var": "PLAID_CLIENT_ID"
+      }
+    },
+    {
+      "id": "phq_plaid_sandbox_secret",
+      "project": "private-hq",
+      "sm_secret_key": "phq_plaid_sandbox_secret",
+      "source": {
+        "kind": "env_file",
+        "path": ".env",
+        "extract": "env_var",
+        "var": "PLAID_SANDBOX_SECRET"
+      }
+    },
+    {
+      "id": "phq_logo_dev_secret_key",
+      "project": "private-hq",
+      "sm_secret_key": "phq_logo_dev_secret_key",
+      "source": {
+        "kind": "env_file",
+        "path": ".env",
+        "extract": "env_var",
+        "var": "LOGO_DEV_SECRET_KEY"
+      }
+    },
+    {
+      "id": "phq_logo_dev_publishable_key",
+      "project": "private-hq",
+      "sm_secret_key": "phq_logo_dev_publishable_key",
+      "source": {
+        "kind": "env_file",
+        "path": ".env",
+        "extract": "env_var",
+        "var": "LOGO_DEV_PUBLISHABLE_KEY"
+      }
+    },
+    {
+      "id": "phq_serper_api_key",
+      "project": "private-hq",
+      "sm_secret_key": "phq_serper_api_key",
+      "source": {
+        "kind": "env_file",
+        "path": ".env",
+        "extract": "env_var",
+        "var": "SERPER_API_KEY"
+      }
+    },
+    {
+      "id": "phq_canva_client_id",
+      "project": "private-hq",
+      "sm_secret_key": "phq_canva_client_id",
+      "source": {
+        "kind": "env_file",
+        "path": "active/provider-lab/canva/.env.local",
+        "extract": "env_var",
+        "var": "CANVA_CLIENT_ID"
+      }
+    },
+    {
+      "id": "phq_canva_client_secret",
+      "project": "private-hq",
+      "sm_secret_key": "phq_canva_client_secret",
+      "source": {
+        "kind": "env_file",
+        "path": "active/provider-lab/canva/.env.local",
+        "extract": "env_var",
+        "var": "CANVA_CLIENT_SECRET"
+      }
+    },
+    {
+      "id": "phq_v0_api_key",
+      "project": "private-hq",
+      "sm_secret_key": "phq_v0_api_key",
+      "source": {
+        "kind": "env_file",
+        "path": "active/provider-lab/v0/.env.local",
+        "extract": "env_var",
+        "var": "V0_API_KEY"
+      }
+    },
+    {
+      "id": "phq_google_api_key",
+      "project": "private-hq",
+      "sm_secret_key": "phq_google_api_key",
+      "source": {
+        "kind": "env_file",
+        "path": "active/provider-lab/presenton-codex/.env.local",
+        "extract": "env_var",
+        "var": "GOOGLE_API_KEY"
+      }
+    },
+    {
+      "id": "phq_codex_access_token",
+      "project": "private-hq",
+      "sm_secret_key": "phq_codex_access_token",
+      "source": {
+        "kind": "env_file",
+        "path": "active/provider-lab/presenton-codex/.env.local",
+        "extract": "env_var",
+        "var": "CODEX_ACCESS_TOKEN"
+      }
+    },
+    {
+      "id": "phq_codex_refresh_token",
+      "project": "private-hq",
+      "sm_secret_key": "phq_codex_refresh_token",
+      "source": {
+        "kind": "env_file",
+        "path": "active/provider-lab/presenton-codex/.env.local",
+        "extract": "env_var",
+        "var": "CODEX_REFRESH_TOKEN"
+      }
+    },
+    {
+      "id": "phq_pexels_api_key",
+      "project": "private-hq",
+      "sm_secret_key": "phq_pexels_api_key",
+      "source": {
+        "kind": "env_file",
+        "path": "active/provider-lab/presenton-codex/.env.local",
+        "extract": "env_var",
+        "var": "PEXELS_API_KEY"
+      }
+    },
+    {
+      "id": "phq_pixabay_api_key",
+      "project": "private-hq",
+      "sm_secret_key": "phq_pixabay_api_key",
+      "source": {
+        "kind": "env_file",
+        "path": "active/provider-lab/presenton-codex/.env.local",
+        "extract": "env_var",
+        "var": "PIXABAY_API_KEY"
+      }
     }
   ]
 }

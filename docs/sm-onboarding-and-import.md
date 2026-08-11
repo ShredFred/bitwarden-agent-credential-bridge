@@ -63,13 +63,14 @@ write, no local delete):
 
 ```powershell
 npm run import:local-to-sm
-# when dry-run is all green:
-npm run import:local-to-sm -- --apply --i-approve-secrets-manager-machine-write
+# when dry-run is all green (add --env-root for personal-hq .env paths):
+npm run import:local-to-sm -- --apply --i-approve-secrets-manager-machine-write --env-root "F:\Github Repos\personal-hq"
 ```
 
 Manifest: `samples/operational/local-to-sm-import-manifest.json`  
 Local purge stays **disabled** until a later digest-verified gate — old DPAPI
-files are kept after a successful apply.
+files are kept after a successful apply. See
+[`sm-local-purge-later.md`](sm-local-purge-later.md).
 
 Team journey: once SM holds the keys, assign the same machine/project access to
 Miriam or Jessica; they run setup once and do **not** need your local DPAPI
