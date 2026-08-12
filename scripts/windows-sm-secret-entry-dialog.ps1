@@ -1,6 +1,7 @@
 # Windows WinForms secret-entry dialog for agent-callable SM writes.
 # Reads a value-free form JSON file. Writes secrets via live:sm-write stdin.
 # Emits only value-free JSON on stdout. Never prints secret values.
+# Visual theme: clean modern macOS-inspired layout (calm, structured).
 param(
   [Parameter(Mandatory = $true)][string]$FormPath,
   [Parameter(Mandatory = $true)][string]$BridgeRoot,
@@ -10,11 +11,32 @@ param(
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
+[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
+$OutputEncoding = [System.Text.UTF8Encoding]::new($false)
 
 function Write-Result([hashtable]$Object, [int]$Code = 0) {
-  [Console]::Out.Write(($Object | ConvertTo-Json -Compress -Depth 6))
+  $json = ($Object | ConvertTo-Json -Compress -Depth 6)
+  $bytes = [System.Text.Encoding]::UTF8.GetBytes($json)
+  $stdout = [Console]::OpenStandardOutput()
+  $stdout.Write($bytes, 0, $bytes.Length)
   exit $Code
 }
+
+# Calm Apple-like palette on Windows
+$cBg      = [System.Drawing.Color]::FromArgb(246, 246, 248)
+$cCard    = [System.Drawing.Color]::FromArgb(255, 255, 255)
+$cText    = [System.Drawing.Color]::FromArgb(29, 29, 31)
+$cSecondary = [System.Drawing.Color]::FromArgb(110, 110, 115)
+$cBorder  = [System.Drawing.Color]::FromArgb(210, 210, 215)
+$cAccent  = [System.Drawing.Color]::FromArgb(0, 122, 255)
+$cDanger  = [System.Drawing.Color]::FromArgb(255, 59, 48)
+$cInputBg = [System.Drawing.Color]::FromArgb(255, 255, 255)
+$cBtnSecondaryBg = [System.Drawing.Color]::FromArgb(242, 242, 247)
+
+$fontTitle = New-Object System.Drawing.Font('Segoe UI Semibold', 13)
+$fontBody  = New-Object System.Drawing.Font('Segoe UI', 9.5)
+$fontSmall = New-Object System.Drawing.Font('Segoe UI', 8.5)
+$fontLabel = New-Object System.Drawing.Font('Segoe UI Semibold', 9)
 
 if (-not (Test-Path -LiteralPath $FormPath)) {
   Write-Result @{ ok = $false; code = 'form_path_absent' } 1
@@ -41,11 +63,14 @@ if (-not (Test-Path -LiteralPath $writeScript)) {
   Write-Result @{ ok = $false; code = 'write_script_absent' } 1
 }
 
-# Ensure bws is discoverable for the write child.
 $localBws = Join-Path $env:LOCALAPPDATA 'Programs\Bitwarden'
 if (Test-Path -LiteralPath $localBws) {
   $env:Path = "$localBws;$env:Path"
 }
+
+$formWidth = 560
+$contentLeft = 28
+$contentWidth = 504
 
 $ui = New-Object System.Windows.Forms.Form
 $ui.Text = [string]$formObj.title
@@ -55,55 +80,91 @@ $ui.MaximizeBox = $false
 $ui.MinimizeBox = $false
 $ui.ShowInTaskbar = $true
 $ui.TopMost = $true
-$ui.ShowInTaskbar = $true
-$ui.Width = 560
-$ui.Add_Shown({
-  $ui.TopMost = $true
-  $ui.Activate()
-  $ui.BringToFront()
-  [void][System.Windows.Forms.Application]::DoEvents()
-  $first = $inputBoxes.Values | Select-Object -First 1
-  if ($null -ne $first) { $first.Box.Focus() }
-})
+$ui.BackColor = $cBg
+$ui.ForeColor = $cText
+$ui.Font = $fontBody
+$ui.Width = $formWidth
 
-$y = 12
+$y = 24
+
+$title = New-Object System.Windows.Forms.Label
+$title.Location = New-Object System.Drawing.Point($contentLeft, $y)
+$title.Size = New-Object System.Drawing.Size($contentWidth, 28)
+$title.Font = $fontTitle
+$title.ForeColor = $cText
+$title.Text = [string]$formObj.title
+$ui.Controls.Add($title)
+$y += 34
+
+$infoText = [string]$formObj.info
+$infoLines = @($infoText -split "(`r`n|`n|`r)")
+$infoHeight = [Math]::Max(40, (18 * [Math]::Max(1, $infoLines.Count)) + 8)
+
 $lblInfo = New-Object System.Windows.Forms.Label
-$lblInfo.Location = New-Object System.Drawing.Point(16, $y)
-$lblInfo.Size = New-Object System.Drawing.Size(510, 64)
-$lblInfo.Text = [string]$formObj.info
+$lblInfo.Location = New-Object System.Drawing.Point($contentLeft, $y)
+$lblInfo.Size = New-Object System.Drawing.Size($contentWidth, $infoHeight)
+$lblInfo.Font = $fontBody
+$lblInfo.ForeColor = $cSecondary
+$lblInfo.Text = $infoText
 $ui.Controls.Add($lblInfo)
-$y += 72
+$y += ($infoHeight + 10)
 
-$lblProject = New-Object System.Windows.Forms.Label
-$lblProject.Location = New-Object System.Drawing.Point(16, $y)
-$lblProject.Size = New-Object System.Drawing.Size(510, 20)
-$lblProject.Text = "SM project: $($formObj.project)  |  values go only into Secrets Manager"
-$ui.Controls.Add($lblProject)
+$lblMeta = New-Object System.Windows.Forms.Label
+$lblMeta.Location = New-Object System.Drawing.Point($contentLeft, $y)
+$lblMeta.Size = New-Object System.Drawing.Size($contentWidth, 18)
+$lblMeta.Font = $fontSmall
+$lblMeta.ForeColor = $cSecondary
+$lblMeta.Text = ("Project  " + [string]$formObj.project + "    ·    Secrets Manager only")
+$ui.Controls.Add($lblMeta)
 $y += 28
 
 $inputBoxes = @{}
 foreach ($field in $fields) {
+  $isSecret = $true
+  if ($null -ne $field.PSObject.Properties['secret']) {
+    $isSecret = [bool]$field.secret
+  } elseif ([string]$field.kind -eq 'text') {
+    $isSecret = $false
+  }
+
   $lbl = New-Object System.Windows.Forms.Label
-  $lbl.Location = New-Object System.Drawing.Point(16, $y)
-  $lbl.Size = New-Object System.Drawing.Size(510, 18)
-  $reqMark = if ($field.required -eq $true) { ' *' } else { '' }
-  $lbl.Text = "$($field.label)$reqMark  [$($field.sm_key)]"
+  $lbl.Location = New-Object System.Drawing.Point($contentLeft, $y)
+  $lbl.Size = New-Object System.Drawing.Size($contentWidth, 18)
+  $lbl.Font = $fontLabel
+  $lbl.ForeColor = $cText
+  $req = if ($field.required -eq $true) { '' } else { ' (optional)' }
+  $lbl.Text = ([string]$field.label + $req)
   $ui.Controls.Add($lbl)
   $y += 20
 
+  $keyHint = New-Object System.Windows.Forms.Label
+  $keyHint.Location = New-Object System.Drawing.Point($contentLeft, $y)
+  $keyHint.Size = New-Object System.Drawing.Size($contentWidth, 16)
+  $keyHint.Font = $fontSmall
+  $keyHint.ForeColor = $cSecondary
+  $kindNote = if ($isSecret) { 'secret' } else { 'visible to agent' }
+  $keyHint.Text = ([string]$field.sm_key + '  ·  ' + $kindNote)
+  $ui.Controls.Add($keyHint)
+  $y += 18
+
   if ($null -ne $field.hint -and [string]$field.hint -ne '') {
     $hint = New-Object System.Windows.Forms.Label
-    $hint.Location = New-Object System.Drawing.Point(16, $y)
-    $hint.Size = New-Object System.Drawing.Size(510, 18)
-    $hint.ForeColor = [System.Drawing.Color]::DimGray
+    $hint.Location = New-Object System.Drawing.Point($contentLeft, $y)
+    $hint.Size = New-Object System.Drawing.Size($contentWidth, 16)
+    $hint.Font = $fontSmall
+    $hint.ForeColor = $cSecondary
     $hint.Text = [string]$field.hint
     $ui.Controls.Add($hint)
     $y += 18
   }
 
   $box = New-Object System.Windows.Forms.TextBox
-  $box.Location = New-Object System.Drawing.Point(16, $y)
-  $box.Size = New-Object System.Drawing.Size(510, 24)
+  $box.Location = New-Object System.Drawing.Point($contentLeft, $y)
+  $box.Size = New-Object System.Drawing.Size($contentWidth, 28)
+  $box.Font = $fontBody
+  $box.BackColor = $cInputBg
+  $box.ForeColor = $cText
+  $box.BorderStyle = 'FixedSingle'
   if ([string]$field.kind -eq 'password') {
     $box.UseSystemPasswordChar = $true
   }
@@ -112,31 +173,53 @@ foreach ($field in $fields) {
     Box = $box
     Field = $field
   }
-  $y += 34
+  $y += 40
 }
 
 $status = New-Object System.Windows.Forms.Label
-$status.Location = New-Object System.Drawing.Point(16, $y)
-$status.Size = New-Object System.Drawing.Size(510, 36)
-$status.ForeColor = [System.Drawing.Color]::DarkRed
+$status.Location = New-Object System.Drawing.Point($contentLeft, $y)
+$status.Size = New-Object System.Drawing.Size($contentWidth, 22)
+$status.Font = $fontSmall
+$status.ForeColor = $cDanger
 $status.Text = ''
 $ui.Controls.Add($status)
-$y += 40
-
-$btnOk = New-Object System.Windows.Forms.Button
-$btnOk.Text = 'In Secrets Manager speichern'
-$btnOk.Location = New-Object System.Drawing.Point(200, $y)
-$btnOk.Size = New-Object System.Drawing.Size(200, 30)
-$ui.Controls.Add($btnOk)
+$y += 30
 
 $btnCancel = New-Object System.Windows.Forms.Button
-$btnCancel.Text = 'Abbrechen'
-$btnCancel.Location = New-Object System.Drawing.Point(420, $y)
-$btnCancel.Size = New-Object System.Drawing.Size(106, 30)
+$btnCancel.Text = 'Cancel'
+$btnCancel.Location = New-Object System.Drawing.Point(($contentLeft + $contentWidth - 210), $y)
+$btnCancel.Size = New-Object System.Drawing.Size(96, 32)
+$btnCancel.FlatStyle = 'Flat'
+$btnCancel.FlatAppearance.BorderColor = $cBorder
+$btnCancel.FlatAppearance.BorderSize = 1
+$btnCancel.BackColor = $cBtnSecondaryBg
+$btnCancel.ForeColor = $cText
+$btnCancel.Font = $fontBody
 $btnCancel.DialogResult = [System.Windows.Forms.DialogResult]::Cancel
 $ui.Controls.Add($btnCancel)
 $ui.CancelButton = $btnCancel
-$ui.Height = $y + 80
+
+$btnOk = New-Object System.Windows.Forms.Button
+$btnOk.Text = 'Save'
+$btnOk.Location = New-Object System.Drawing.Point(($contentLeft + $contentWidth - 102), $y)
+$btnOk.Size = New-Object System.Drawing.Size(102, 32)
+$btnOk.FlatStyle = 'Flat'
+$btnOk.FlatAppearance.BorderSize = 0
+$btnOk.BackColor = $cAccent
+$btnOk.ForeColor = [System.Drawing.Color]::White
+$btnOk.Font = $fontLabel
+$ui.Controls.Add($btnOk)
+
+$ui.Height = $y + 88
+
+$ui.Add_Shown({
+  $ui.TopMost = $true
+  $ui.Activate()
+  $ui.BringToFront()
+  [void][System.Windows.Forms.Application]::DoEvents()
+  $first = $inputBoxes.Values | Select-Object -First 1
+  if ($null -ne $first) { $first.Box.Focus() }
+})
 
 function Clear-SecretBoxes {
   foreach ($key in @($inputBoxes.Keys)) {
@@ -148,6 +231,7 @@ $script:SaveOk = $false
 $script:WriteReport = $null
 
 $btnOk.Add_Click({
+  $status.ForeColor = $cDanger
   $status.Text = ''
   $values = @{}
   foreach ($key in @($inputBoxes.Keys)) {
@@ -158,11 +242,11 @@ $btnOk.Add_Click({
     $minLen = if ($null -ne $field.min_length) { [int]$field.min_length } else { if ($required) { 1 } else { 0 } }
     $maxLen = if ($null -ne $field.max_length) { [int]$field.max_length } else { 4096 }
     if ($required -and $text.Length -lt 1) {
-      $status.Text = "Pflichtfeld fehlt: $($field.label)"
+      $status.Text = ('Required: ' + [string]$field.label)
       return
     }
     if ($text.Length -gt 0 -and ($text.Length -lt $minLen -or $text.Length -gt $maxLen)) {
-      $status.Text = "Ungültige Länge: $($field.label)"
+      $status.Text = ('Invalid length: ' + [string]$field.label)
       return
     }
     if ($text.Length -gt 0) {
@@ -171,32 +255,19 @@ $btnOk.Add_Click({
   }
 
   if ($values.Count -lt 1) {
-    $status.Text = 'Kein Wert eingegeben.'
+    $status.Text = 'Nothing to save.'
     return
   }
 
   $btnOk.Enabled = $false
   $btnCancel.Enabled = $false
-  $status.ForeColor = [System.Drawing.Color]::DarkBlue
-  $status.Text = 'Speichere…'
+  $status.ForeColor = $cSecondary
+  $status.Text = 'Saving...'
 
   $written = New-Object System.Collections.Generic.List[string]
   $actions = @{}
-  $publicValues = @{}
   try {
     foreach ($key in @($values.Keys)) {
-      $meta = $inputBoxes[$key]
-      $field = $meta.Field
-      $isSecret = $true
-      if ($null -ne $field.secret) {
-        $isSecret = [bool]$field.secret
-      } elseif ([string]$field.kind -eq 'text') {
-        $isSecret = $false
-      }
-      if (-not $isSecret) {
-        $publicValues[$key] = [string]$values[$key]
-      }
-
       $psi = New-Object System.Diagnostics.ProcessStartInfo
       $psi.FileName = $node.Source
       $psi.Arguments = "`"$writeScript`" $WriteApprovalFlag --project `"$($formObj.project)`" --key `"$key`""
@@ -275,8 +346,8 @@ $btnOk.Add_Click({
     $ui.Close()
   }
   catch {
-    $status.ForeColor = [System.Drawing.Color]::DarkRed
-    $status.Text = "Speichern fehlgeschlagen ($($_.Exception.Message))."
+    $status.ForeColor = $cDanger
+    $status.Text = ('Could not save (' + $_.Exception.Message + ')')
     $btnOk.Enabled = $true
     $btnCancel.Enabled = $true
   }
