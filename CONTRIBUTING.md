@@ -1,16 +1,20 @@
 # Contributing to Agent Credential Bridge
 
-Thank you for considering a contribution. This is a security research harness,
-so clarity and restraint matter more than feature count.
+Thank you for considering a contribution. This project is both an experimental
+credential broker and a security research harness. Clarity and restraint matter
+more than feature count.
 
 ## Before you start
 
-- Read the README, architecture document, security policy, and code of conduct.
+- Read the [README](README.md), [Features](docs/features.md),
+  [Architecture](docs/architecture.md), security policy, and code of conduct.
+  Agent-facing rules live in [AGENTS.md](AGENTS.md).
 - Never include a real credential, vault export, token, cookie, recovery code,
   private service inventory, or raw machine output in a commit, issue, pull
   request, discussion, test, or log.
-- Use generated fake values only. If a contribution needs a real vault or live
-  service to demonstrate value, it is outside the current public scope.
+- Use generated fake values in tests and pull requests. Operator-approved
+  Secrets Manager work belongs on the machine, not in git. If a contribution
+  needs a secret value in the review surface, it is out of scope.
 - Do not open a public issue for a potential vulnerability. Use private
   vulnerability reporting as described in SECURITY.md.
 

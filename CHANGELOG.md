@@ -7,10 +7,16 @@ Semantic Versioning while it remains on the experimental 0.x line.
 
 ### Added
 
+- Human-facing product README, [feature map](docs/features.md), and
+  [research index](docs/research-status.md). Agent runbooks stay separate.
+- Phase 17b in-process Bridge-owned Playwright driver behind the same
+  index-only login allow-list (`driver: 'playwright'`). Playwright is not a
+  package dependency; stub tests always run. Agent CDP, `playwright-cli`,
+  cookie export, and non-loopback hosts remain forbidden.
 - Phase 17 Bridge-owned browser for `browser_form_login`: agent selects
   field indices, Bridge injects in-memory secrets, cookies never leave the
-  jar (`docs/phase17-bridge-owned-browser.md`). Playwright/CDP/cookie export
-  remain forbidden; `authorization_ready` stays false.
+  jar (`docs/phase17-bridge-owned-browser.md`). Agent CDP, cookie export, and
+  `playwright-cli` remain forbidden; `authorization_ready` stays false.
 - Phase 16 fake-loopback SSH/FTP session brokers (policy versions 7/8), private-hq
   multi-class SM matrix coverage, and operator docs
   (`docs/phase16-ssh-ftp-session-brokers.md`). `env_inject` remains rejected;

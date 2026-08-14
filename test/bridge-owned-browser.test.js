@@ -47,6 +47,15 @@ describe('bridge-owned browser', () => {
       assert.equal(session.cookie_export_forbidden, true);
       assert.equal(session.authorization_ready, false);
 
+      const contract = await readJson(await fetch(`${session.baseUrl}/contract`));
+      assert.equal(contract.ok, true);
+      assert.ok(contract.allowed_ops.includes('snapshot'));
+      assert.ok(contract.forbidden_ops.includes('cookie_list'));
+      assert.ok(contract.allowed_paths.includes('/home'));
+      assert.ok(contract.error_codes.includes('session_material_forbidden'));
+      assert.deepEqual(contract.inject_login_body, ['empty', 'generation']);
+      assert.equal(JSON.stringify(contract).includes(credentials.password), false);
+
       const snapRes = await fetch(`${session.baseUrl}/snapshot`);
       const snap = await readJson(snapRes);
       assert.equal(snapRes.status, 200);

@@ -1553,6 +1553,9 @@ machine-account resolve path as the productive same-user default:
   `BWS_ACCESS_TOKEN` on an agent-readable process environment;
 - resolve secret values into short-lived Bridge/broker memory via a pinned
   upstream `bws` CLI or an injected test adapter; never log or return secrets;
+  on Windows, `bws.exe` may be resolved from the default LocalAppData
+  Programs\\Bitwarden location when it is not on PATH; a missing CLI is
+  `bws_missing` and must not be reported as an `authorization_ready` failure;
 - keep `helper_vault_free=true` — no vault client and no secrets on the
   LocalService helper pipe;
 - keep `authorization_ready` evidence-driven (Windows 9e/10c or platform
@@ -1649,7 +1652,49 @@ Phase 17 may add a Bridge-owned browser runtime for policy version 5
 - one session writer; MFA/CAPTCHA fail closed; `authorization_ready` stays
   false; helper remains vault-free.
 
-Phase 17 must not wire Playwright/Chrome-extension/agent CDP, export cookies,
-solve MFA, or open non-loopback hosts such as `traffic.mivia.ai`. Those need a
-later explicit live gate and a Bridge-owned driver that still uses this
-command allow-list.
+Phase 17 must not export cookies, solve MFA, or open non-loopback hosts such as
+`traffic.mivia.ai`. Agent-owned Playwright CLI, Chrome extensions, and agent CDP
+remain forbidden. A later live gate is required for public origins.
+
+## Phase 17b scope
+
+Phase 17b may add an in-process Bridge-owned Playwright page adapter behind the
+same Phase 17 HTTP allow-list:
+
+- `startBridgeOwnedBrowser({ driver: 'playwright' })` launches Chromium, Firefox,
+  or WebKit inside the Bridge process; the agent still only sees indices and
+  `inject_login` with an empty body;
+- the page, context, CDP endpoint, cookies, and caller-supplied selectors never
+  appear on the session handle or agent JSON;
+- fill uses bounded field-name selectors after index authorization; submit uses
+  the authorized button label, not a free CSS/XPath string;
+- default `npm test` stays dependency-free: Playwright is not a package
+  dependency; stub tests always run and a live Playwright case skips when the
+  package or browsers are absent;
+- missing Playwright maps to `playwright_absent`; launch/goto failure maps to
+  `playwright_launch_failed`.
+
+Phase 17b must not add `playwright` to `package.json`, expose `playwright-cli`
+or agent CDP, export cookies, solve MFA, open non-loopback hosts, or set
+`authorization_ready=true`.
+
+## Phase 17c scope
+
+Phase 17c may wire the Phase 17/17b browser so a consuming agent can start it
+without improvising:
+
+- operator CLI `npm run start:browser:sm` behind
+  `--i-approve-secrets-manager-machine-resolve` and
+  `--i-approve-bridge-owned-browser`, with `--alias` and
+  `--driver fetch|playwright`; emit one value-free JSON handle;
+- `GET /contract` on the browser session (allowed/forbidden ops, paths,
+  error codes) — already in 17b follow-up;
+- `GET /services` on the operational SM bridge so ports survive a lost
+  stdout line;
+- docs with a four-call transcript; optional `POST /read` only for
+  `allowed_paths`, behind the same sensitive-scan (never cookies/HTML dumps
+  of login pages).
+
+Phase 17c must not export cookies, add agent CDP/`playwright-cli`, solve MFA,
+open non-loopback hosts, put `BWS_ACCESS_TOKEN` in agent env, or set
+`authorization_ready=true`.

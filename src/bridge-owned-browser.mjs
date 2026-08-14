@@ -5,11 +5,13 @@ import { PASSWORD_PLACEHOLDER, USERNAME_PLACEHOLDER } from './constants.js';
 import { createFetchPageAdapter } from './bridge-browser-fake-adapter.mjs';
 import {
   ALLOWED_AGENT_OPS,
+  AGENT_ERROR_CODES,
   BridgeBrowserTargetingError,
   authorizeTargetSelection,
   assertInjectSafe,
   denyAgentOp,
   enumerateAgentCandidates,
+  FORBIDDEN_AGENT_OPS,
   parseTargetSelection,
 } from './bridge-browser-targeting.mjs';
 import { validatePolicy } from './policy.js';
@@ -37,6 +39,10 @@ let activeSessions = 0;
  *   policy: unknown,
  *   credentials: import('./basic-credentials.js').BasicCredentials,
  *   adapter?: ReturnType<typeof createFetchPageAdapter>,
+ *   driver?: 'fetch' | 'playwright',
+ *   playwright?: object,
+ *   browser?: 'chromium' | 'firefox' | 'webkit',
+ *   headless?: boolean,
  *   log?: (entry: {level:string,message:string,meta?:object}) => void,
  * }} options
  */
@@ -66,10 +72,33 @@ export async function startBridgeOwnedBrowser(options) {
     throw new BridgeOwnedBrowserError('invalid_credentials');
   }
 
-  const adapter = options.adapter ?? createFetchPageAdapter({
-    origin: policy.login_origin,
-    loginPath: policy.login_path,
-  });
+  let adapter = options.adapter;
+  if (!adapter) {
+    if (options.driver === 'playwright') {
+      try {
+        const { createPlaywrightPageAdapter } = await import('./bridge-browser-playwright-adapter.mjs');
+        adapter = await createPlaywrightPageAdapter({
+          origin: policy.login_origin,
+          loginPath: policy.login_path,
+          playwright: options.playwright,
+          headless: options.headless,
+          browser: options.browser,
+        });
+      } catch (error) {
+        if (error instanceof BridgeBrowserTargetingError) {
+          throw new BridgeOwnedBrowserError(error.code);
+        }
+        throw new BridgeOwnedBrowserError('playwright_launch_failed');
+      }
+    } else if (options.driver === undefined || options.driver === 'fetch') {
+      adapter = createFetchPageAdapter({
+        origin: policy.login_origin,
+        loginPath: policy.login_path,
+      });
+    } else {
+      throw new BridgeOwnedBrowserError('invalid_request');
+    }
+  }
 
   /** @type {Set<string>} */
   const sensitive = buildCredentialSensitiveVariants(credentials);
@@ -129,7 +158,7 @@ export async function startBridgeOwnedBrowser(options) {
   } catch {
     closed = true;
     activeSessions = Math.max(0, activeSessions - 1);
-    adapter.close();
+    await adapter.close();
     throw new BridgeOwnedBrowserError('bind_failed');
   }
 
@@ -137,7 +166,7 @@ export async function startBridgeOwnedBrowser(options) {
   if (address === null || typeof address === 'string') {
     closed = true;
     activeSessions = Math.max(0, activeSessions - 1);
-    adapter.close();
+    await adapter.close();
     await closeHttp(server);
     throw new BridgeOwnedBrowserError('bind_failed');
   }
@@ -161,7 +190,7 @@ export async function startBridgeOwnedBrowser(options) {
     async close() {
       if (closed) return;
       closed = true;
-      adapter.close();
+      await adapter.close();
       sensitive.clear();
       activeSessions = Math.max(0, activeSessions - 1);
       await closeHttp(server);
@@ -207,6 +236,24 @@ async function handleAgentRequest(req, res, ctx) {
       return;
     }
 
+    if (op === 'contract' && req.method === 'GET') {
+      writeJson(res, sensitive, {
+        ok: true,
+        allowed_ops: ALLOWED_AGENT_OPS,
+        forbidden_ops: FORBIDDEN_AGENT_OPS,
+        allowed_paths: ctx.policy.allowed_paths,
+        login_path: ctx.policy.login_path,
+        success_path: ctx.policy.success_path,
+        error_codes: AGENT_ERROR_CODES,
+        inject_login_body: Object.freeze(['empty', 'generation']),
+        cookie_export_forbidden: true,
+        agent_cdp_absent: true,
+        authorization_ready: false,
+        helper_vault_free: true,
+      });
+      return;
+    }
+
     if (op === 'snapshot' && req.method === 'GET') {
       await handleSnapshot(res, ctx);
       return;
@@ -241,7 +288,7 @@ async function handleAgentRequest(req, res, ctx) {
 async function handleSnapshot(res, ctx) {
   const { adapter, sensitive, bumpGeneration, setLastSnapshot, getLoggedIn, policy } = ctx;
   const page = await adapter.snapshotPage();
-  adapter.absorbCookiesInto(sensitive);
+  await adapter.absorbCookiesInto(sensitive);
   const generation = bumpGeneration();
   if (page.facts.challenge !== 'none') {
     const code = page.facts.challenge === 'mfa' ? 'mfa_required' : 'captcha_required';
@@ -323,8 +370,9 @@ async function handleInject(req, res, ctx) {
     password: ctx.credentials.password,
     hiddenNames: [...ctx.policy.hidden_fields],
     maxRedirectHops: ctx.policy.max_redirect_hops,
+    submitLabel: authorized.submit.name,
   });
-  ctx.adapter.absorbCookiesInto(ctx.sensitive);
+  await ctx.adapter.absorbCookiesInto(ctx.sensitive);
   const landed = new URL(submitted.url);
   if (landed.origin !== new URL(ctx.policy.login_origin).origin) {
     throw new BridgeOwnedBrowserError('origin_mismatch');
@@ -357,7 +405,7 @@ async function handleGoto(req, res, ctx) {
   }
   const target = new URL(raw.path, `${ctx.policy.login_origin}/`).href;
   const page = await ctx.adapter.goto(target);
-  ctx.adapter.absorbCookiesInto(ctx.sensitive);
+  await ctx.adapter.absorbCookiesInto(ctx.sensitive);
   ctx.bumpGeneration();
   writeJson(res, ctx.sensitive, {
     ok: true,
@@ -369,6 +417,7 @@ async function handleGoto(req, res, ctx) {
 
 function opFromPath(method, pathname) {
   if (method === 'GET' && pathname === '/status') return 'status';
+  if (method === 'GET' && pathname === '/contract') return 'contract';
   if (method === 'GET' && pathname === '/snapshot') return 'snapshot';
   if (method === 'POST' && pathname === '/select_targets') return 'select_targets';
   if (method === 'POST' && pathname === '/inject_login') return 'inject_login';

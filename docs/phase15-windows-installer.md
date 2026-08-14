@@ -19,8 +19,11 @@ on tag `v*` and uploads the Setup EXE.
 
 ## User journey
 
+Product overview: [README](../README.md) · [Features](features.md).
+
 1. Install Node.js 20+ (required; not bundled).
-2. Install `bws` (Bitwarden Secrets Manager CLI) on PATH.
+2. Install `bws` (Bitwarden Secrets Manager CLI); PATH optional if it lives at
+   `%LOCALAPPDATA%\Programs\Bitwarden\bws.exe`.
 3. Run Setup EXE → Start Menu **Setup Bridge** → paste machine token.
 4. Cloud default; optional self-host URL in the wizard.
 5. **Start Bridge** from Start Menu.

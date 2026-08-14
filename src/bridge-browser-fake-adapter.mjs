@@ -42,9 +42,11 @@ export function createFetchPageAdapter(options) {
      *   password: string,
      *   hiddenNames: string[],
      *   maxRedirectHops: number,
+     *   submitLabel?: string,
      * }} submit
      */
     async submitLogin(submit) {
+      void submit.submitLabel;
       const { html: loginHtml, url: loginUrl } = await request(fetchImpl, jar, currentUrl, {
         method: 'GET',
       });
@@ -108,13 +110,13 @@ export function createFetchPageAdapter(options) {
      * Add issued cookie values into a sensitive set without exposing them to the agent.
      * @param {Set<string>} sensitive
      */
-    absorbCookiesInto(sensitive) {
+    async absorbCookiesInto(sensitive) {
       for (const value of jar.values()) {
         if (value.length >= 8) sensitive.add(value);
       }
     },
 
-    close() {
+    async close() {
       jar.clear();
     },
   };

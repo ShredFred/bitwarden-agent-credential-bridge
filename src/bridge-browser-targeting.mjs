@@ -15,10 +15,36 @@ export class BridgeBrowserTargetingError extends Error {
 
 export const ALLOWED_AGENT_OPS = Object.freeze([
   'status',
+  'contract',
   'snapshot',
   'select_targets',
   'inject_login',
   'goto',
+]);
+
+export const AGENT_ERROR_CODES = Object.freeze([
+  'adapter_failed',
+  'already_logged_in',
+  'captcha_required',
+  'challenge_blocked',
+  'command_forbidden',
+  'concurrent_session_forbidden',
+  'extra_field_forbidden',
+  'inject_before_select',
+  'invalid_request',
+  'mfa_required',
+  'not_found',
+  'not_logged_in',
+  'origin_mismatch',
+  'path_denied',
+  'playwright_absent',
+  'playwright_launch_failed',
+  'sensitive_response_blocked',
+  'session_expired',
+  'session_material_forbidden',
+  'stale_generation',
+  'success_path_mismatch',
+  'target_kind_mismatch',
 ]);
 
 export const FORBIDDEN_AGENT_OPS = Object.freeze([
@@ -40,6 +66,8 @@ export const FORBIDDEN_AGENT_OPS = Object.freeze([
   'localstorage_get',
   'sessionstorage_list',
   'sessionstorage_get',
+  'playwright',
+  'playwright_cli',
   'request',
   'request_body',
   'response_body',

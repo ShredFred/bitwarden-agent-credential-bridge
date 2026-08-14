@@ -81,7 +81,9 @@ describe('bridge browser targeting', () => {
       assert.equal(denyAgentOp(op), 'session_material_forbidden');
     }
     assert.equal(denyAgentOp('screenshot'), 'command_forbidden');
+    assert.equal(denyAgentOp('playwright_cli'), 'command_forbidden');
     assert.equal(denyAgentOp('snapshot'), null);
+    assert.equal(denyAgentOp('contract'), null);
     assert.ok(FORBIDDEN_AGENT_OPS.includes('cookie_list'));
   });
 

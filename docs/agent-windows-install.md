@@ -37,7 +37,7 @@ git clone https://github.com/ShredFred/bitwarden-agent-credential-bridge.git
 cd bitwarden-agent-credential-bridge
 git checkout main
 npm ci
-# Ensure Bitwarden Secrets Manager CLI `bws` is on PATH (pin per docs).
+# bws: PATH or default %LOCALAPPDATA%\Programs\Bitwarden\bws.exe
 npm run setup:sm:wizard
 # Import keys named from samples/operational/bindings-sm.json into MiViA + private-hq
 npm run seed:sm -- --i-approve-secrets-manager-machine-write --prune --smoke --i-approve-secrets-manager-machine-resolve
@@ -67,5 +67,16 @@ Also revoke the machine token in Bitwarden SM if the PC should lose access.
 - Never echo or log the access token or secret values.
 - Never set `BWS_ACCESS_TOKEN` in the user/agent environment for general use.
 - Never claim `authorization_ready=true` from SM setup alone.
+- Missing `bws` is `bws_missing`. `authorization_ready=false` is LocalService
+  writer evidence and does not mean the SM CLI failed.
 - LocalService Day-2 install is optional and separate.
 - Follow [`sm-onboarding-and-import.md`](sm-onboarding-and-import.md) when adding or importing service keys.
+
+## Browser (agent-blind)
+
+The Bridge-owned browser (`GET /snapshot` → index select → empty
+`inject_login`) is implemented and tested. It is **not** started by
+`start:operational:sm` yet — that command still auto-logs-in via the Phase 6
+session broker. Do not invent `playwright-cli`, CDP, or cookie export as a
+workaround. See [`phase17-bridge-owned-browser.md`](phase17-bridge-owned-browser.md).
+The next wiring slice is Phase 17c (`start:browser:sm`).

@@ -19,15 +19,19 @@ npm run start:operational
 npm run live:disposable-bitwarden -- --i-approve-disposable-dev-bitwarden
 ```
 
-`start:operational` loads `samples/operational/bindings.json`, starts bearer,
-API-key header, Basic, API-key query, and browser form-login brokers with fake
-vault secrets, prints value-free status JSON, then waits for Ctrl+C.
+`start:operational` loads `samples/operational/bindings.json`, starts the bound
+HTTP and session brokers with fake vault secrets, prints value-free status
+JSON, then waits for Ctrl+C. SM-backed start is
+`npm run start:operational:sm` (Phase 14). The Bridge-owned browser
+(`startBridgeOwnedBrowser`) is a separate Phase 17 runtime, not this auto-login
+session broker.
 
 ## Binding rules
 
 - Policies must live under `policies/*.json`
 - Alias, policy path, and `credential_class` must match atomically
-- Rejected classes (`oauth`, MFA/SMS/email, SSH/FTP, `env_inject`) fail closed
+- Rejected classes (`oauth`, MFA/SMS/email, `env_inject`) fail closed.
+  SSH/FTP are dedicated session brokers (Phase 16), never `env_inject`.
 - DPAPI disposable password is never reused across multiple aliases
 
 ## Non-claims
