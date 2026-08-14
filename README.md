@@ -113,7 +113,7 @@ phase list:
 2. [SM onboarding and import](docs/sm-onboarding-and-import.md)
 3. [Experiment rules](AGENTS.md)
 4. [Bridge-owned browser contract](docs/phase17-bridge-owned-browser.md)
-   (library + tests today; SM start command is the next slice)
+   (`npm run start:browser:sm`)
 
 Never echo tokens. Never set `BWS_ACCESS_TOKEN` in the user environment.
 Never claim `authorization_ready=true` from SM setup alone. Missing `bws` is

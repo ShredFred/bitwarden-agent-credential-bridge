@@ -7,6 +7,9 @@ Semantic Versioning while it remains on the experimental 0.x line.
 
 ### Added
 
+- Phase 17c `npm run start:browser:sm` (dual approval flags, `--alias`) and
+  operational `GET /services` discovery on `http://127.0.0.1:18791`.
+  Bridge-owned browser CLI binds `http://127.0.0.1:18792`.
 - Human-facing product README, [feature map](docs/features.md), and
   [research index](docs/research-status.md). Agent runbooks stay separate.
 - Phase 17b in-process Bridge-owned Playwright driver behind the same

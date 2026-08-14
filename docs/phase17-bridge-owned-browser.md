@@ -7,14 +7,15 @@ The agent is the eyes. The Bridge is the hands for secrets.
 
 ## Status
 
-The HTTP contract is implemented and tested. **There is not yet an operator
-CLI that starts it against Secrets Manager.** `npm run start:operational:sm`
-still uses the Phase 6 auto-login session broker for `browser_form_login`.
-A consuming agent (Claude) asked for `npm run start:browser:sm` as the next
-slice — see Phase 17c in `AGENTS.md`.
+`npm run start:browser:sm` starts one Secrets Manager `browser_form_login`
+alias as a Bridge-owned browser. The agent is the eyes; the Bridge injects
+secrets. Loopback fake login site only.
 
-Until then, the surface below is what tests drive, and what a later start
-command will print as a JSON handle.
+`npm run start:operational:sm` still auto-logs-in `browser_form_login` via the
+Phase 6 session broker. Re-read ports at `http://127.0.0.1:18791/services`.
+
+The owned-browser CLI binds `http://127.0.0.1:18792` so `/contract` stays
+findable after a lost stdout line.
 
 ## What works in-process
 
@@ -65,7 +66,17 @@ of asking this surface to grow export ops.
 
 ```bash
 npm run test:phase17
+npm run start:browser:sm -- --i-approve-secrets-manager-machine-resolve --i-approve-bridge-owned-browser --alias phq_web
 ```
+
+Optional `--driver playwright` (not a package dependency; fails `playwright_absent`
+when Playwright is not installed).
+
+## Agent HTTP surface
+
+The start command prints one JSON handle with `baseUrl` and `contract_url`.
+The CLI also binds **http://127.0.0.1:18792**. Operational SM brokers are
+listed at **http://127.0.0.1:18791/services**.
 
 ## Agent HTTP surface
 
@@ -81,10 +92,10 @@ POST /goto             {"path":"/home"}
 ```
 
 ```bash
-curl -s "$BASE/contract"
-curl -s "$BASE/snapshot"
-curl -s -H "content-type: application/json" -d '{"generation":1,"username_index":0,"password_index":1,"submit_index":2}' "$BASE/select_targets"
-curl -s -H "content-type: application/json" -d '{"generation":1}' "$BASE/inject_login"
+curl -s http://127.0.0.1:18792/contract
+curl -s http://127.0.0.1:18792/snapshot
+curl -s -H "content-type: application/json" -d '{"generation":1,"username_index":0,"password_index":1,"submit_index":2}' http://127.0.0.1:18792/select_targets
+curl -s -H "content-type: application/json" -d '{"generation":1}' http://127.0.0.1:18792/inject_login
 ```
 
 Pinning `generation` on `inject_login` is the safe call. An empty `{}` body
@@ -95,7 +106,6 @@ those ops. Use the HTTP credential brokers (or stop) instead.
 
 ## Non-claims / not ready
 
-- Not a Secrets Manager start command yet (Phase 17c)
 - Not a general password manager for arbitrary public websites
 - Not `traffic.mivia.ai` or other non-loopback hosts (needs a later live gate)
 - Not Playwright-CLI, Claude Chrome extension, or agent-owned CDP

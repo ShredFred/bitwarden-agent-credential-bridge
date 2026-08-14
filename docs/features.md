@@ -30,7 +30,8 @@ is still research. Agent runbooks live separately:
 - **Bridge-owned browser** — the agent snapshots value-free field **indices**
   and calls `inject_login` with an empty body. Optional in-process Playwright
   driver; page, CDP, and cookies never appear on the session handle.
-  Operator/SM start command is the next slice (`start:browser:sm`).
+  Operator/SM start: `npm run start:browser:sm`. Re-read operational ports at
+  `http://127.0.0.1:18791/services`.
 - **SSH / FTP** — loopback session brokers with allow-listed ops. Not OpenSSH
   or wire FTP. Never `env_inject`.
 

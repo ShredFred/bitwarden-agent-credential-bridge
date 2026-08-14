@@ -21,10 +21,11 @@ npm run live:disposable-bitwarden -- --i-approve-disposable-dev-bitwarden
 
 `start:operational` loads `samples/operational/bindings.json`, starts the bound
 HTTP and session brokers with fake vault secrets, prints value-free status
-JSON, then waits for Ctrl+C. SM-backed start is
+JSON including `discoveryUrl` (`http://127.0.0.1:18791/services`), then waits
+for Ctrl+C. SM-backed start is
 `npm run start:operational:sm` (Phase 14). The Bridge-owned browser
-(`startBridgeOwnedBrowser`) is a separate Phase 17 runtime, not this auto-login
-session broker.
+(`npm run start:browser:sm`) is a different Phase 17 runtime, not this
+auto-login session broker.
 
 ## Binding rules
 

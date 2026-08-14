@@ -1,4 +1,5 @@
 import { readFile } from 'node:fs/promises';
+import http from 'node:http';
 import path from 'node:path';
 import { startBroker } from './broker.js';
 import { startBrowserSessionBroker } from './browser-session-broker.mjs';
@@ -50,6 +51,9 @@ const OPERATIONAL_CLASSES = new Set([
   'ssh',
   'ftp',
 ]);
+
+/** Loopback discovery so agents can re-read service ports after losing stdout. */
+export const OPERATIONAL_DISCOVERY_BIND = 'http://127.0.0.1:18791';
 
 /**
  * @typedef {{
@@ -253,6 +257,7 @@ function validateSmOperationalBindings(obj) {
  *     targetAclEvidence: object,
  *     peerEvidence: object,
  *   } | null,
+ *   discoveryBind?: string,
  * }} options
  */
 export async function startOperationalBridge(options) {
@@ -292,6 +297,7 @@ export async function startOperationalBridge(options) {
   /** @type {Array<{
    *   alias: string,
    *   credential_class: string,
+   *   runtime: string,
    *   baseUrl: string,
    *   replayUrl?: string,
    * }>} */
@@ -358,6 +364,7 @@ export async function startOperationalBridge(options) {
         services.push({
           alias: binding.alias,
           credential_class: binding.credential_class,
+          runtime: 'browser_session',
           baseUrl: broker.baseUrl,
           replayUrl: broker.replayUrl,
         });
@@ -387,6 +394,7 @@ export async function startOperationalBridge(options) {
         services.push({
           alias: binding.alias,
           credential_class: binding.credential_class,
+          runtime: 'ssh_session',
           baseUrl: broker.baseUrl,
           replayUrl: broker.replayUrl,
         });
@@ -415,6 +423,7 @@ export async function startOperationalBridge(options) {
         services.push({
           alias: binding.alias,
           credential_class: binding.credential_class,
+          runtime: 'ftp_session',
           baseUrl: broker.baseUrl,
           replayUrl: broker.replayUrl,
         });
@@ -481,6 +490,7 @@ export async function startOperationalBridge(options) {
       services.push({
         alias: binding.alias,
         credential_class: binding.credential_class,
+        runtime: 'http_broker',
         baseUrl: broker.baseUrl,
       });
     }
@@ -492,9 +502,30 @@ export async function startOperationalBridge(options) {
     throw new OperationalBridgeError('startup_failed');
   }
 
+  const discoveryBind = options.discoveryBind ?? OPERATIONAL_DISCOVERY_BIND;
+  let discoveryUrl;
+  try {
+    discoveryUrl = await startOperationalDiscovery({
+      bind: discoveryBind,
+      services,
+      profile: table.profile,
+      authorizationReady: authorizationReport.authorization_ready === true,
+      helperVaultFree: authorizationReport.helper_vault_free === true,
+      secretsManagerMode: smMode,
+    });
+  } catch {
+    await cleanup();
+    throw new OperationalBridgeError('discovery_bind_failed');
+  }
+  resources.push({
+    kind: 'discovery',
+    close: () => closeHttp(discoveryUrl.server),
+  });
+
   return Object.freeze({
     profile: table.profile,
     services: Object.freeze(services.map((s) => Object.freeze({ ...s }))),
+    discoveryUrl: discoveryUrl.baseUrl,
     harness_ready: true,
     disposable_dev_ready: false,
     secrets_manager_mode: smMode,
@@ -557,4 +588,88 @@ export async function loadOperationalBindingsFile(repoRoot, relativePath) {
     throw new OperationalBridgeError('bindings_unreadable');
   }
   return validateOperationalBindings(JSON.parse(text));
+}
+
+/**
+ * @param {{
+ *   bind: string,
+ *   services: Array<{ alias: string, credential_class: string, runtime: string, baseUrl: string, replayUrl?: string }>,
+ *   profile: string,
+ *   authorizationReady: boolean,
+ *   helperVaultFree: boolean,
+ *   secretsManagerMode: boolean,
+ * }} options
+ */
+function startOperationalDiscovery(options) {
+  const bindUrl = new URL(options.bind);
+  if (bindUrl.protocol !== 'http:' ||
+      (bindUrl.hostname !== '127.0.0.1' && bindUrl.hostname !== 'localhost')) {
+    return Promise.reject(new OperationalBridgeError('discovery_bind_failed'));
+  }
+  const server = http.createServer((req, res) => {
+    const url = new URL(req.url ?? '/', 'http://127.0.0.1');
+    if (req.method === 'GET' && url.pathname === '/status') {
+      writeDiscoveryJson(res, {
+        ok: true,
+        profile: options.profile,
+        harness_ready: true,
+        secrets_manager_mode: options.secretsManagerMode,
+        authorization_ready: options.authorizationReady,
+        helper_vault_free: options.helperVaultFree,
+        cookie_export_forbidden: true,
+      });
+      return;
+    }
+    if (req.method === 'GET' && url.pathname === '/services') {
+      writeDiscoveryJson(res, {
+        ok: true,
+        profile: options.profile,
+        authorization_ready: options.authorizationReady,
+        helper_vault_free: options.helperVaultFree,
+        cookie_export_forbidden: true,
+        services: options.services.map((service) => ({
+          alias: service.alias,
+          credential_class: service.credential_class,
+          runtime: service.runtime,
+          baseUrl: service.baseUrl,
+          ...(service.replayUrl ? { replayUrl: service.replayUrl } : {}),
+        })),
+      });
+      return;
+    }
+    res.writeHead(403, { 'content-type': 'application/json; charset=utf-8' });
+    res.end(JSON.stringify({ error: 'command_forbidden' }));
+  });
+  return new Promise((resolve, reject) => {
+    server.once('error', reject);
+    server.listen(Number(bindUrl.port), bindUrl.hostname, () => {
+      server.off('error', reject);
+      const address = server.address();
+      if (address === null || typeof address === 'string') {
+        server.close(() => reject(new OperationalBridgeError('discovery_bind_failed')));
+        return;
+      }
+      resolve({
+        server,
+        baseUrl: `http://${bindUrl.hostname}:${address.port}`,
+      });
+    });
+  });
+}
+
+function writeDiscoveryJson(res, payload) {
+  const body = JSON.stringify(payload);
+  if (/"set-cookie"/i.test(body) || /cookie=/i.test(body)) {
+    res.writeHead(502, { 'content-type': 'application/json; charset=utf-8' });
+    res.end(JSON.stringify({ error: 'sensitive_response_blocked' }));
+    return;
+  }
+  res.writeHead(200, { 'content-type': 'application/json; charset=utf-8' });
+  res.end(body);
+}
+
+function closeHttp(server) {
+  return new Promise((resolve) => {
+    server.close(() => resolve(undefined));
+  });
 }
