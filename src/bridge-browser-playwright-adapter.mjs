@@ -23,7 +23,13 @@ export async function createPlaywrightPageAdapter(options) {
   const playwright = options.playwright ?? await importPlaywright();
   const requested = options.browser ?? 'chromium';
   const browserType = pickBrowser(playwright, requested);
-  const launchOptions = { headless: options.headless !== false };
+  const launchOptions = {
+    headless: options.headless !== false,
+    devtools: false,
+    handleSIGINT: false,
+    handleSIGTERM: false,
+    handleSIGHUP: false,
+  };
   if (requested === 'chromium') launchOptions.chromiumSandbox = false;
 
   let browser;
@@ -39,6 +45,8 @@ export async function createPlaywrightPageAdapter(options) {
     context = await browser.newContext({
       acceptDownloads: false,
       javaScriptEnabled: true,
+      bypassCSP: false,
+      ignoreHTTPSErrors: false,
     });
     page = await context.newPage();
     const loginUrl = new URL(options.loginPath, `${origin}/`).href;

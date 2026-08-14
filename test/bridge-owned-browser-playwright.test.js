@@ -65,20 +65,25 @@ function makeStubPlaywright(origin) {
     waitForLoadState: async () => {},
   };
 
-  return {
+  const stub = {
     fills,
     cookieStore,
+    launchOptions: null,
     chromium: {
-      launch: async () => ({
-        newContext: async () => ({
-          newPage: async () => page,
-          cookies: async () => cookieStore.map((cookie) => ({ ...cookie })),
+      launch: async (opts) => {
+        stub.launchOptions = opts;
+        return {
+          newContext: async () => ({
+            newPage: async () => page,
+            cookies: async () => cookieStore.map((cookie) => ({ ...cookie })),
+            close: async () => {},
+          }),
           close: async () => {},
-        }),
-        close: async () => {},
-      }),
+        };
+      },
     },
   };
+  return stub;
 }
 
 async function policyFor(origin) {
@@ -101,6 +106,11 @@ describe('bridge-owned playwright driver', () => {
     });
     try {
       assert.equal(session.agent_cdp_absent, true);
+      assert.equal(session.screenshot_forbidden, true);
+      assert.equal(session.headless, true);
+      assert.equal(stub.launchOptions.headless, true);
+      assert.equal(stub.launchOptions.devtools, false);
+      assert.equal(stub.launchOptions.handleSIGINT, false);
       assert.equal(JSON.stringify(session).includes('newPage'), false);
       const snap = await (await fetch(`${session.baseUrl}/snapshot`)).json();
       await fetch(`${session.baseUrl}/select_targets`, {
@@ -124,6 +134,29 @@ describe('bridge-owned playwright driver', () => {
       assert.ok(stub.fills.some((f) => f.selector.includes('password') && f.value === credentials.password));
       const cookies = await (await fetch(`${session.baseUrl}/cookie_list`)).json();
       assert.equal(cookies.error, 'session_material_forbidden');
+    } finally {
+      await session.close();
+    }
+  });
+
+  it('launches headed Playwright when requested and still forbids screenshots', async () => {
+    const origin = 'http://127.0.0.1:9';
+    const credentials = { username: 'user_abcdefgh', password: generateFakeSentinel() };
+    const stub = makeStubPlaywright(origin);
+    const session = await startBridgeOwnedBrowser({
+      policy: await policyFor(origin),
+      credentials,
+      driver: 'playwright',
+      playwright: stub,
+      headless: false,
+    });
+    try {
+      assert.equal(session.headless, false);
+      assert.equal(stub.launchOptions.headless, false);
+      assert.equal(stub.launchOptions.devtools, false);
+      assert.equal(session.screenshot_forbidden, true);
+      const screenshot = await (await fetch(`${session.baseUrl}/screenshot`)).json();
+      assert.equal(screenshot.error, 'command_forbidden');
     } finally {
       await session.close();
     }

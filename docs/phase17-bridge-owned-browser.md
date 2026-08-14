@@ -40,13 +40,28 @@ findable after a lost stdout line.
 `startBridgeOwnedBrowser` accepts `driver: 'fetch'` (default) or
 `driver: 'playwright'`.
 
-- **fetch** — stdlib HTTP + private cookie jar. Always available. Default
-  `npm test` path.
+- **fetch** — stdlib HTTP + private cookie jar. Always available. Fastest.
+  No window, no screenshots (there is no page to capture).
 - **playwright** (Phase 17b) — in-process Playwright owned by the Bridge.
-  Same HTTP allow-list. The `page` / `context` objects never leave the adapter.
-  Playwright is **not** a package dependency; tests inject a stub or skip when
-  `import('playwright')` fails. Missing install → `playwright_absent`. Launch
-  failure → `playwright_launch_failed`.
+  Same HTTP allow-list. **Headless is the default** and can render pages
+  without a window; `--headed` opens a window for a human watching.
+  Headless Playwright *can* take screenshots in general, but this Bridge
+  **does not** expose `/screenshot` to the agent: pixels can show
+  usernames, form state, and other session material, and images cannot be
+  scanned like JSON. The agent uses `/snapshot` indices instead.
+  Playwright is **not** a package dependency and is **not** vendored: the
+  repo ships a small page adapter (allow-list + fill/submit), not Chromium.
+  Tests inject a stub or skip when `import('playwright')` fails. Missing
+  install → `playwright_absent`. Launch failure → `playwright_launch_failed`.
+
+To try the Playwright driver locally without adding it to this repo:
+
+```bash
+npm install --no-save playwright
+npx playwright install chromium
+```
+
+Then start with `--driver playwright` (headless) or `--driver playwright --headed`.
 
 Raw `playwright-cli`, Chrome extensions, and agent CDP remain forbidden. If a
 task needs cookies or storage state, use the HTTP credential brokers instead
@@ -70,7 +85,10 @@ npm run start:browser:sm -- --i-approve-secrets-manager-machine-resolve --i-appr
 ```
 
 Optional `--driver playwright` (not a package dependency; fails `playwright_absent`
-when Playwright is not installed).
+when Playwright is not installed). Playwright is **headless by default**;
+`--headed` opens a window (Playwright only; invalid with `fetch`).
+Unknown flags such as `--screenshot` or `--devtools` are `invalid_request`.
+`GET /screenshot` stays `command_forbidden` in both modes.
 
 ## Agent HTTP surface
 
@@ -78,10 +96,8 @@ The start command prints one JSON handle with `baseUrl` and `contract_url`.
 The CLI also binds **http://127.0.0.1:18792**. Operational SM brokers are
 listed at **http://127.0.0.1:18791/services**.
 
-## Agent HTTP surface
-
 Discover the session, then the four-call login (replace `$BASE` with the
-session URL from the future start command or from a test handle):
+session URL from the start command or from a test handle):
 
 ```http
 GET  /contract
@@ -109,5 +125,5 @@ those ops. Use the HTTP credential brokers (or stop) instead.
 - Not a general password manager for arbitrary public websites
 - Not `traffic.mivia.ai` or other non-loopback hosts (needs a later live gate)
 - Not Playwright-CLI, Claude Chrome extension, or agent-owned CDP
-- Not cookie export, `state-save`, or MFA/CAPTCHA solving
+- Not cookie export, `state-save`, screenshots, or MFA/CAPTCHA solving
 - `authorization_ready` remains false

@@ -45,12 +45,17 @@ describe('bridge-owned browser', () => {
       assert.equal(session.origin_bound, true);
       assert.equal(session.agent_cdp_absent, true);
       assert.equal(session.cookie_export_forbidden, true);
+      assert.equal(session.screenshot_forbidden, true);
+      assert.equal(session.headless, true);
+      assert.equal(session.driver, 'fetch');
       assert.equal(session.authorization_ready, false);
 
       const contract = await readJson(await fetch(`${session.baseUrl}/contract`));
       assert.equal(contract.ok, true);
       assert.ok(contract.allowed_ops.includes('snapshot'));
       assert.ok(contract.forbidden_ops.includes('cookie_list'));
+      assert.equal(contract.screenshot_forbidden, true);
+      assert.equal(contract.headless, true);
       assert.ok(contract.allowed_paths.includes('/home'));
       assert.ok(contract.error_codes.includes('session_material_forbidden'));
       assert.deepEqual(contract.inject_login_body, ['empty', 'generation']);
@@ -105,6 +110,17 @@ describe('bridge-owned browser', () => {
       await session.close();
       await site.close();
     }
+  });
+
+  it('rejects headed fetch because there is no window to show', async () => {
+    await assert.rejects(
+      async () => startBridgeOwnedBrowser({
+        policy: await policyFor('http://127.0.0.1:9'),
+        credentials: { username: 'user_abcdefgh', password: generateFakeSentinel() },
+        headless: false,
+      }),
+      (error) => error instanceof BridgeOwnedBrowserError && error.code === 'invalid_request',
+    );
   });
 
   it('rejects cookie/eval/selector smuggling with stable codes', async () => {

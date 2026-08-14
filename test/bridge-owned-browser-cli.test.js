@@ -53,7 +53,7 @@ describe('bridge-owned browser SM CLI', () => {
         '--alias',
         'phq_web',
       ]),
-      { ok: true, alias: 'phq_web', driver: 'fetch' },
+      { ok: true, alias: 'phq_web', driver: 'fetch', headless: true },
     );
     assert.equal(
       parseBridgeOwnedBrowserCli([
@@ -61,8 +61,75 @@ describe('bridge-owned browser SM CLI', () => {
         BRIDGE_OWNED_BROWSER_APPROVAL_FLAG,
         '--alias=phq_web',
         '--driver=playwright',
-      ]).driver,
-      'playwright',
+      ]).headless,
+      true,
+    );
+    assert.equal(
+      parseBridgeOwnedBrowserCli([
+        SM_RESOLVE_APPROVAL_FLAG,
+        BRIDGE_OWNED_BROWSER_APPROVAL_FLAG,
+        '--alias',
+        'phq_web',
+        '--driver',
+        'playwright',
+        '--headed',
+      ]).headless,
+      false,
+    );
+    assert.equal(
+      parseBridgeOwnedBrowserCli([
+        SM_RESOLVE_APPROVAL_FLAG,
+        BRIDGE_OWNED_BROWSER_APPROVAL_FLAG,
+        '--alias',
+        'phq_web',
+        '--driver',
+        'playwright',
+        '--headless',
+      ]).headless,
+      true,
+    );
+    assert.equal(
+      parseBridgeOwnedBrowserCli([
+        SM_RESOLVE_APPROVAL_FLAG,
+        BRIDGE_OWNED_BROWSER_APPROVAL_FLAG,
+        '--alias',
+        'phq_web',
+        '--headed',
+        '--headless',
+      ]).code,
+      'invalid_request',
+    );
+    assert.equal(
+      parseBridgeOwnedBrowserCli([
+        SM_RESOLVE_APPROVAL_FLAG,
+        BRIDGE_OWNED_BROWSER_APPROVAL_FLAG,
+        '--alias',
+        'phq_web',
+        '--headed',
+      ]).code,
+      'invalid_request',
+    );
+    assert.equal(
+      parseBridgeOwnedBrowserCli([
+        SM_RESOLVE_APPROVAL_FLAG,
+        BRIDGE_OWNED_BROWSER_APPROVAL_FLAG,
+        '--alias',
+        'phq_web',
+        '--screenshot',
+      ]).code,
+      'invalid_request',
+    );
+    assert.equal(
+      parseBridgeOwnedBrowserCli([
+        SM_RESOLVE_APPROVAL_FLAG,
+        BRIDGE_OWNED_BROWSER_APPROVAL_FLAG,
+        '--alias',
+        'phq_web',
+        '--driver',
+        'playwright',
+        '--devtools',
+      ]).code,
+      'invalid_request',
     );
     assert.equal(
       parseBridgeOwnedBrowserCli([
@@ -105,6 +172,10 @@ describe('bridge-owned browser SM CLI', () => {
       assert.equal(started.session.agent_cdp_absent, true);
       const contract = await (await fetch(`${started.session.baseUrl}/contract`)).json();
       assert.ok(contract.allowed_ops.includes('inject_login'));
+      assert.equal(contract.screenshot_forbidden, true);
+      assert.equal(contract.headless, true);
+      assert.equal(contract.driver, 'fetch');
+      assert.ok(contract.forbidden_ops.includes('screenshot'));
       const snap = await (await fetch(`${started.session.baseUrl}/snapshot`)).json();
       await fetch(`${started.session.baseUrl}/select_targets`, {
         method: 'POST',

@@ -7,7 +7,8 @@
  *   --i-approve-secrets-manager-machine-resolve
  *   --i-approve-bridge-owned-browser
  *   --alias <binding>
- * Optional: --driver fetch|playwright (default fetch)
+ * Optional: --driver fetch|playwright (default fetch, no browser window)
+ * Optional: --headed (Playwright window; default is headless)
  *
  * Emits one value-free JSON handle. Never prints tokens or passwords.
  * authorization_ready stays evidence-driven (default false).
@@ -81,6 +82,7 @@ if (!parsed.ok) {
     authorization_ready: false,
     helper_vault_free: true,
     cookie_export_forbidden: true,
+    screenshot_forbidden: true,
     agent_cdp_absent: true,
   });
   await shutdown(1);
@@ -117,6 +119,7 @@ if (!parsed.ok) {
         bindings,
         alias: parsed.alias,
         driver: parsed.driver,
+        headless: parsed.headless,
         bind: BRIDGE_OWNED_BROWSER_CLI_BIND,
         resolveSecret: async (binding) => {
           const resolved = await resolveSecretsManagerSecret(
@@ -155,12 +158,14 @@ if (!parsed.ok) {
         ok: true,
         alias: session.alias,
         driver: session.driver,
+        headless: session.session.headless,
         runtime: session.runtime,
         baseUrl: session.session.baseUrl,
         contract_url: `${session.session.baseUrl}/contract`,
         origin_bound: true,
         agent_cdp_absent: true,
         cookie_export_forbidden: true,
+        screenshot_forbidden: true,
         secrets_manager_mode: true,
         authorization_ready: session.session.authorization_ready,
         helper_vault_free: true,
@@ -181,6 +186,7 @@ if (!parsed.ok) {
           absentOperationalAuthorizationForPlatform(process.platform).authorization_ready,
         helper_vault_free: true,
         cookie_export_forbidden: true,
+        screenshot_forbidden: true,
         agent_cdp_absent: true,
       });
       await shutdown(1);

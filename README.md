@@ -30,7 +30,7 @@ This project inverts that:
 | The agent may | The agent never gets |
 | --- | --- |
 | Call a policy-pinned HTTP route | The bearer token, API key, or Basic password |
-| Pick login fields by **index** | CSS/XPath, cookies, CDP, or the password value |
+| Pick login fields by **index** | CSS/XPath, cookies, CDP, screenshots, or the password value |
 | Replay an opaque session on allow-listed paths | `Set-Cookie`, storage state, or `eval` |
 | Exec a pinned SSH/FTP op on loopback | Process-environment injection (`env_inject`) |
 
@@ -55,7 +55,7 @@ local setup window. After that, agents work. Secrets do not.
 | --- | --- |
 | HTTP bearer / API-key header / Basic / query | Injects exactly one outbound credential; strips caller forgeries |
 | Browser form-login | Logs in from memory; agent sees an opaque session, not the cookie |
-| Bridge-owned browser | Agent is the *eyes* (field indices). Bridge is the *hands* for secrets. Optional in-process Playwright, never agent CDP |
+| Bridge-owned browser | Agent is the *eyes* (field indices). Bridge is the *hands* for secrets. Optional in-process Playwright adapter (not a package dependency; headless default). Never agent CDP or screenshots |
 | SSH / FTP (loopback) | Dedicated session brokers, allow-listed ops, no `env_inject` |
 
 Unsupported on purpose, and they fail closed: OAuth, interactive MFA, SMS,
@@ -127,6 +127,8 @@ Never claim `authorization_ready=true` from SM setup alone. Missing `bws` is
   explicit live gate. Agent Playwright-CLI, Chrome extensions, and agent CDP
   are not the secret path.
 - **No cookie export.** If a task needs the cookie, use an HTTP broker or stop.
+- **No agent screenshots.** Headless Playwright can render pixels, but
+  `/screenshot` stays forbidden. Use `/snapshot` field indices.
 - **No MFA solving.** Challenge pages fail closed.
 - Platform writer isolation (Windows LocalService, macOS LaunchDaemon, Linux
   systemd) is a documented research ladder, not a prerequisite for SM resolve.
@@ -137,7 +139,9 @@ Phase-by-phase research index: [Research status](docs/research-status.md).
 ## Requirements
 
 - Node.js 20+ (default tests are standard-library only — no npm runtime
-  dependencies). Playwright is optional and **not** a package dependency.
+  dependencies). Playwright is optional and **not** a package dependency:
+  the repo ships a small page adapter, not a browser. Default driver is
+  `fetch`. Install Playwright yourself only if you want `--driver playwright`.
 
 ```bash
 npm test

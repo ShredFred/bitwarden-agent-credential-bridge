@@ -1664,6 +1664,8 @@ same Phase 17 HTTP allow-list:
 - `startBridgeOwnedBrowser({ driver: 'playwright' })` launches Chromium, Firefox,
   or WebKit inside the Bridge process; the agent still only sees indices and
   `inject_login` with an empty body;
+- launch is headless unless `headless: false`; screenshots stay off the agent
+  API (`command_forbidden`);
 - the page, context, CDP endpoint, cookies, and caller-supplied selectors never
   appear on the session handle or agent JSON;
 - fill uses bounded field-name selectors after index authorization; submit uses
@@ -1686,7 +1688,8 @@ without improvising:
 - operator CLI `npm run start:browser:sm` behind
   `--i-approve-secrets-manager-machine-resolve` and
   `--i-approve-bridge-owned-browser`, with `--alias` and
-  `--driver fetch|playwright`; emit one value-free JSON handle;
+  `--driver fetch|playwright`; Playwright may take `--headed` (default
+  headless); emit one value-free JSON handle;
 - `GET /contract` on the browser session (allowed/forbidden ops, paths,
   error codes) — already in 17b follow-up;
 - `GET /services` on the operational SM bridge so ports survive a lost

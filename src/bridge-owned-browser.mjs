@@ -72,16 +72,25 @@ export async function startBridgeOwnedBrowser(options) {
     throw new BridgeOwnedBrowserError('invalid_credentials');
   }
 
+  const driver = options.driver ?? 'fetch';
+  if (driver !== 'fetch' && driver !== 'playwright') {
+    throw new BridgeOwnedBrowserError('invalid_request');
+  }
+  if (driver === 'fetch' && options.headless === false) {
+    throw new BridgeOwnedBrowserError('invalid_request');
+  }
+  const headless = driver === 'fetch' ? true : options.headless !== false;
+
   let adapter = options.adapter;
   if (!adapter) {
-    if (options.driver === 'playwright') {
+    if (driver === 'playwright') {
       try {
         const { createPlaywrightPageAdapter } = await import('./bridge-browser-playwright-adapter.mjs');
         adapter = await createPlaywrightPageAdapter({
           origin: policy.login_origin,
           loginPath: policy.login_path,
           playwright: options.playwright,
-          headless: options.headless,
+          headless,
           browser: options.browser,
         });
       } catch (error) {
@@ -90,13 +99,11 @@ export async function startBridgeOwnedBrowser(options) {
         }
         throw new BridgeOwnedBrowserError('playwright_launch_failed');
       }
-    } else if (options.driver === undefined || options.driver === 'fetch') {
+    } else {
       adapter = createFetchPageAdapter({
         origin: policy.login_origin,
         loginPath: policy.login_path,
       });
-    } else {
-      throw new BridgeOwnedBrowserError('invalid_request');
     }
   }
 
@@ -138,6 +145,8 @@ export async function startBridgeOwnedBrowser(options) {
       log,
       isClosed: () => closed,
       getLoggedIn: () => loggedIn,
+      driver,
+      headless,
       setLoggedIn: (value) => { loggedIn = value; },
       getGeneration: () => generation,
       bumpGeneration: () => {
@@ -182,6 +191,9 @@ export async function startBridgeOwnedBrowser(options) {
     origin_bound: true,
     agent_cdp_absent: true,
     cookie_export_forbidden: true,
+    screenshot_forbidden: true,
+    driver,
+    headless,
     authorization_ready: false,
     helper_vault_free: true,
     agent_secret_visible: false,
@@ -227,6 +239,9 @@ async function handleAgentRequest(req, res, ctx) {
         origin_bound: true,
         agent_cdp_absent: true,
         cookie_export_forbidden: true,
+        screenshot_forbidden: true,
+        driver: ctx.driver,
+        headless: ctx.headless,
         authorization_ready: false,
         helper_vault_free: true,
         agent_secret_visible: false,
@@ -247,6 +262,9 @@ async function handleAgentRequest(req, res, ctx) {
         error_codes: AGENT_ERROR_CODES,
         inject_login_body: Object.freeze(['empty', 'generation']),
         cookie_export_forbidden: true,
+        screenshot_forbidden: true,
+        driver: ctx.driver,
+        headless: ctx.headless,
         agent_cdp_absent: true,
         authorization_ready: false,
         helper_vault_free: true,

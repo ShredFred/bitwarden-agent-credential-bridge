@@ -8,6 +8,12 @@ export const BRIDGE_OWNED_BROWSER_APPROVAL_FLAG = '--i-approve-bridge-owned-brow
 export const BRIDGE_OWNED_BROWSER_CLI_BIND = 'http://127.0.0.1:18792';
 
 const ALIAS_PATTERN = /^[a-z][a-z0-9_]{0,31}$/;
+const KNOWN_SWITCHES = new Set([
+  SM_RESOLVE_APPROVAL_FLAG,
+  BRIDGE_OWNED_BROWSER_APPROVAL_FLAG,
+  '--headed',
+  '--headless',
+]);
 
 /**
  * @param {string[]} argv
@@ -15,6 +21,7 @@ const ALIAS_PATTERN = /^[a-z][a-z0-9_]{0,31}$/;
  *   ok: true,
  *   alias: string,
  *   driver: 'fetch' | 'playwright',
+ *   headless: boolean,
  * } | {
  *   ok: false,
  *   code: string,
@@ -43,7 +50,31 @@ export function parseBridgeOwnedBrowserCli(argv) {
   if (driver !== 'fetch' && driver !== 'playwright') {
     return { ok: false, code: 'invalid_request' };
   }
-  return { ok: true, alias, driver };
+  if (hasUnknownCliFlag(argv)) {
+    return { ok: false, code: 'invalid_request' };
+  }
+  if (argv.includes('--headless') && argv.includes('--headed')) {
+    return { ok: false, code: 'invalid_request' };
+  }
+  if (argv.includes('--headed') && driver === 'fetch') {
+    return { ok: false, code: 'invalid_request' };
+  }
+  const headless = !argv.includes('--headed');
+  return { ok: true, alias, driver, headless };
+}
+
+/**
+ * @param {string[]} argv
+ */
+function hasUnknownCliFlag(argv) {
+  for (const arg of argv) {
+    if (typeof arg !== 'string' || !arg.startsWith('-')) continue;
+    if (arg.startsWith('--alias=') || arg.startsWith('--driver=')) continue;
+    if (arg === '--alias' || arg === '--driver') continue;
+    if (KNOWN_SWITCHES.has(arg)) continue;
+    return true;
+  }
+  return false;
 }
 
 /**

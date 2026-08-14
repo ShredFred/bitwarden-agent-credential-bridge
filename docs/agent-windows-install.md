@@ -78,6 +78,11 @@ Also revoke the machine token in Bitwarden SM if the PC should lose access.
 npm run start:browser:sm -- --i-approve-secrets-manager-machine-resolve --i-approve-bridge-owned-browser --alias phq_web
 ```
 
+Default is the fast `fetch` driver (no window, no Playwright install).
+Playwright is optional and not shipped in this repo; headless unless
+you pass `--driver playwright --headed`. `/screenshot` is forbidden in both
+modes; use `/snapshot` field indices.
+
 Then `GET http://127.0.0.1:18792/contract` and the four-call login
 (snapshot → select_targets by index → inject_login with generation).
 Do not invent `playwright-cli`, CDP, or cookie export.
