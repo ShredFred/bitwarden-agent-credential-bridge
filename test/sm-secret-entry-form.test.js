@@ -1,4 +1,7 @@
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, it } from 'node:test';
 import {
   parseSmSecretEntryForm,
@@ -7,6 +10,13 @@ import {
   sanitizeSmSecretEntryPublicValues,
   SmSecretEntryFormError,
 } from '../src/sm-secret-entry-form.mjs';
+
+const dialogScriptPath = path.join(
+  path.dirname(fileURLToPath(import.meta.url)),
+  '..',
+  'scripts',
+  'windows-sm-secret-entry-dialog.ps1',
+);
 
 describe('sm secret entry form', () => {
   it('accepts a multi-field agent form without secret values', () => {
@@ -143,5 +153,17 @@ describe('sm secret entry form', () => {
       }),
       (error) => error instanceof SmSecretEntryFormError && error.code === 'password_must_be_secret',
     );
+  });
+
+  it('keeps the WinForms dialog script ASCII-only to avoid PowerShell mojibake', () => {
+    const bytes = fs.readFileSync(dialogScriptPath);
+    for (let i = 0; i < bytes.length; i += 1) {
+      assert.ok(bytes[i] < 0x80, `non-ASCII byte at offset ${i}`);
+    }
+    const src = bytes.toString('utf8');
+    assert.equal(src.includes('\u00b7'), false);
+    assert.match(src, /BwRoundPanel/);
+    assert.match(src, /Secrets Manager/);
+    assert.match(src, /Measure-UiText/);
   });
 });
