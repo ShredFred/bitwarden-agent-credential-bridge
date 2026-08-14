@@ -47,7 +47,7 @@ From source:
 
 ```powershell
 npm ci
-# bws must be on PATH (default install: %LOCALAPPDATA%\Programs\Bitwarden)
+# bws: PATH or default %LOCALAPPDATA%\Programs\Bitwarden\bws.exe
 npm run setup:sm:wizard
 # or: npm run setup:sm -- --i-approve-sm-machine-setup
 ```

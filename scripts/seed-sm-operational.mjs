@@ -39,6 +39,8 @@ import {
   fetchSecretsManagerSecretValue,
   listSecretsManagerSecretKeys,
   upsertSecretsManagerSecret,
+  SecretsManagerBwsAdapterError,
+  withBwsDiagnostic,
 } from '../src/secrets-manager-bws-adapter.mjs';
 import {
   SM_RESOLVE_APPROVAL_FLAG,
@@ -57,7 +59,7 @@ const IMPORT_MANIFEST_PATH = path.join(
 );
 
 function emit(payload, code = 0) {
-  process.stdout.write(`${JSON.stringify(payload)}\n`);
+  process.stdout.write(`${JSON.stringify(withBwsDiagnostic(payload))}\n`);
   process.exitCode = code;
 }
 
@@ -282,7 +284,8 @@ if (!process.argv.includes(SM_WRITE_APPROVAL_FLAG)) {
     }, smokeOk === false ? 1 : 0);
   } catch (error) {
     const code = error instanceof SecretsManagerTokenCollectorError ||
-      error instanceof OperationalBridgeError
+      error instanceof OperationalBridgeError ||
+      error instanceof SecretsManagerBwsAdapterError
       ? error.code
       : 'seed_failed';
     emit({

@@ -37,7 +37,7 @@ describe('phase14 secrets manager operational wiring', () => {
     );
     assert.equal(table.profile, 'operational_sm_same_user');
     assert.equal(table.bindings.length, 2);
-    assert.equal(table.bindings[0].sm_secret_key, 'mivia_demo_bearer');
+    assert.equal(table.bindings[0].sm_secret_key, 'mivia_api_bearer');
   });
 
   it('requires an injected SM resolver and starts with fake adapter secrets', async () => {
@@ -102,6 +102,8 @@ describe('phase14 secrets manager operational wiring', () => {
     assert.notEqual(ops.code, 0);
     const opsPayload = JSON.parse(ops.stdout.trim().split(/\r?\n/).pop());
     assert.equal(opsPayload.code, 'approval_flag_required');
+    assert.equal(opsPayload.authorization_ready, false);
+    assert.equal(opsPayload.bws_available, undefined);
 
     const setup = await runNode(
       path.join(root, 'scripts', 'setup-sm-machine.mjs'),

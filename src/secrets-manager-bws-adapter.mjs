@@ -1,4 +1,6 @@
 import { execFile } from 'node:child_process';
+import fs from 'node:fs';
+import path from 'node:path';
 import process from 'node:process';
 import { promisify } from 'node:util';
 import { resolveBwsServerOptions } from './secrets-manager-allow-config.mjs';
@@ -17,6 +19,73 @@ export class SecretsManagerBwsAdapterError extends Error {
     this.name = 'SecretsManagerBwsAdapterError';
     this.code = code;
   }
+}
+
+export const BWS_MISSING_HINT =
+  'Install Bitwarden Secrets Manager CLI (bws). Windows default is LocalAppData\\Programs\\Bitwarden\\bws.exe; PATH is not required if that file exists. authorization_ready is LocalService writer evidence, not this error.';
+
+/**
+ * Prefer an explicit path, then the well-known Windows install location, then
+ * PATH lookup via the bare `bws` name. Never returns host usernames or expands
+ * LocalAppData into agent-readable error payloads.
+ *
+ * @param {{
+ *   bwsPath?: string,
+ *   platform?: NodeJS.Platform,
+ *   env?: NodeJS.ProcessEnv,
+ *   pathExists?: (filePath: string) => boolean,
+ * }} [options]
+ * @returns {string}
+ */
+export function resolveBwsExecutable(options = {}) {
+  if (typeof options.bwsPath === 'string' && options.bwsPath.length > 0) {
+    return options.bwsPath;
+  }
+  const platform = options.platform ?? process.platform;
+  const env = options.env ?? process.env;
+  const exists = typeof options.pathExists === 'function'
+    ? options.pathExists
+    : defaultBwsPathExists;
+  if (platform === 'win32') {
+    const local = env.LOCALAPPDATA;
+    if (typeof local === 'string' && local.length > 0) {
+      const candidate = path.join(local, 'Programs', 'Bitwarden', 'bws.exe');
+      if (exists(candidate)) {
+        return candidate;
+      }
+    }
+  }
+  return 'bws';
+}
+
+function defaultBwsPathExists(filePath) {
+  try {
+    return fs.statSync(filePath).isFile();
+  } catch {
+    return false;
+  }
+}
+
+function bwsExecutableFromOptions(options) {
+  return resolveBwsExecutable(options);
+}
+
+/**
+ * Attach a value-free hint when the failure is missing bws, without treating
+ * authorization_ready as the primary error code.
+ * @param {Record<string, unknown>} payload
+ */
+export function withBwsDiagnostic(payload) {
+  if (!payload || payload.code !== 'bws_missing') {
+    return payload;
+  }
+  return {
+    ...payload,
+    hint: typeof payload.hint === 'string' && payload.hint.length > 0
+      ? payload.hint
+      : BWS_MISSING_HINT,
+    bws_available: false,
+  };
 }
 
 const SECRET_KEY = /^[a-zA-Z][a-zA-Z0-9_.-]{0,127}$/;
@@ -68,9 +137,7 @@ export async function fetchSecretsManagerSecretValue(options) {
   const run = typeof options.runCommand === 'function'
     ? options.runCommand
     : defaultRunCommand;
-  const bwsPath = typeof options.bwsPath === 'string' && options.bwsPath.length > 0
-    ? options.bwsPath
-    : 'bws';
+  const bwsPath = bwsExecutableFromOptions(options);
   const serverUrl = serverUrlFromOptions(options);
 
   // bws 2.x: PROJECT_ID is a positional argument (not --project-id).
@@ -167,9 +234,7 @@ export async function upsertSecretsManagerSecret(options) {
   const run = typeof options.runCommand === 'function'
     ? options.runCommand
     : defaultRunCommand;
-  const bwsPath = typeof options.bwsPath === 'string' && options.bwsPath.length > 0
-    ? options.bwsPath
-    : 'bws';
+  const bwsPath = bwsExecutableFromOptions(options);
   const projectId = options.projectId.toLowerCase();
   const serverUrl = serverUrlFromOptions(options);
 
@@ -250,9 +315,7 @@ export async function listSecretsManagerSecretKeys(options) {
   const run = typeof options.runCommand === 'function'
     ? options.runCommand
     : defaultRunCommand;
-  const bwsPath = typeof options.bwsPath === 'string' && options.bwsPath.length > 0
-    ? options.bwsPath
-    : 'bws';
+  const bwsPath = bwsExecutableFromOptions(options);
   const serverUrl = serverUrlFromOptions(options);
   const listed = await run(bwsPath, withServerArgs([
     'secret', 'list',
@@ -303,9 +366,7 @@ export async function deleteSecretsManagerSecret(options) {
   const run = typeof options.runCommand === 'function'
     ? options.runCommand
     : defaultRunCommand;
-  const bwsPath = typeof options.bwsPath === 'string' && options.bwsPath.length > 0
-    ? options.bwsPath
-    : 'bws';
+  const bwsPath = bwsExecutableFromOptions(options);
   const serverUrl = serverUrlFromOptions(options);
   await run(bwsPath, withServerArgs([
     'secret', 'delete',
@@ -343,6 +404,9 @@ async function defaultRunCommand(executable, args, runOptions = {}) {
     stderr = result.stderr;
     code = 0;
   } catch (error) {
+    if (error?.code === 'ENOENT') {
+      throw new SecretsManagerBwsAdapterError('bws_missing');
+    }
     code = typeof error?.code === 'number' ? error.code : 1;
     stdout = typeof error?.stdout === 'string' ? error.stdout : '';
     stderr = typeof error?.stderr === 'string' ? error.stderr : '';

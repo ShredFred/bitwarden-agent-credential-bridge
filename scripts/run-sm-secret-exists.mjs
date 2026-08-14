@@ -24,11 +24,12 @@ import {
 import {
   listSecretsManagerSecretKeys,
   SecretsManagerBwsAdapterError,
+  withBwsDiagnostic,
 } from '../src/secrets-manager-bws-adapter.mjs';
 import { isProjectAllowed } from '../src/secrets-manager-allow-config.mjs';
 
 function emit(payload, code = 0) {
-  process.stdout.write(`${JSON.stringify(payload)}\n`);
+  process.stdout.write(`${JSON.stringify(withBwsDiagnostic(payload))}\n`);
   process.exitCode = code;
 }
 

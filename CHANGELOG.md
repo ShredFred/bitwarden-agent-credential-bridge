@@ -5,6 +5,14 @@ Semantic Versioning while it remains on the experimental 0.x line.
 
 ## Unreleased
 
+### Fixed
+
+- Secrets Manager CLIs resolve `bws` from the default Windows install
+  location (`LocalAppData\\Programs\\Bitwarden\\bws.exe`) when it is not on
+  PATH, and report `bws_missing` instead of a generic startup failure.
+  `authorization_ready: false` remains LocalService writer evidence and is
+  not the missing-CLI error code.
+
 ### Added
 
 - Phase 17c `npm run start:browser:sm` (dual approval flags, `--alias`) and

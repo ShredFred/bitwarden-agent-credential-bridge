@@ -14,6 +14,7 @@ import {
   defaultMacSecretsManagerTokenPath,
 } from './secrets-manager-token-collector.mjs';
 import { SM_DEFAULT_ALLOWED_PROJECT_IDS } from './secrets-manager-defaults.mjs';
+import { resolveBwsExecutable } from './secrets-manager-bws-adapter.mjs';
 
 const execFileAsync = promisify(execFile);
 
@@ -250,7 +251,7 @@ async function pathExists(filePath) {
  * Check that `bws` is runnable. Never returns token/secret data.
  */
 export async function checkBwsAvailable(options = {}) {
-  const bwsPath = options.bwsPath ?? 'bws';
+  const bwsPath = resolveBwsExecutable(options);
   const run = typeof options.runCommand === 'function'
     ? options.runCommand
     : async (exe, args) => {
@@ -259,7 +260,11 @@ export async function checkBwsAvailable(options = {}) {
         timeout: 10000,
         maxBuffer: 64 * 1024,
         encoding: 'utf8',
-        env: { PATH: process.env.PATH, SystemRoot: process.env.SystemRoot },
+        env: {
+          Path: process.env.Path || process.env.PATH,
+          PATH: process.env.PATH || process.env.Path,
+          SystemRoot: process.env.SystemRoot,
+        },
       });
       return result.stdout;
     };

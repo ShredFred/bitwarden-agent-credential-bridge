@@ -31,7 +31,7 @@ import {
   resolveSecretsManagerSecret,
   SecretsManagerResolverError,
 } from '../src/secrets-manager-resolver.mjs';
-import { fetchSecretsManagerSecretValue } from '../src/secrets-manager-bws-adapter.mjs';
+import { fetchSecretsManagerSecretValue, SecretsManagerBwsAdapterError, withBwsDiagnostic } from '../src/secrets-manager-bws-adapter.mjs';
 import {
   SM_DEFAULT_PROJECTS,
   SM_OPERATIONAL_BINDINGS_PATH,
@@ -42,7 +42,7 @@ const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const bindingsPath = SM_OPERATIONAL_BINDINGS_PATH;
 
 function emit(payload, code = 0) {
-  process.stdout.write(`${JSON.stringify(payload)}\n`);
+  process.stdout.write(`${JSON.stringify(withBwsDiagnostic(payload))}\n`);
   process.exitCode = code;
 }
 
@@ -312,7 +312,8 @@ if (!process.argv.includes(SM_RESOLVE_APPROVAL_FLAG)) {
     }, allSmoke && allRejected && onecli_proxy_sm_rejected ? 0 : 1);
   } catch (error) {
     const code = error instanceof SecretsManagerTokenCollectorError ||
-      error instanceof OperationalBridgeError
+      error instanceof OperationalBridgeError ||
+      error instanceof SecretsManagerBwsAdapterError
       ? error.code
       : (typeof error?.message === 'string' && error.message.startsWith('secret_leak:')
         ? error.message

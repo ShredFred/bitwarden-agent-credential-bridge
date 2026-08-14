@@ -24,9 +24,10 @@ import {
   writeSecretsManagerAllowConfig,
   SecretsManagerLifecycleError,
 } from '../src/secrets-manager-local-lifecycle.mjs';
+import { withBwsDiagnostic } from '../src/secrets-manager-bws-adapter.mjs';
 
 function emit(payload, code = 0) {
-  process.stdout.write(`${JSON.stringify(payload)}\n`);
+  process.stdout.write(`${JSON.stringify(withBwsDiagnostic(payload))}\n`);
   process.exitCode = code;
 }
 
@@ -159,7 +160,6 @@ if (!process.argv.includes(SM_SETUP_APPROVAL_FLAG)) {
       emit({
         ok: false,
         code: 'bws_missing',
-        hint: 'Install Bitwarden Secrets Manager CLI (bws) and ensure it is on PATH',
         authorization_ready: false,
       }, 1);
     } else {
