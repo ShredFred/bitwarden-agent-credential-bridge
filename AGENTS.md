@@ -1631,3 +1631,25 @@ versions 7 and 8) for disposable/dev Secrets Manager secrets only:
 Phase 16 must not open non-loopback SSH/FTP without a later explicit live gate,
 implement OpenSSH/FTP wire compatibility, place credentials in agent env, or
 treat session success as production writer isolation.
+
+## Phase 17 scope
+
+Phase 17 may add a Bridge-owned browser runtime for policy version 5
+`browser_form_login` on loopback fake login sites:
+
+- the agent may snapshot value-free field candidates and select them by index
+  only (no CSS, XPath, or caller-supplied selectors);
+- `inject_login` accepts no credential values; the Bridge re-verifies origin,
+  password input type, and same-origin form action, then fills from in-memory
+  secrets;
+- cookies, CSRF values, passwords, and usernames stay off agent-readable
+  surfaces; `eval`, CDP, cookie-list, fill, and storage-state ops fail closed
+  with `session_material_forbidden` or `command_forbidden`;
+- after login, the agent may open only policy `allowed_paths`;
+- one session writer; MFA/CAPTCHA fail closed; `authorization_ready` stays
+  false; helper remains vault-free.
+
+Phase 17 must not wire Playwright/Chrome-extension/agent CDP, export cookies,
+solve MFA, or open non-loopback hosts such as `traffic.mivia.ai`. Those need a
+later explicit live gate and a Bridge-owned driver that still uses this
+command allow-list.

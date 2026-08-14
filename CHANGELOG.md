@@ -7,6 +7,10 @@ Semantic Versioning while it remains on the experimental 0.x line.
 
 ### Added
 
+- Phase 17 Bridge-owned browser for `browser_form_login`: agent selects
+  field indices, Bridge injects in-memory secrets, cookies never leave the
+  jar (`docs/phase17-bridge-owned-browser.md`). Playwright/CDP/cookie export
+  remain forbidden; `authorization_ready` stays false.
 - Phase 16 fake-loopback SSH/FTP session brokers (policy versions 7/8), private-hq
   multi-class SM matrix coverage, and operator docs
   (`docs/phase16-ssh-ftp-session-brokers.md`). `env_inject` remains rejected;

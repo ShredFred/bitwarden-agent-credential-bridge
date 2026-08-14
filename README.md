@@ -394,9 +394,11 @@ AGENTS.md                           experiment rules for agents
   `http_basic`, `http_api_key_query`) plus disposable/dev `browser_form_login`
   (policy v5) for loopback form login via a dedicated session broker (not
   `startBroker`).
-- Browser sessions use stdlib fetch + cookie jar; Playwright is not default.
-  Secrets and session cookies must not appear on agent-readable surfaces.
-  MFA/CAPTCHA/login failure are fail-closed and value-free.
+- Browser sessions use stdlib fetch + cookie jar (Phase 6) or a Bridge-owned
+  browser command surface (Phase 17). Playwright, Chrome extensions, and agent
+  CDP are not the secret path. Secrets and session cookies must not appear on
+  agent-readable surfaces. MFA/CAPTCHA/login failure are fail-closed and
+  value-free. See [docs/phase17-bridge-owned-browser.md](docs/phase17-bridge-owned-browser.md).
 - Sample policy uses port `0` for bind/upstream placeholders; runtime code supplies the concrete upstream origin after the fake API listens.
 - No TLS for the fake harness bind path, no persistence, no multi-writer coordination beyond “one writer at a time” for this repo.
 - Not a company Password-Manager vault client inside LocalService. Phase 14
@@ -412,6 +414,7 @@ AGENTS.md                           experiment rules for agents
   attach): [docs/sm-onboarding-and-import.md](docs/sm-onboarding-and-import.md)
   and [docs/sm-operational-key-naming.md](docs/sm-operational-key-naming.md).
 - See [docs/phase6-browser-form-login.md](docs/phase6-browser-form-login.md),
+  [docs/phase17-bridge-owned-browser.md](docs/phase17-bridge-owned-browser.md),
   [docs/phase7-hq-operational-readiness.md](docs/phase7-hq-operational-readiness.md),
   and [docs/windows-laptop-onboarding.md](docs/windows-laptop-onboarding.md).
 - The disposable executor does not isolate against a malicious concurrent process

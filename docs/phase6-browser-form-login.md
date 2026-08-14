@@ -44,5 +44,7 @@ the embedded approval flag. It does not read personal/company Bitwarden.
 - Not automatic login to arbitrary public websites (only pinned disposable demos
   behind an explicit operator approval flag)
 - Not Playwright/browser DOM automation by default
+- See [Phase 17](phase17-bridge-owned-browser.md) for the Bridge-owned browser
+  command surface (still no agent CDP or cookie export)
 - Not FTP/SSH/RDP/cookie export to the agent
 - `authorization_ready` remains false; same-user process isolation is not claimed
