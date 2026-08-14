@@ -82,7 +82,7 @@ if (!parsed.ok) {
     authorization_ready: false,
     helper_vault_free: true,
     cookie_export_forbidden: true,
-    screenshot_forbidden: true,
+    screenshot_password_entry_forbidden: true,
     agent_cdp_absent: true,
   });
   await shutdown(1);
@@ -165,12 +165,12 @@ if (!parsed.ok) {
         origin_bound: true,
         agent_cdp_absent: true,
         cookie_export_forbidden: true,
-        screenshot_forbidden: true,
+        screenshot_password_entry_forbidden: true,
         secrets_manager_mode: true,
         authorization_ready: session.session.authorization_ready,
         helper_vault_free: true,
         env_inject_forbidden: true,
-        note: 'Bridge-owned browser; agent uses /contract /snapshot /select_targets /inject_login. Ctrl+C to stop.',
+        note: 'Bridge-owned browser; agent uses /contract /snapshot /screenshot /select_targets /inject_login. Ctrl+C to stop.',
       });
     } catch (error) {
       const code = error instanceof SecretsManagerTokenCollectorError ||
@@ -186,7 +186,7 @@ if (!parsed.ok) {
           absentOperationalAuthorizationForPlatform(process.platform).authorization_ready,
         helper_vault_free: true,
         cookie_export_forbidden: true,
-        screenshot_forbidden: true,
+        screenshot_password_entry_forbidden: true,
         agent_cdp_absent: true,
       });
       await shutdown(1);

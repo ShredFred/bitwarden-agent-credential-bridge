@@ -32,8 +32,9 @@ in [Architecture](architecture.md) over adding another README section.
 | 7 | Query API keys, rejected classes, multi-class matrix | [phase7](phase7-hq-operational-readiness.md) |
 | 8 | Operational multi-service bridge | [phase8](phase8-operational-bridge.md) |
 | 16 | Loopback SSH/FTP session brokers | [phase16](phase16-ssh-ftp-session-brokers.md) |
-| 17 / 17b | Bridge-owned browser + optional Playwright adapter (not vendored; headless default; screenshots forbidden) | [phase17](phase17-bridge-owned-browser.md) |
+| 17 / 17b | Bridge-owned browser + optional Playwright adapter (not vendored; headless default) | [phase17](phase17-bridge-owned-browser.md) |
 | 17c | SM start command + `/services` discovery | [phase17](phase17-bridge-owned-browser.md) |
+| 17d | Screenshots except during password entry | [phase17](phase17-bridge-owned-browser.md) |
 
 ## Secrets Manager and install
 

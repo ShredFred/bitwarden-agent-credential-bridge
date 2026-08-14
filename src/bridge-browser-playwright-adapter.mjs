@@ -3,6 +3,10 @@ import {
   parseLoginPageFacts,
 } from './bridge-browser-targeting.mjs';
 
+export const MAX_SCREENSHOT_BYTES = 512 * 1024;
+
+const PNG_MAGIC = Buffer.from([0x89, 0x50, 0x4e, 0x47]);
+
 /**
  * In-process Playwright driver owned by the Bridge.
  * The page, context, CDP, and cookie values never appear on the returned adapter.
@@ -20,6 +24,7 @@ export async function createPlaywrightPageAdapter(options) {
     throw new BridgeBrowserTargetingError('invalid_request');
   }
   const origin = new URL(options.origin).origin;
+  const loginUrl = new URL(options.loginPath, `${origin}/`).href;
   const playwright = options.playwright ?? await importPlaywright();
   const requested = options.browser ?? 'chromium';
   const browserType = pickBrowser(playwright, requested);
@@ -49,7 +54,6 @@ export async function createPlaywrightPageAdapter(options) {
       ignoreHTTPSErrors: false,
     });
     page = await context.newPage();
-    const loginUrl = new URL(options.loginPath, `${origin}/`).href;
     await page.goto(loginUrl, { waitUntil: 'domcontentloaded' });
   } catch (error) {
     if (context) await context.close().catch(() => {});
@@ -134,6 +138,43 @@ export async function createPlaywrightPageAdapter(options) {
       return cookies.map((cookie) => cookie.name);
     },
 
+    async passwordFieldsOccupied() {
+      return passwordFieldsOccupied(page);
+    },
+
+    async screenshotPage() {
+      try {
+        if (await passwordFieldsOccupied(page)) {
+          throw new BridgeBrowserTargetingError('password_entry_active');
+        }
+        const raw = await page.screenshot({
+          type: 'png',
+          fullPage: false,
+          animations: 'disabled',
+        });
+        const bytes = Buffer.from(raw);
+        if (bytes.length > MAX_SCREENSHOT_BYTES) {
+          throw new BridgeBrowserTargetingError('screenshot_too_large');
+        }
+        if (bytes.length < 24 || bytes.subarray(0, 4).compare(PNG_MAGIC) !== 0) {
+          throw new BridgeBrowserTargetingError('adapter_failed');
+        }
+        return bytes;
+      } catch (error) {
+        if (error instanceof BridgeBrowserTargetingError) throw error;
+        throw new BridgeBrowserTargetingError('adapter_failed');
+      }
+    },
+
+    async resetLoginPage() {
+      try {
+        await page.goto(loginUrl, { waitUntil: 'domcontentloaded' });
+      } catch (error) {
+        if (error instanceof BridgeBrowserTargetingError) throw error;
+        throw new BridgeBrowserTargetingError('adapter_failed');
+      }
+    },
+
     /**
      * @param {Set<string>} sensitive
      */
@@ -166,6 +207,19 @@ function pickBrowser(playwright, name) {
     throw new BridgeBrowserTargetingError('playwright_absent');
   }
   return type;
+}
+
+async function passwordFieldsOccupied(page) {
+  const loc = page.locator('input[type="password"]');
+  if (typeof loc.evaluateAll === 'function') {
+    const values = await loc.evaluateAll((els) => els.map((el) => String(el.value ?? '')));
+    return values.some((value) => value.length > 0);
+  }
+  if (typeof loc.inputValue === 'function') {
+    const value = await loc.inputValue();
+    return typeof value === 'string' && value.length > 0;
+  }
+  return false;
 }
 
 function assertSameOrigin(url, origin) {

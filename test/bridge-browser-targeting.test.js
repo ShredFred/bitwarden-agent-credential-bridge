@@ -80,7 +80,7 @@ describe('bridge browser targeting', () => {
     for (const op of ['eval', 'cookie_list', 'state_save', 'fill', 'fill_password', 'cdp']) {
       assert.equal(denyAgentOp(op), 'session_material_forbidden');
     }
-    assert.equal(denyAgentOp('screenshot'), 'command_forbidden');
+    assert.equal(denyAgentOp('screenshot'), null);
     assert.equal(denyAgentOp('playwright_cli'), 'command_forbidden');
     assert.equal(denyAgentOp('snapshot'), null);
     assert.equal(denyAgentOp('contract'), null);

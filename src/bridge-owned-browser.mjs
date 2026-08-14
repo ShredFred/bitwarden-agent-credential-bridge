@@ -125,6 +125,7 @@ export async function startBridgeOwnedBrowser(options) {
   let lastUsedAt = createdAt;
   let closed = false;
   let loggedIn = false;
+  let passwordEntryActive = false;
   let generation = 0;
   /** @type {null | { generation: number, origin: string, candidates: readonly object[], form_action: string }} */
   let lastSnapshot = null;
@@ -132,8 +133,14 @@ export async function startBridgeOwnedBrowser(options) {
   let authorized = null;
 
   const bindUrl = new URL(policy.bind);
+  let opTail = Promise.resolve();
   const server = http.createServer((req, res) => {
-    void handleAgentRequest(req, res, {
+    opTail = opTail.then(
+      () => handleAgentRequest(req, res, ctx),
+      () => handleAgentRequest(req, res, ctx),
+    );
+  });
+  const ctx = {
       policy,
       credentials,
       adapter,
@@ -147,6 +154,8 @@ export async function startBridgeOwnedBrowser(options) {
       getLoggedIn: () => loggedIn,
       driver,
       headless,
+      isPasswordEntryActive: () => passwordEntryActive,
+      setPasswordEntryActive: (value) => { passwordEntryActive = value === true; },
       setLoggedIn: (value) => { loggedIn = value; },
       getGeneration: () => generation,
       bumpGeneration: () => {
@@ -159,8 +168,7 @@ export async function startBridgeOwnedBrowser(options) {
       setLastSnapshot: (snap) => { lastSnapshot = snap; },
       getAuthorized: () => authorized,
       setAuthorized: (value) => { authorized = value; },
-    });
-  });
+  };
 
   try {
     await listenHttp(server, bindUrl);
@@ -191,7 +199,7 @@ export async function startBridgeOwnedBrowser(options) {
     origin_bound: true,
     agent_cdp_absent: true,
     cookie_export_forbidden: true,
-    screenshot_forbidden: true,
+    screenshot_password_entry_forbidden: true,
     driver,
     headless,
     authorization_ready: false,
@@ -239,7 +247,8 @@ async function handleAgentRequest(req, res, ctx) {
         origin_bound: true,
         agent_cdp_absent: true,
         cookie_export_forbidden: true,
-        screenshot_forbidden: true,
+        screenshot_password_entry_forbidden: true,
+        screenshot_unsupported: ctx.driver === 'fetch',
         driver: ctx.driver,
         headless: ctx.headless,
         authorization_ready: false,
@@ -262,7 +271,8 @@ async function handleAgentRequest(req, res, ctx) {
         error_codes: AGENT_ERROR_CODES,
         inject_login_body: Object.freeze(['empty', 'generation']),
         cookie_export_forbidden: true,
-        screenshot_forbidden: true,
+        screenshot_password_entry_forbidden: true,
+        screenshot_unsupported: ctx.driver === 'fetch',
         driver: ctx.driver,
         headless: ctx.headless,
         agent_cdp_absent: true,
@@ -289,6 +299,11 @@ async function handleAgentRequest(req, res, ctx) {
 
     if (op === 'goto' && req.method === 'POST') {
       await handleGoto(req, res, ctx);
+      return;
+    }
+
+    if (op === 'screenshot' && req.method === 'GET') {
+      await handleScreenshot(res, ctx);
       return;
     }
 
@@ -373,40 +388,50 @@ async function handleInject(req, res, ctx) {
     throw new BridgeOwnedBrowserError('stale_generation');
   }
 
-  const live = await ctx.adapter.snapshotPage();
-  assertInjectSafe(live.facts, authorized, ctx.policy);
-  if (live.facts.challenge !== 'none') {
-    const code = live.facts.challenge === 'mfa' ? 'mfa_required' : 'captcha_required';
-    throw new BridgeOwnedBrowserError(code);
-  }
+  ctx.setPasswordEntryActive(true);
+  try {
+    const live = await ctx.adapter.snapshotPage();
+    assertInjectSafe(live.facts, authorized, ctx.policy);
+    if (live.facts.challenge !== 'none') {
+      const code = live.facts.challenge === 'mfa' ? 'mfa_required' : 'captcha_required';
+      throw new BridgeOwnedBrowserError(code);
+    }
 
-  const submitted = await ctx.adapter.submitLogin({
-    formAction: live.facts.form_action,
-    usernameField: authorized.username.name,
-    passwordField: authorized.password.name,
-    username: ctx.credentials.username,
-    password: ctx.credentials.password,
-    hiddenNames: [...ctx.policy.hidden_fields],
-    maxRedirectHops: ctx.policy.max_redirect_hops,
-    submitLabel: authorized.submit.name,
-  });
-  await ctx.adapter.absorbCookiesInto(ctx.sensitive);
-  const landed = new URL(submitted.url);
-  if (landed.origin !== new URL(ctx.policy.login_origin).origin) {
-    throw new BridgeOwnedBrowserError('origin_mismatch');
+    const submitted = await ctx.adapter.submitLogin({
+      formAction: live.facts.form_action,
+      usernameField: authorized.username.name,
+      passwordField: authorized.password.name,
+      username: ctx.credentials.username,
+      password: ctx.credentials.password,
+      hiddenNames: [...ctx.policy.hidden_fields],
+      maxRedirectHops: ctx.policy.max_redirect_hops,
+      submitLabel: authorized.submit.name,
+    });
+    await ctx.adapter.absorbCookiesInto(ctx.sensitive);
+    const landed = new URL(submitted.url);
+    if (landed.origin !== new URL(ctx.policy.login_origin).origin) {
+      throw new BridgeOwnedBrowserError('origin_mismatch');
+    }
+    if (landed.pathname !== ctx.policy.success_path) {
+      throw new BridgeOwnedBrowserError('success_path_mismatch');
+    }
+    ctx.setLoggedIn(true);
+    ctx.bumpGeneration();
+    writeJson(res, ctx.sensitive, {
+      ok: true,
+      logged_in: true,
+      origin_bound: true,
+      cookie_export_forbidden: true,
+      agent_secret_visible: false,
+    });
+  } catch (error) {
+    if (typeof ctx.adapter.resetLoginPage === 'function') {
+      await ctx.adapter.resetLoginPage().catch(() => {});
+    }
+    throw error;
+  } finally {
+    ctx.setPasswordEntryActive(false);
   }
-  if (landed.pathname !== ctx.policy.success_path) {
-    throw new BridgeOwnedBrowserError('success_path_mismatch');
-  }
-  ctx.setLoggedIn(true);
-  ctx.bumpGeneration();
-  writeJson(res, ctx.sensitive, {
-    ok: true,
-    logged_in: true,
-    origin_bound: true,
-    cookie_export_forbidden: true,
-    agent_secret_visible: false,
-  });
 }
 
 async function handleGoto(req, res, ctx) {
@@ -433,10 +458,42 @@ async function handleGoto(req, res, ctx) {
   });
 }
 
+async function handleScreenshot(res, ctx) {
+  if (ctx.isPasswordEntryActive()) {
+    throw new BridgeOwnedBrowserError('password_entry_active');
+  }
+  if (typeof ctx.adapter.screenshotPage !== 'function') {
+    throw new BridgeOwnedBrowserError('screenshot_unsupported');
+  }
+  if (typeof ctx.adapter.passwordFieldsOccupied === 'function' &&
+      await ctx.adapter.passwordFieldsOccupied()) {
+    throw new BridgeOwnedBrowserError('password_entry_active');
+  }
+  const png = await ctx.adapter.screenshotPage();
+  if (!Buffer.isBuffer(png)) {
+    throw new BridgeOwnedBrowserError('adapter_failed');
+  }
+  let path = '';
+  try {
+    path = new URL(ctx.adapter.currentUrl()).pathname;
+  } catch {
+    throw new BridgeOwnedBrowserError('adapter_failed');
+  }
+  writeJson(res, ctx.sensitive, {
+    ok: true,
+    logged_in: ctx.getLoggedIn(),
+    path,
+    media_type: 'image/png',
+    byte_length: png.length,
+    png_base64: png.toString('base64'),
+  });
+}
+
 function opFromPath(method, pathname) {
   if (method === 'GET' && pathname === '/status') return 'status';
   if (method === 'GET' && pathname === '/contract') return 'contract';
   if (method === 'GET' && pathname === '/snapshot') return 'snapshot';
+  if (method === 'GET' && pathname === '/screenshot') return 'screenshot';
   if (method === 'POST' && pathname === '/select_targets') return 'select_targets';
   if (method === 'POST' && pathname === '/inject_login') return 'inject_login';
   if (method === 'POST' && pathname === '/goto') return 'goto';
@@ -456,7 +513,8 @@ function statusFor(code) {
     code === 'command_forbidden' ||
     code === 'session_material_forbidden' ||
     code === 'path_denied' ||
-    code === 'already_logged_in'
+    code === 'already_logged_in' ||
+    code === 'password_entry_active'
   ) {
     return 403;
   }

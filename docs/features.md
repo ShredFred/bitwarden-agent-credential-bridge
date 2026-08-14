@@ -30,8 +30,8 @@ is still research. Agent runbooks live separately:
 - **Bridge-owned browser** — the agent snapshots value-free field **indices**
   and calls `inject_login` with an empty body. Optional in-process Playwright
   driver (not a package dependency; headless by default, `--headed` for a
-  visible window); page, CDP, cookies, and screenshots never appear on the
-  session handle.
+  visible window); page, CDP, and cookies never appear on the session handle.
+  Screenshots are allowed except during password fill.
   Operator/SM start: `npm run start:browser:sm`. Re-read operational ports at
   `http://127.0.0.1:18791/services`.
 - **SSH / FTP** — loopback session brokers with allow-listed ops. Not OpenSSH
@@ -57,7 +57,7 @@ These are product decisions, not missing tickets:
 | OAuth, interactive MFA, SMS, email codes | Need a later explicit live gate and a different broker |
 | Free CSS / XPath / `eval` in the browser | Prompt-injection / confused deputy |
 | Cookie export / Playwright storage state | Use an HTTP broker or stop |
-| Agent screenshots (`/screenshot`) | Pixels can show usernames and form state; images cannot be redacted like JSON. Use `/snapshot` indices |
+| Screenshots during password fill | Occupied password inputs and in-flight `inject_login` return `password_entry_active`. Empty login form and post-login pages may be captured |
 | Personal or company Bitwarden PM as the default | SM machine accounts are the productive path; personal PM is a separate flagged slice |
 | `authorization_ready=true` from install or unlock | Would launder incomplete evidence |
 

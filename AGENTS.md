@@ -1664,8 +1664,8 @@ same Phase 17 HTTP allow-list:
 - `startBridgeOwnedBrowser({ driver: 'playwright' })` launches Chromium, Firefox,
   or WebKit inside the Bridge process; the agent still only sees indices and
   `inject_login` with an empty body;
-- launch is headless unless `headless: false`; screenshots stay off the agent
-  API (`command_forbidden`);
+- launch is headless unless `headless: false`; screenshots are allowed except
+  during password fill / `inject_login` (`password_entry_active`);
 - the page, context, CDP endpoint, cookies, and caller-supplied selectors never
   appear on the session handle or agent JSON;
 - fill uses bounded field-name selectors after index authorization; submit uses
@@ -1701,3 +1701,24 @@ without improvising:
 Phase 17c must not export cookies, add agent CDP/`playwright-cli`, solve MFA,
 open non-loopback hosts, put `BWS_ACCESS_TOKEN` in agent env, or set
 `authorization_ready=true`.
+
+## Phase 17d scope
+
+Phase 17d may add `GET /screenshot` on the Bridge-owned browser except during
+password entry:
+
+- allowed on an empty login form (before fill) and after `logged_in` on the
+  current page;
+- forbidden while `inject_login` is filling/submitting, and while any
+  `input[type=password]` is non-empty (`password_entry_active`);
+- session ops are one-writer serialized so a screenshot cannot interleave with
+  fill; failed inject reloads the login page before the agent can capture;
+- Playwright only; the `fetch` driver returns `screenshot_unsupported`;
+- PNG is bounded; responses still pass the sensitive-variant scan; cookies,
+  CDP, and storage-state remain forbidden.
+
+Phase 17d must not export cookies, solve MFA, open non-loopback hosts, add
+`playwright` to `package.json`, or set `authorization_ready=true`. A screenshot
+of a logged-in page may still show a username in the UI; that residual is
+accepted so the agent can control layout. The password-entry phase is the
+closed window.

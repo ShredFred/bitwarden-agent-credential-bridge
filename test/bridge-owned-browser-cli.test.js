@@ -172,10 +172,11 @@ describe('bridge-owned browser SM CLI', () => {
       assert.equal(started.session.agent_cdp_absent, true);
       const contract = await (await fetch(`${started.session.baseUrl}/contract`)).json();
       assert.ok(contract.allowed_ops.includes('inject_login'));
-      assert.equal(contract.screenshot_forbidden, true);
+      assert.equal(contract.screenshot_password_entry_forbidden, true);
+      assert.equal(contract.screenshot_unsupported, true);
       assert.equal(contract.headless, true);
       assert.equal(contract.driver, 'fetch');
-      assert.ok(contract.forbidden_ops.includes('screenshot'));
+      assert.ok(contract.allowed_ops.includes('screenshot'));
       const snap = await (await fetch(`${started.session.baseUrl}/snapshot`)).json();
       await fetch(`${started.session.baseUrl}/select_targets`, {
         method: 'POST',

@@ -17,9 +17,10 @@ Semantic Versioning while it remains on the experimental 0.x line.
 
 - Bridge-owned Playwright accepts both headless (default) and `--headed`.
   `--headed` with the `fetch` driver is `invalid_request`. Unknown flags
-  such as `--screenshot` or `--devtools` fail closed. Launch pins
-  `devtools: false` and lets the Bridge own SIGINT. `/screenshot` stays
-  `command_forbidden` in both modes; the agent uses `/snapshot` indices.
+  such as `--devtools` fail closed. Launch pins
+  `devtools: false` and lets the Bridge own SIGINT.
+  `GET /screenshot` is allowed except during password fill
+  (`password_entry_active`); `fetch` returns `screenshot_unsupported`.
   Playwright is an optional host install, not a package dependency.
 - Phase 17c `npm run start:browser:sm` (dual approval flags, `--alias`) and
   operational `GET /services` discovery on `http://127.0.0.1:18791`.

@@ -20,6 +20,7 @@ export const ALLOWED_AGENT_OPS = Object.freeze([
   'select_targets',
   'inject_login',
   'goto',
+  'screenshot',
 ]);
 
 export const AGENT_ERROR_CODES = Object.freeze([
@@ -39,6 +40,9 @@ export const AGENT_ERROR_CODES = Object.freeze([
   'path_denied',
   'playwright_absent',
   'playwright_launch_failed',
+  'password_entry_active',
+  'screenshot_too_large',
+  'screenshot_unsupported',
   'sensitive_response_blocked',
   'session_expired',
   'session_material_forbidden',
@@ -60,7 +64,6 @@ export const FORBIDDEN_AGENT_OPS = Object.freeze([
   'fill',
   'type',
   'press',
-  'screenshot',
   'pdf',
   'localstorage_list',
   'localstorage_get',

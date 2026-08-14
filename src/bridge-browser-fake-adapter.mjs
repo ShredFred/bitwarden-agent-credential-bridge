@@ -116,6 +116,21 @@ export function createFetchPageAdapter(options) {
       }
     },
 
+    async passwordFieldsOccupied() {
+      return false;
+    },
+
+    async screenshotPage() {
+      throw new BridgeBrowserTargetingError('screenshot_unsupported');
+    },
+
+    async resetLoginPage() {
+      const target = new URL(options.loginPath, `${origin}/`).href;
+      const { html, url } = await request(fetchImpl, jar, target, { method: 'GET' });
+      currentUrl = url;
+      return { html, url, facts: parseLoginPageFacts(html, url) };
+    },
+
     async close() {
       jar.clear();
     },

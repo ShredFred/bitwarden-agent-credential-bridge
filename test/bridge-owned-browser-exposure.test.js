@@ -64,6 +64,7 @@ describe('bridge-owned browser exposure', () => {
         body: JSON.stringify({ path: '/api/me' }),
       })).json();
       const cookies = await (await fetch(`${session.baseUrl}/cookie_list`)).json();
+      const shot = await (await fetch(`${session.baseUrl}/screenshot`)).json();
 
       const secrets = [username, password, 'csrf_token_aa'];
       assertNoSecret('snapshot', snap, secrets);
@@ -71,12 +72,14 @@ describe('bridge-owned browser exposure', () => {
       assertNoSecret('status', status, secrets);
       assertNoSecret('home', home, secrets);
       assertNoSecret('goto', me, secrets);
+      assertNoSecret('screenshot', shot, secrets);
       assertNoSecret('logs', logs, secrets);
       assertNoSecret('handle', {
         session_id: session.session_id,
         baseUrl: session.baseUrl,
       }, secrets);
       assert.equal(cookies.error, 'session_material_forbidden');
+      assert.equal(shot.error, 'screenshot_unsupported');
       assert.equal(status.cookie_export_forbidden, true);
       assert.equal(status.agent_secret_visible, false);
     } finally {

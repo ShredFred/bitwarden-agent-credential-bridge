@@ -45,7 +45,7 @@ describe('bridge-owned browser', () => {
       assert.equal(session.origin_bound, true);
       assert.equal(session.agent_cdp_absent, true);
       assert.equal(session.cookie_export_forbidden, true);
-      assert.equal(session.screenshot_forbidden, true);
+      assert.equal(session.screenshot_password_entry_forbidden, true);
       assert.equal(session.headless, true);
       assert.equal(session.driver, 'fetch');
       assert.equal(session.authorization_ready, false);
@@ -54,7 +54,9 @@ describe('bridge-owned browser', () => {
       assert.equal(contract.ok, true);
       assert.ok(contract.allowed_ops.includes('snapshot'));
       assert.ok(contract.forbidden_ops.includes('cookie_list'));
-      assert.equal(contract.screenshot_forbidden, true);
+      assert.equal(contract.screenshot_password_entry_forbidden, true);
+      assert.equal(contract.screenshot_unsupported, true);
+      assert.ok(contract.allowed_ops.includes('screenshot'));
       assert.equal(contract.headless, true);
       assert.ok(contract.allowed_paths.includes('/home'));
       assert.ok(contract.error_codes.includes('session_material_forbidden'));
@@ -141,7 +143,7 @@ describe('bridge-owned browser', () => {
         assert.equal(body.error, 'session_material_forbidden', op);
       }
       const screenshot = await readJson(await fetch(`${session.baseUrl}/screenshot`));
-      assert.equal(screenshot.error, 'command_forbidden');
+      assert.equal(screenshot.error, 'screenshot_unsupported');
 
       const snap = await readJson(await fetch(`${session.baseUrl}/snapshot`));
       const smuggled = await fetch(`${session.baseUrl}/select_targets`, {

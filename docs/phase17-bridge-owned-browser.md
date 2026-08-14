@@ -29,6 +29,8 @@ findable after a lost stdout line.
   snapshot. No credential in the command. The Bridge re-checks origin,
   password `type`, and same-origin form action, then fills from memory
 - After `logged_in=true`, `POST /goto` only on `allowed_paths`
+- `GET /screenshot` — Playwright PNG except during password fill
+  (`password_entry_active`). `fetch` returns `screenshot_unsupported`
 - `cookie_list`, `eval`, `cdp`, `fill`, `state_save`, `playwright_cli`, and
   related ops return `session_material_forbidden` or `command_forbidden`
 - Exposure tests scan username, password, hidden-field values, and issued
@@ -41,16 +43,16 @@ findable after a lost stdout line.
 `driver: 'playwright'`.
 
 - **fetch** — stdlib HTTP + private cookie jar. Always available. Fastest.
-  No window, no screenshots (there is no page to capture).
-- **playwright** (Phase 17b) — in-process Playwright owned by the Bridge.
+  No window. `GET /screenshot` → `screenshot_unsupported`.
+- **playwright** (Phase 17b / 17d) — in-process Playwright owned by the Bridge.
   Same HTTP allow-list. **Headless is the default** and can render pages
   without a window; `--headed` opens a window for a human watching.
-  Headless Playwright *can* take screenshots in general, but this Bridge
-  **does not** expose `/screenshot` to the agent: pixels can show
-  usernames, form state, and other session material, and images cannot be
-  scanned like JSON. The agent uses `/snapshot` indices instead.
-  Playwright is **not** a package dependency and is **not** vendored: the
-  repo ships a small page adapter (allow-list + fill/submit), not Chromium.
+  `GET /screenshot` is allowed on an empty login form and after login.
+  It is forbidden while `inject_login` fills the password and while any
+  password input is non-empty (`password_entry_active`). Ops are serialized
+  so a screenshot cannot interleave with fill. Playwright is **not** a
+  package dependency and is **not** vendored: the repo ships a small page
+  adapter (allow-list + fill/submit), not Chromium.
   Tests inject a stub or skip when `import('playwright')` fails. Missing
   install → `playwright_absent`. Launch failure → `playwright_launch_failed`.
 
@@ -87,8 +89,8 @@ npm run start:browser:sm -- --i-approve-secrets-manager-machine-resolve --i-appr
 Optional `--driver playwright` (not a package dependency; fails `playwright_absent`
 when Playwright is not installed). Playwright is **headless by default**;
 `--headed` opens a window (Playwright only; invalid with `fetch`).
-Unknown flags such as `--screenshot` or `--devtools` are `invalid_request`.
-`GET /screenshot` stays `command_forbidden` in both modes.
+Unknown flags such as `--devtools` are `invalid_request`.
+`GET /screenshot` (HTTP, Playwright) is allowed except during password fill.
 
 ## Agent HTTP surface
 
@@ -102,9 +104,12 @@ session URL from the start command or from a test handle):
 ```http
 GET  /contract
 GET  /snapshot
+GET  /screenshot
 POST /select_targets   {"generation":1,"username_index":0,"password_index":1,"submit_index":2}
 POST /inject_login     {"generation":1}
+GET  /screenshot
 POST /goto             {"path":"/home"}
+GET  /screenshot
 ```
 
 ```bash
@@ -125,5 +130,6 @@ those ops. Use the HTTP credential brokers (or stop) instead.
 - Not a general password manager for arbitrary public websites
 - Not `traffic.mivia.ai` or other non-loopback hosts (needs a later live gate)
 - Not Playwright-CLI, Claude Chrome extension, or agent-owned CDP
-- Not cookie export, `state-save`, screenshots, or MFA/CAPTCHA solving
+- Not cookie export, `state-save`, MFA/CAPTCHA solving, or screenshots during
+  password fill
 - `authorization_ready` remains false

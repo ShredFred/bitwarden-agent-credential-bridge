@@ -31,13 +31,20 @@ function makeStubPlaywright(origin) {
   let html = LOGIN_HTML;
   const cookieStore = [];
   const fills = [];
+  let passwordValue = '';
+  const png = Buffer.from(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwADhQGAWjR9awAAAABJRU5ErkJggg==',
+    'base64',
+  );
 
   function locator(selector) {
     const loc = {
       fill: async (value) => {
         fills.push({ selector, value });
+        if (String(selector).includes('password')) passwordValue = value;
       },
       click: async () => {
+        passwordValue = '';
         url = `${origin}/home`;
         html = HOME_HTML;
         cookieStore.splice(0, cookieStore.length, {
@@ -45,6 +52,8 @@ function makeStubPlaywright(origin) {
           value: 'sessiontoken_abcdefghijk',
         });
       },
+      evaluateAll: async () => [passwordValue],
+      inputValue: async () => passwordValue,
       first: () => loc,
       getByRole: () => loc,
       locator: () => loc,
@@ -59,8 +68,12 @@ function makeStubPlaywright(origin) {
       url = next;
       if (String(next).endsWith('/api/me')) html = ME_JSON;
       else if (String(next).endsWith('/home')) html = HOME_HTML;
-      else html = LOGIN_HTML;
+      else {
+        html = LOGIN_HTML;
+        passwordValue = '';
+      }
     },
+    screenshot: async () => png,
     locator,
     waitForLoadState: async () => {},
   };
@@ -106,12 +119,17 @@ describe('bridge-owned playwright driver', () => {
     });
     try {
       assert.equal(session.agent_cdp_absent, true);
-      assert.equal(session.screenshot_forbidden, true);
+      assert.equal(session.screenshot_password_entry_forbidden, true);
       assert.equal(session.headless, true);
       assert.equal(stub.launchOptions.headless, true);
       assert.equal(stub.launchOptions.devtools, false);
       assert.equal(stub.launchOptions.handleSIGINT, false);
       assert.equal(JSON.stringify(session).includes('newPage'), false);
+      const before = await (await fetch(`${session.baseUrl}/screenshot`)).json();
+      assert.equal(before.ok, true);
+      assert.equal(before.media_type, 'image/png');
+      assert.ok(before.byte_length > 24);
+      assert.equal(JSON.stringify(before).includes(credentials.password), false);
       const snap = await (await fetch(`${session.baseUrl}/snapshot`)).json();
       await fetch(`${session.baseUrl}/select_targets`, {
         method: 'POST',
@@ -134,12 +152,16 @@ describe('bridge-owned playwright driver', () => {
       assert.ok(stub.fills.some((f) => f.selector.includes('password') && f.value === credentials.password));
       const cookies = await (await fetch(`${session.baseUrl}/cookie_list`)).json();
       assert.equal(cookies.error, 'session_material_forbidden');
+      const after = await (await fetch(`${session.baseUrl}/screenshot`)).json();
+      assert.equal(after.ok, true);
+      assert.equal(after.logged_in, true);
+      assert.equal(JSON.stringify(after).includes(credentials.password), false);
     } finally {
       await session.close();
     }
   });
 
-  it('launches headed Playwright when requested and still forbids screenshots', async () => {
+  it('launches headed Playwright when requested and still forbids screenshots during password entry', async () => {
     const origin = 'http://127.0.0.1:9';
     const credentials = { username: 'user_abcdefgh', password: generateFakeSentinel() };
     const stub = makeStubPlaywright(origin);
@@ -154,9 +176,39 @@ describe('bridge-owned playwright driver', () => {
       assert.equal(session.headless, false);
       assert.equal(stub.launchOptions.headless, false);
       assert.equal(stub.launchOptions.devtools, false);
-      assert.equal(session.screenshot_forbidden, true);
-      const screenshot = await (await fetch(`${session.baseUrl}/screenshot`)).json();
-      assert.equal(screenshot.error, 'command_forbidden');
+      assert.equal(session.screenshot_password_entry_forbidden, true);
+      const before = await (await fetch(`${session.baseUrl}/screenshot`)).json();
+      assert.equal(before.ok, true);
+    } finally {
+      await session.close();
+    }
+  });
+
+  it('refuses screenshots while a password field is occupied', async () => {
+    const origin = 'http://127.0.0.1:9';
+    const credentials = { username: 'user_abcdefgh', password: generateFakeSentinel() };
+    const adapter = {
+      origin,
+      snapshotPage: async () => {
+        throw new BridgeBrowserTargetingError('adapter_failed');
+      },
+      currentUrl: () => `${origin}/login`,
+      cookieNames: () => [],
+      absorbCookiesInto: async () => {},
+      passwordFieldsOccupied: async () => true,
+      screenshotPage: async () => {
+        throw new Error('must not capture while password is present');
+      },
+      close: async () => {},
+    };
+    const session = await startBridgeOwnedBrowser({
+      policy: await policyFor(origin),
+      credentials,
+      adapter,
+    });
+    try {
+      const shot = await (await fetch(`${session.baseUrl}/screenshot`)).json();
+      assert.equal(shot.error, 'password_entry_active');
     } finally {
       await session.close();
     }
