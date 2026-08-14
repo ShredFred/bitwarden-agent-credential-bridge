@@ -29,8 +29,9 @@ findable after a lost stdout line.
   snapshot. No credential in the command. The Bridge re-checks origin,
   password `type`, and same-origin form action, then fills from memory
 - After `logged_in=true`, `POST /goto` only on `allowed_paths`
-- `GET /screenshot` — Playwright PNG except during password fill
-  (`password_entry_active`). `fetch` returns `screenshot_unsupported`
+- `GET /screenshot` — Playwright raw `image/png` except during password fill
+  (`password_entry_active`). Errors stay JSON. `fetch` returns
+  `screenshot_unsupported`
 - `cookie_list`, `eval`, `cdp`, `fill`, `state_save`, `playwright_cli`, and
   related ops return `session_material_forbidden` or `command_forbidden`
 - Exposure tests scan username, password, hidden-field values, and issued
@@ -48,6 +49,8 @@ findable after a lost stdout line.
   Same HTTP allow-list. **Headless is the default** and can render pages
   without a window; `--headed` opens a window for a human watching.
   `GET /screenshot` is allowed on an empty login form and after login.
+  Success is raw `image/png` with value-free `x-bridge-logged-in` /
+  `x-bridge-path` headers — never `png_base64` in JSON.
   It is forbidden while `inject_login` fills the password and while any
   password input is non-empty (`password_entry_active`). Ops are serialized
   so a screenshot cannot interleave with fill. Playwright is **not** a
@@ -90,7 +93,8 @@ Optional `--driver playwright` (not a package dependency; fails `playwright_abse
 when Playwright is not installed). Playwright is **headless by default**;
 `--headed` opens a window (Playwright only; invalid with `fetch`).
 Unknown flags such as `--devtools` are `invalid_request`.
-`GET /screenshot` (HTTP, Playwright) is allowed except during password fill.
+`GET /screenshot` (HTTP, Playwright) is allowed except during password fill;
+the body is `image/png`, not JSON.
 
 ## Agent HTTP surface
 

@@ -57,7 +57,7 @@ These are product decisions, not missing tickets:
 | OAuth, interactive MFA, SMS, email codes | Need a later explicit live gate and a different broker |
 | Free CSS / XPath / `eval` in the browser | Prompt-injection / confused deputy |
 | Cookie export / Playwright storage state | Use an HTTP broker or stop |
-| Screenshots during password fill | Occupied password inputs and in-flight `inject_login` return `password_entry_active`. Empty login form and post-login pages may be captured |
+| Screenshots during password fill | Occupied password inputs and in-flight `inject_login` return `password_entry_active`. Empty login form and post-login pages may be captured as raw `image/png`, never `png_base64` JSON |
 | Personal or company Bitwarden PM as the default | SM machine accounts are the productive path; personal PM is a separate flagged slice |
 | `authorization_ready=true` from install or unlock | Would launder incomplete evidence |
 

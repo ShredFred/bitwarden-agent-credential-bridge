@@ -1714,8 +1714,10 @@ password entry:
 - session ops are one-writer serialized so a screenshot cannot interleave with
   fill; failed inject reloads the login page before the agent can capture;
 - Playwright only; the `fetch` driver returns `screenshot_unsupported`;
-- PNG is bounded; responses still pass the sensitive-variant scan; cookies,
-  CDP, and storage-state remain forbidden.
+- success is raw `image/png` (never `png_base64` JSON); value-free headers
+  carry `x-bridge-logged-in` and `x-bridge-path`; PNG bytes are bounded and
+  scanned for sensitive variants; cookies, CDP, and storage-state remain
+  forbidden.
 
 Phase 17d must not export cookies, solve MFA, open non-loopback hosts, add
 `playwright` to `package.json`, or set `authorization_ready=true`. A screenshot

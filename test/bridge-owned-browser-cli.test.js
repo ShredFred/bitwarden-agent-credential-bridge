@@ -174,6 +174,7 @@ describe('bridge-owned browser SM CLI', () => {
       assert.ok(contract.allowed_ops.includes('inject_login'));
       assert.equal(contract.screenshot_password_entry_forbidden, true);
       assert.equal(contract.screenshot_unsupported, true);
+      assert.equal(contract.screenshot_json_pixels_absent, true);
       assert.equal(contract.headless, true);
       assert.equal(contract.driver, 'fetch');
       assert.ok(contract.allowed_ops.includes('screenshot'));

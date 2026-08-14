@@ -26,6 +26,25 @@ const LOGIN_HTML =
 const HOME_HTML = '<html><body><h1>home</h1></body></html>';
 const ME_JSON = '{"ok":true,"role":"member"}';
 
+async function readPng(url) {
+  const response = await fetch(url);
+  const type = response.headers.get('content-type') ?? '';
+  if (type.includes('application/json')) {
+    return {
+      status: response.status,
+      json: await response.json(),
+    };
+  }
+  const bytes = Buffer.from(await response.arrayBuffer());
+  return {
+    status: response.status,
+    contentType: type,
+    loggedIn: response.headers.get('x-bridge-logged-in'),
+    path: response.headers.get('x-bridge-path'),
+    bytes,
+  };
+}
+
 function makeStubPlaywright(origin) {
   let url = `${origin}/login`;
   let html = LOGIN_HTML;
@@ -125,11 +144,15 @@ describe('bridge-owned playwright driver', () => {
       assert.equal(stub.launchOptions.devtools, false);
       assert.equal(stub.launchOptions.handleSIGINT, false);
       assert.equal(JSON.stringify(session).includes('newPage'), false);
-      const before = await (await fetch(`${session.baseUrl}/screenshot`)).json();
-      assert.equal(before.ok, true);
-      assert.equal(before.media_type, 'image/png');
-      assert.ok(before.byte_length > 24);
-      assert.equal(JSON.stringify(before).includes(credentials.password), false);
+      const before = await readPng(`${session.baseUrl}/screenshot`);
+      assert.equal(before.status, 200);
+      assert.equal(before.contentType, 'image/png');
+      assert.equal(before.loggedIn, 'false');
+      assert.equal(before.path, '/login');
+      assert.ok(before.bytes.length > 24);
+      assert.equal(before.bytes.subarray(0, 4).toString('hex'), '89504e47');
+      assert.equal(before.bytes.includes(credentials.password), false);
+      assert.equal(JSON.stringify(before).includes('png_base64'), false);
       const snap = await (await fetch(`${session.baseUrl}/snapshot`)).json();
       await fetch(`${session.baseUrl}/select_targets`, {
         method: 'POST',
@@ -152,10 +175,12 @@ describe('bridge-owned playwright driver', () => {
       assert.ok(stub.fills.some((f) => f.selector.includes('password') && f.value === credentials.password));
       const cookies = await (await fetch(`${session.baseUrl}/cookie_list`)).json();
       assert.equal(cookies.error, 'session_material_forbidden');
-      const after = await (await fetch(`${session.baseUrl}/screenshot`)).json();
-      assert.equal(after.ok, true);
-      assert.equal(after.logged_in, true);
-      assert.equal(JSON.stringify(after).includes(credentials.password), false);
+      const after = await readPng(`${session.baseUrl}/screenshot`);
+      assert.equal(after.status, 200);
+      assert.equal(after.contentType, 'image/png');
+      assert.equal(after.loggedIn, 'true');
+      assert.equal(after.path, '/home');
+      assert.equal(after.bytes.includes(credentials.password), false);
     } finally {
       await session.close();
     }
@@ -177,8 +202,10 @@ describe('bridge-owned playwright driver', () => {
       assert.equal(stub.launchOptions.headless, false);
       assert.equal(stub.launchOptions.devtools, false);
       assert.equal(session.screenshot_password_entry_forbidden, true);
-      const before = await (await fetch(`${session.baseUrl}/screenshot`)).json();
-      assert.equal(before.ok, true);
+      const before = await readPng(`${session.baseUrl}/screenshot`);
+      assert.equal(before.status, 200);
+      assert.equal(before.contentType, 'image/png');
+      assert.equal(before.loggedIn, 'false');
     } finally {
       await session.close();
     }

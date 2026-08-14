@@ -81,7 +81,8 @@ npm run start:browser:sm -- --i-approve-secrets-manager-machine-resolve --i-appr
 Default is the fast `fetch` driver (no window, no Playwright install).
 Playwright is optional and not shipped in this repo; headless unless
 you pass `--driver playwright --headed`. `GET /screenshot` works with
-Playwright except during password fill (`password_entry_active`).
+Playwright except during password fill (`password_entry_active`) and
+returns raw `image/png`, not JSON.
 The `fetch` driver returns `screenshot_unsupported`.
 
 Then `GET http://127.0.0.1:18792/contract` and the four-call login

@@ -128,8 +128,9 @@ Never claim `authorization_ready=true` from SM setup alone. Missing `bws` is
   are not the secret path.
 - **No cookie export.** If a task needs the cookie, use an HTTP broker or stop.
 - **No screenshots during password fill.** `GET /screenshot` is allowed before
-  and after login; `inject_login` and occupied password fields return
-  `password_entry_active`. The `fetch` driver cannot screenshot.
+  and after login as raw `image/png` (not JSON). `inject_login` and occupied
+  password fields return `password_entry_active`. The `fetch` driver cannot
+  screenshot.
 - **No MFA solving.** Challenge pages fail closed.
 - Platform writer isolation (Windows LocalService, macOS LaunchDaemon, Linux
   systemd) is a documented research ladder, not a prerequisite for SM resolve.

@@ -273,6 +273,8 @@ async function handleAgentRequest(req, res, ctx) {
         cookie_export_forbidden: true,
         screenshot_password_entry_forbidden: true,
         screenshot_unsupported: ctx.driver === 'fetch',
+        screenshot_media_type: 'image/png',
+        screenshot_json_pixels_absent: true,
         driver: ctx.driver,
         headless: ctx.headless,
         agent_cdp_absent: true,
@@ -479,13 +481,9 @@ async function handleScreenshot(res, ctx) {
   } catch {
     throw new BridgeOwnedBrowserError('adapter_failed');
   }
-  writeJson(res, ctx.sensitive, {
-    ok: true,
-    logged_in: ctx.getLoggedIn(),
+  writePng(res, ctx.sensitive, png, {
+    loggedIn: ctx.getLoggedIn(),
     path,
-    media_type: 'image/png',
-    byte_length: png.length,
-    png_base64: png.toString('base64'),
   });
 }
 
@@ -552,6 +550,40 @@ function writeJson(res, sensitive, payload) {
   }
   res.writeHead(200, { 'content-type': 'application/json; charset=utf-8' });
   res.end(body);
+}
+
+const SAFE_SCREENSHOT_PATH = /^\/[A-Za-z0-9/_.-]{0,127}$/;
+
+/**
+ * @param {import('node:http').ServerResponse} res
+ * @param {Set<string>} sensitive
+ * @param {Buffer} png
+ * @param {{ loggedIn: boolean, path: string }} meta
+ */
+function writePng(res, sensitive, png, meta) {
+  const utf8 = png.toString('utf8');
+  const latin1 = png.toString('latin1');
+  const b64 = png.toString('base64');
+  if (
+    containsSensitive(utf8, sensitive) ||
+    containsSensitive(latin1, sensitive) ||
+    containsSensitive(b64, sensitive)
+  ) {
+    writeFixed(res, 502, 'sensitive_response_blocked');
+    return;
+  }
+  if (!SAFE_SCREENSHOT_PATH.test(meta.path)) {
+    writeFixed(res, 502, 'adapter_failed');
+    return;
+  }
+  res.writeHead(200, {
+    'content-type': 'image/png',
+    'content-length': String(png.length),
+    'cache-control': 'no-store',
+    'x-bridge-logged-in': meta.loggedIn ? 'true' : 'false',
+    'x-bridge-path': meta.path,
+  });
+  res.end(png);
 }
 
 function writeFixed(res, status, code) {

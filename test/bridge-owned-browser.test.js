@@ -56,6 +56,8 @@ describe('bridge-owned browser', () => {
       assert.ok(contract.forbidden_ops.includes('cookie_list'));
       assert.equal(contract.screenshot_password_entry_forbidden, true);
       assert.equal(contract.screenshot_unsupported, true);
+      assert.equal(contract.screenshot_media_type, 'image/png');
+      assert.equal(contract.screenshot_json_pixels_absent, true);
       assert.ok(contract.allowed_ops.includes('screenshot'));
       assert.equal(contract.headless, true);
       assert.ok(contract.allowed_paths.includes('/home'));
