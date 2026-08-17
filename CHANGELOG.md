@@ -7,6 +7,11 @@ Semantic Versioning while it remains on the experimental 0.x line.
 
 ### Fixed
 
+- Laptop-ready CLI reports `approval_flag_required` before
+  `unsupported_platform`, so Linux CI matches the operator-flag contract.
+  Phase 9e operational-bridge tests pin `platform: 'win32'` when feeding
+  Windows synthetic evidence. The live Windows target-ACL probe is skipped
+  in GitHub Actions (`timeout_or_terminated` without a persistent service).
 - Secrets Manager CLIs resolve `bws` from the default Windows install
   location (`LocalAppData\\Programs\\Bitwarden\\bws.exe`) when it is not on
   PATH, and report `bws_missing` instead of a generic startup failure.
