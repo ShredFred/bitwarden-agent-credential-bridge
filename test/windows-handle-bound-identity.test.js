@@ -151,6 +151,10 @@ describe('Windows handle-bound identity live probe (win32)', () => {
       t.skip('Windows-only probe');
       return;
     }
+    if (process.env.GITHUB_ACTIONS === 'true') {
+      t.skip('live handle-bound probe is not part of GitHub Actions CI');
+      return;
+    }
     const { collectWindowsHandleBoundIdentityEvidence } = await import(
       '../src/windows-handle-bound-identity.mjs'
     );
