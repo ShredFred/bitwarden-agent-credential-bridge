@@ -7,6 +7,10 @@ The public GitHub repository is the source of truth for reviewable code and
 decisions. Private planning is separate, sanitized, and never a place for
 credentials.
 
+Humans installing the Bridge: [README](../README.md) and [Features](features.md).
+Agents: [agent-windows-install.md](agent-windows-install.md).
+This document is the maintainer workflow.
+
 ## The everyday workflow
 
 1. Start with a discussion if the idea changes a security boundary, scope, or

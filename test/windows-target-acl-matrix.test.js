@@ -124,6 +124,10 @@ describe('Windows target ACL matrix live probe (win32)', () => {
       t.skip('Windows-only probe');
       return;
     }
+    if (process.env.GITHUB_ACTIONS === 'true') {
+      t.skip('live AccessCheck probe is not part of GitHub Actions CI');
+      return;
+    }
     const { evidence, report } = await collectWindowsTargetAclEvidence(persistentLayout());
     assert.equal(report.authorization_ready, false);
     assert.equal(report.operational_bridge_unwired, true);

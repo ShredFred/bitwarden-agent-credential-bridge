@@ -60,5 +60,24 @@ describe('secrets manager local lifecycle', () => {
       runCommand: async () => 'bws 1.0.0',
     });
     assert.equal(bws.bws_available, true);
+    const missing = await checkBwsAvailable({
+      bwsPath: path.join(os.tmpdir(), 'no-such-bws-executable'),
+    });
+    assert.equal(missing.bws_available, false);
+
+    const local = path.join(os.tmpdir(), 'fake-localappdata');
+    const expected = path.join(local, 'Programs', 'Bitwarden', 'bws.exe');
+    let seen = null;
+    const fromDefault = await checkBwsAvailable({
+      platform: 'win32',
+      env: { LOCALAPPDATA: local },
+      pathExists: (filePath) => filePath === expected,
+      runCommand: async (exe) => {
+        seen = exe;
+        return 'bws 2.1.0';
+      },
+    });
+    assert.equal(fromDefault.bws_available, true);
+    assert.equal(seen, expected);
   });
 });

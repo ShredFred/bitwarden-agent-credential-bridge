@@ -2,6 +2,8 @@
 
 Kein Extra-Windows-User. Kein LocalService nötig. Token einmal einfügen.
 
+Produktüberblick: [README](../README.md) · [Features](features.md).
+
 **Onboarding + Import (Keys, Naming, Seed):**  
 [`sm-onboarding-and-import.md`](sm-onboarding-and-import.md)  
 **Agenten:** [`agent-windows-install.md`](agent-windows-install.md)  
@@ -10,8 +12,10 @@ Kein Extra-Windows-User. Kein LocalService nötig. Token einmal einfügen.
 
 ## Was ist `bws`?
 
-Bitwarden Secrets Manager CLI. Bridge nutzt sie im Hintergrund; muss auf PATH
-liegen (Installer prüft / weist hin).
+Bitwarden Secrets Manager CLI. Bridge nutzt sie im Hintergrund. Windows:
+Default-Install unter `LocalAppData\Programs\Bitwarden\bws.exe` — PATH ist
+nicht nötig, wenn diese Datei existiert. Fehlt `bws`, ist der Code
+`bws_missing` (nicht `authorization_ready`).
 
 ## Setup
 

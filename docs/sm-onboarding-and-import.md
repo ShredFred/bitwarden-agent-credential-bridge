@@ -47,7 +47,7 @@ From source:
 
 ```powershell
 npm ci
-# bws must be on PATH (default install: %LOCALAPPDATA%\Programs\Bitwarden)
+# bws: PATH or default %LOCALAPPDATA%\Programs\Bitwarden\bws.exe
 npm run setup:sm:wizard
 # or: npm run setup:sm -- --i-approve-sm-machine-setup
 ```
@@ -114,6 +114,16 @@ npm run live:sm-matrix -- --i-approve-secrets-manager-machine-resolve
 # value on stdin only — never echoed
 "***" | npm run live:sm-write -- --i-approve-secrets-manager-machine-write --project private-hq --key phq_github_api_bearer
 ```
+
+Or open the **agent-callable WinForms dialog** (multi-field, value-free result):
+
+```powershell
+npm run sm:secret-entry -- --i-approve-secrets-manager-machine-write `
+  --form-file samples/operational/sm-secret-entry-klicktipp.json
+```
+
+See [`sm-secret-entry-dialog.md`](sm-secret-entry-dialog.md) for the form schema
+and `npm run sm:secret-exists` so agents can check presence without reading values.
 
 6. Re-run seed **without** inventing new fake values for that key if you only
    added a binding for an existing SM value — or upsert via write as above.

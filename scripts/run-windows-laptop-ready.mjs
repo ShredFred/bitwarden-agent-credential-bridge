@@ -50,21 +50,21 @@ function runNpm(script, args = []) {
   });
 }
 
-if (process.platform !== 'win32') {
+if (!APPROVE_INSTALL && !APPROVE_PERSONAL) {
   emit({
     ok: false,
-    code: 'unsupported_platform',
+    code: 'approval_flag_required',
+    note: 'Pass --i-approve-persistent-install and/or --i-approve-personal-bitwarden-agent-resolve',
     authorization_ready: false,
     helper_vault_free: true,
   });
   process.exit(1);
 }
 
-if (!APPROVE_INSTALL && !APPROVE_PERSONAL) {
+if (process.platform !== 'win32') {
   emit({
     ok: false,
-    code: 'approval_flag_required',
-    note: 'Pass --i-approve-persistent-install and/or --i-approve-personal-bitwarden-agent-resolve',
+    code: 'unsupported_platform',
     authorization_ready: false,
     helper_vault_free: true,
   });

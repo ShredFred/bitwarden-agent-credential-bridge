@@ -5,8 +5,42 @@ Semantic Versioning while it remains on the experimental 0.x line.
 
 ## Unreleased
 
+### Fixed
+
+- Laptop-ready CLI reports `approval_flag_required` before
+  `unsupported_platform`, so Linux CI matches the operator-flag contract.
+  Phase 9e operational-bridge tests pin `platform: 'win32'` when feeding
+  Windows synthetic evidence. The live Windows target-ACL probe is skipped
+  in GitHub Actions (`timeout_or_terminated` without a persistent service).
+- Secrets Manager CLIs resolve `bws` from the default Windows install
+  location (`LocalAppData\\Programs\\Bitwarden\\bws.exe`) when it is not on
+  PATH, and report `bws_missing` instead of a generic startup failure.
+  `authorization_ready: false` remains LocalService writer evidence and is
+  not the missing-CLI error code.
+
 ### Added
 
+- Bridge-owned Playwright accepts both headless (default) and `--headed`.
+  `--headed` with the `fetch` driver is `invalid_request`. Unknown flags
+  such as `--devtools` fail closed. Launch pins
+  `devtools: false` and lets the Bridge own SIGINT.
+  `GET /screenshot` is allowed except during password fill
+  (`password_entry_active`); success is raw `image/png` (no `png_base64`
+  JSON). `fetch` returns `screenshot_unsupported`.
+  Playwright is an optional host install, not a package dependency.
+- Phase 17c `npm run start:browser:sm` (dual approval flags, `--alias`) and
+  operational `GET /services` discovery on `http://127.0.0.1:18791`.
+  Bridge-owned browser CLI binds `http://127.0.0.1:18792`.
+- Human-facing product README, [feature map](docs/features.md), and
+  [research index](docs/research-status.md). Agent runbooks stay separate.
+- Phase 17b in-process Bridge-owned Playwright driver behind the same
+  index-only login allow-list (`driver: 'playwright'`). Playwright is not a
+  package dependency; stub tests always run. Agent CDP, `playwright-cli`,
+  cookie export, and non-loopback hosts remain forbidden.
+- Phase 17 Bridge-owned browser for `browser_form_login`: agent selects
+  field indices, Bridge injects in-memory secrets, cookies never leave the
+  jar (`docs/phase17-bridge-owned-browser.md`). Agent CDP, cookie export, and
+  `playwright-cli` remain forbidden; `authorization_ready` stays false.
 - Phase 16 fake-loopback SSH/FTP session brokers (policy versions 7/8), private-hq
   multi-class SM matrix coverage, and operator docs
   (`docs/phase16-ssh-ftp-session-brokers.md`). `env_inject` remains rejected;

@@ -6,7 +6,9 @@ only. The HTTP `startBroker` path rejects this class (`wrong_broker`).
 ## What works today
 
 - Loopback fake website login (form + CSRF hidden field + session cookie)
-- Dedicated session broker (stdlib `fetch` + in-memory cookie jar; no Playwright)
+- Dedicated session broker (stdlib `fetch` + in-memory cookie jar)
+- See [Phase 17](phase17-bridge-owned-browser.md) for the Bridge-owned browser
+  (optional in-process Playwright; still no agent CDP or cookie export)
 - Opaque `{ logged_in, origin_bound, session_id }` plus allow-listed replay only
 - Exposure tests that scan username, password, and issued session cookie values
 - MFA / CAPTCHA / bad login / concurrent writer / idle TTL / cross-origin redirect
@@ -44,5 +46,8 @@ the embedded approval flag. It does not read personal/company Bitwarden.
 - Not automatic login to arbitrary public websites (only pinned disposable demos
   behind an explicit operator approval flag)
 - Not Playwright/browser DOM automation by default
-- Not FTP/SSH/RDP/cookie export to the agent
+- See [Phase 17](phase17-bridge-owned-browser.md) for the Bridge-owned browser
+  command surface (optional in-process Playwright driver; still no agent CDP
+  or cookie export)
+- Not RDP or cookie export to the agent. Loopback SSH/FTP is Phase 16.
 - `authorization_ready` remains false; same-user process isolation is not claimed

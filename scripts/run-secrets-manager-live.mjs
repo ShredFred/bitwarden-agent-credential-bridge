@@ -22,7 +22,7 @@ import {
   buildSecretsManagerResolverGate,
   resolveSecretsManagerSecret,
 } from '../src/secrets-manager-resolver.mjs';
-import { fetchSecretsManagerSecretValue } from '../src/secrets-manager-bws-adapter.mjs';
+import { fetchSecretsManagerSecretValue, SecretsManagerBwsAdapterError, withBwsDiagnostic } from '../src/secrets-manager-bws-adapter.mjs';
 import { loadOperationalBindingsFile } from '../src/operational-bridge.mjs';
 
 const APPROVAL_FLAG = '--i-approve-secrets-manager-machine-resolve';
@@ -30,7 +30,7 @@ const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const bindingsPath = 'samples/operational/bindings-sm.json';
 
 function emit(payload, code = 0) {
-  process.stdout.write(`${JSON.stringify(payload)}\n`);
+  process.stdout.write(`${JSON.stringify(withBwsDiagnostic(payload))}\n`);
   process.exitCode = code;
 }
 
@@ -120,10 +120,13 @@ if (!process.argv.includes(APPROVAL_FLAG)) {
           credential_class: binding.credential_class,
         },
       );
-    } catch {
+    } catch (error) {
+      const code = error instanceof SecretsManagerBwsAdapterError
+        ? error.code
+        : 'sm_resolve_failed';
       emit({
         ok: false,
-        code: 'sm_resolve_failed',
+        code,
         live_secret_resolved: false,
         authorization_ready: false,
         helper_vault_free: true,

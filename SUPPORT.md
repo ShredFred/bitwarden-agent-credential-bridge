@@ -7,12 +7,16 @@
 - Use **Pull Requests** for reviewed implementation proposals.
 - Use **private vulnerability reporting** for suspected security issues.
 
-This is an experimental, volunteer-maintained research project. Best-effort
-community support is welcome, but there is no guaranteed response time, private
-consulting channel, or production support commitment.
+This is an experimental, volunteer-maintained project. Best-effort community
+support is welcome, but there is no guaranteed response time, private consulting
+channel, or production support commitment.
 
 ## Before asking
 
-Check the README, architecture document, limitations, and existing discussions.
+- Humans: [README](README.md), [Features](docs/features.md),
+  [Windows onboarding](docs/windows-laptop-onboarding.md).
+- Agents: [agent Windows install](docs/agent-windows-install.md).
+- Contributors: [Architecture](docs/architecture.md).
+
 Never include real credentials, vault references, raw host output, or private
 service details in a support request.

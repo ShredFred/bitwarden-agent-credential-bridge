@@ -37,7 +37,7 @@ git clone https://github.com/ShredFred/bitwarden-agent-credential-bridge.git
 cd bitwarden-agent-credential-bridge
 git checkout main
 npm ci
-# Ensure Bitwarden Secrets Manager CLI `bws` is on PATH (pin per docs).
+# bws: PATH or default %LOCALAPPDATA%\Programs\Bitwarden\bws.exe
 npm run setup:sm:wizard
 # Import keys named from samples/operational/bindings-sm.json into MiViA + private-hq
 npm run seed:sm -- --i-approve-secrets-manager-machine-write --prune --smoke --i-approve-secrets-manager-machine-resolve
@@ -67,5 +67,27 @@ Also revoke the machine token in Bitwarden SM if the PC should lose access.
 - Never echo or log the access token or secret values.
 - Never set `BWS_ACCESS_TOKEN` in the user/agent environment for general use.
 - Never claim `authorization_ready=true` from SM setup alone.
+- Missing `bws` is `bws_missing`. `authorization_ready=false` is LocalService
+  writer evidence and does not mean the SM CLI failed.
 - LocalService Day-2 install is optional and separate.
 - Follow [`sm-onboarding-and-import.md`](sm-onboarding-and-import.md) when adding or importing service keys.
+
+## Browser (agent-blind)
+
+```powershell
+npm run start:browser:sm -- --i-approve-secrets-manager-machine-resolve --i-approve-bridge-owned-browser --alias phq_web
+```
+
+Default is the fast `fetch` driver (no window, no Playwright install).
+Playwright is optional and not shipped in this repo; headless unless
+you pass `--driver playwright --headed`. `GET /screenshot` works with
+Playwright except during password fill (`password_entry_active`) and
+returns raw `image/png`, not JSON.
+The `fetch` driver returns `screenshot_unsupported`.
+
+Then `GET http://127.0.0.1:18792/contract` and the four-call login
+(snapshot → select_targets by index → inject_login with generation).
+Do not invent `playwright-cli`, CDP, or cookie export.
+`start:operational:sm` still auto-logs-in browser aliases via Phase 6;
+re-read those ports at `http://127.0.0.1:18791/services`.
+See [`phase17-bridge-owned-browser.md`](phase17-bridge-owned-browser.md).

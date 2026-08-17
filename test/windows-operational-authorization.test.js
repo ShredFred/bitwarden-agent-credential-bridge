@@ -124,6 +124,7 @@ describe('Windows operational authorization (Phase 9e)', () => {
     const bridge = await startOperationalBridge({
       repoRoot: root,
       bindings,
+      platform: 'win32',
       productionAuthorizationEvidence: buildCompleteOperationalAuthorizationEvidenceForHarness(),
     });
     try {
@@ -146,6 +147,7 @@ describe('Windows operational authorization (Phase 9e)', () => {
       () => startOperationalBridge({
         repoRoot: root,
         bindings,
+        platform: 'win32',
         productionAuthorizationEvidence: {
           ...complete,
           peerEvidence: { ...complete.peerEvidence },

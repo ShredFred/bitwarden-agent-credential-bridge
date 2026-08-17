@@ -1,5 +1,8 @@
 # Windows laptop onboarding
 
+Human quickstart for this PC. Product overview:
+[README](../README.md) · [Features](features.md).
+
 **Default:** Windows Setup EXE or guided `setup:sm` → Secrets Manager same-user
 (MiViA + private-hq). No extra OS account. LocalService optional.
 

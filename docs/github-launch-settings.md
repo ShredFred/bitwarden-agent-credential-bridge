@@ -5,11 +5,10 @@ copy-ready repository settings, not commands to run before approval.
 
 ## Repository description
 
-> Fail-closed, fake-only security research harness for policy-pinned agent credential injection. Not a vault integration or production broker.
+> Agents can use Bitwarden Secrets Manager without seeing the secrets. Fail-closed brokers, Windows installer, experimental research harness. Not affiliated with Bitwarden.
 
-This description is intentionally precise: it explains the research value
-without implying Bitwarden compatibility, live vault support, or production
-readiness.
+This description sells the operator-visible product without claiming
+production writer isolation, Bitwarden endorsement, or `authorization_ready`.
 
 ## Suggested topics
 
@@ -23,10 +22,12 @@ Add only topics that are true today:
 - `security-testing`
 - `fail-closed`
 - `developer-tools`
+- `windows`
 
-Do not add `bitwarden`, `onecli`, `production-ready`, `password-manager`,
-or `mcp` merely for discoverability. Those would overstate the present scope
-or imply a relationship that has not been established.
+Do not add `onecli`, `production-ready`, `password-manager`, or `mcp` merely
+for discoverability. Do not add `bitwarden` as a topic: the project integrates
+with Secrets Manager that *you* bring, and is not an official Bitwarden
+product.
 
 ## About panel
 

@@ -1,18 +1,20 @@
 #!/usr/bin/env node
 /**
- * Agent-blind Secrets Manager write (create/update).
+ * Value-free SM secret presence check for agents.
  *
- * Reads secret value from stdin (one line). Never prints the value or token.
- * Returns only { ok, action }. Requires machine setup + write approval flag.
+ * Reports whether a key exists in an allowlisted project. Never returns values.
  *
  * Usage:
- *   echo value| npm run live:sm-write -- --i-approve-secrets-manager-machine-write \
- *     --project mivia --key my_secret_key
+ *   node scripts/run-sm-secret-exists.mjs --i-approve-secrets-manager-machine-resolve \
+ *     --project mivia --key mivia_klicktipp_api_user
+ *
+ *   node scripts/run-sm-secret-exists.mjs --i-approve-secrets-manager-machine-resolve \
+ *     --project mivia --prefix mivia_klicktipp_
  */
 import process from 'node:process';
 import {
   SM_DEFAULT_PROJECTS,
-  SM_WRITE_APPROVAL_FLAG,
+  SM_RESOLVE_APPROVAL_FLAG,
 } from '../src/secrets-manager-defaults.mjs';
 import { buildSecretsManagerLiveScope } from '../src/secrets-manager-live-gate.mjs';
 import {
@@ -20,7 +22,7 @@ import {
   SecretsManagerTokenCollectorError,
 } from '../src/secrets-manager-token-collector.mjs';
 import {
-  upsertSecretsManagerSecret,
+  listSecretsManagerSecretKeys,
   SecretsManagerBwsAdapterError,
   withBwsDiagnostic,
 } from '../src/secrets-manager-bws-adapter.mjs';
@@ -37,25 +39,6 @@ function argValue(name) {
   return process.argv[idx + 1];
 }
 
-function readStdinLine() {
-  return new Promise((resolve, reject) => {
-    let data = '';
-    const timer = setTimeout(() => {
-      reject(new Error('stdin_timeout'));
-    }, 30000);
-    process.stdin.setEncoding('utf8');
-    process.stdin.on('data', (chunk) => { data += chunk; });
-    process.stdin.on('end', () => {
-      clearTimeout(timer);
-      resolve(data.replace(/\r?\n$/, ''));
-    });
-    process.stdin.on('error', (error) => {
-      clearTimeout(timer);
-      reject(error);
-    });
-  });
-}
-
 function resolveProjectId(raw) {
   if (raw === 'mivia') return SM_DEFAULT_PROJECTS.mivia;
   if (raw === 'private-hq' || raw === 'private_hq' || raw === 'privatehq') {
@@ -64,30 +47,49 @@ function resolveProjectId(raw) {
   return raw;
 }
 
-if (!process.argv.includes(SM_WRITE_APPROVAL_FLAG)) {
+const KEY_RE = /^[a-zA-Z][a-zA-Z0-9_.-]{0,127}$/;
+const PREFIX_RE = /^[a-zA-Z][a-zA-Z0-9_.-]{0,120}_$/;
+
+if (!process.argv.includes(SM_RESOLVE_APPROVAL_FLAG)) {
   emit({
     ok: false,
     code: 'approval_flag_required',
-    required_flag: SM_WRITE_APPROVAL_FLAG,
+    required_flag: SM_RESOLVE_APPROVAL_FLAG,
     authorization_ready: false,
     helper_vault_free: true,
+    agent_secret_visible: false,
   }, 1);
 } else if (process.platform !== 'win32' && process.platform !== 'darwin') {
   emit({ ok: false, code: 'unsupported_platform', authorization_ready: false }, 1);
 } else {
   const projectArg = argValue('--project');
   const key = argValue('--key');
-  if (typeof projectArg !== 'string' || typeof key !== 'string') {
+  const prefix = argValue('--prefix');
+  if (typeof projectArg !== 'string') {
     emit({
       ok: false,
       code: 'usage',
-      hint: 'Provide --project mivia|private-hq|<uuid> and --key <secret_key>; value on stdin',
+      hint: 'Provide --project and either --key or --prefix',
       authorization_ready: false,
+      helper_vault_free: true,
+      agent_secret_visible: false,
     }, 1);
+  } else if ((key && prefix) || (!key && !prefix)) {
+    emit({
+      ok: false,
+      code: 'usage',
+      hint: 'Provide exactly one of --key or --prefix',
+      authorization_ready: false,
+      helper_vault_free: true,
+      agent_secret_visible: false,
+    }, 1);
+  } else if (key && !KEY_RE.test(key)) {
+    emit({ ok: false, code: 'invalid_key', authorization_ready: false }, 1);
+  } else if (prefix && !PREFIX_RE.test(prefix)) {
+    emit({ ok: false, code: 'invalid_prefix', authorization_ready: false }, 1);
   } else {
     try {
       const projectId = resolveProjectId(projectArg);
-      const secretValue = await readStdinLine();
       const scope = buildSecretsManagerLiveScope();
       const bundle = await collectSecretsManagerMachineBundle(scope);
       if (!isProjectAllowed(bundle.allow, projectId)) {
@@ -96,33 +98,48 @@ if (!process.argv.includes(SM_WRITE_APPROVAL_FLAG)) {
           code: 'project_not_allowed',
           authorization_ready: false,
           helper_vault_free: true,
+          agent_secret_visible: false,
         }, 1);
       } else {
-        const result = await upsertSecretsManagerSecret({
+        const listed = await listSecretsManagerSecretKeys({
           accessToken: bundle.accessToken,
           projectId,
-          secretKey: key,
-          secretValue,
           allowConfig: bundle.allow,
         });
-        emit({
-          ok: true,
-          action: result.action,
-          project: projectArg,
-          key,
-          live_secret_written: true,
-          authorization_ready: false,
-          helper_vault_free: true,
-          env_inject_forbidden: true,
-          agent_secret_visible: false,
-        });
+        const keys = listed.map((row) => row.key).sort();
+        if (key) {
+          emit({
+            ok: true,
+            project: projectArg,
+            key,
+            exists: keys.includes(key),
+            authorization_ready: false,
+            helper_vault_free: true,
+            agent_secret_visible: false,
+            env_inject_forbidden: true,
+          });
+        } else {
+          const matches = keys.filter((k) => k.startsWith(prefix));
+          emit({
+            ok: true,
+            project: projectArg,
+            prefix,
+            exists: matches.length > 0,
+            matching_keys: matches,
+            matching_count: matches.length,
+            authorization_ready: false,
+            helper_vault_free: true,
+            agent_secret_visible: false,
+            env_inject_forbidden: true,
+          });
+        }
       }
     } catch (error) {
       const code =
         error instanceof SecretsManagerTokenCollectorError ||
         error instanceof SecretsManagerBwsAdapterError
           ? error.code
-          : 'write_failed';
+          : 'exists_check_failed';
       emit({
         ok: false,
         code,

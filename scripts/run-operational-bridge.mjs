@@ -57,9 +57,11 @@ try {
     services: bridge.services.map((s) => ({
       alias: s.alias,
       credential_class: s.credential_class,
+      runtime: s.runtime,
       baseUrl: s.baseUrl,
       ...(s.replayUrl ? { replayUrl: s.replayUrl } : {}),
     })),
+    discoveryUrl: bridge.discoveryUrl,
     smoke,
     harness_ready: bridge.harness_ready === true && allOk,
     disposable_dev_ready: false,

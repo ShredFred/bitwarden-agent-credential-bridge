@@ -29,6 +29,8 @@ import {
 import {
   fetchSecretsManagerSecretValue,
   upsertSecretsManagerSecret,
+  SecretsManagerBwsAdapterError,
+  withBwsDiagnostic,
 } from '../src/secrets-manager-bws-adapter.mjs';
 
 const APPROVAL_FLAG = '--i-approve-secrets-manager-machine-resolve';
@@ -39,7 +41,7 @@ const USER_KEY = 'privatehq_demo_login_user';
 const PASS_KEY = 'privatehq_demo_login_pass';
 
 function emit(payload, code = 0) {
-  process.stdout.write(`${JSON.stringify(payload)}\n`);
+  process.stdout.write(`${JSON.stringify(withBwsDiagnostic(payload))}\n`);
   process.exitCode = code;
 }
 
@@ -180,7 +182,8 @@ if (!process.argv.includes(APPROVAL_FLAG)) {
     }, loginOk && replayRes.status === 200 ? 0 : 1);
   } catch (error) {
     const code = error instanceof SecretsManagerTokenCollectorError ||
-      error instanceof OperationalBridgeError
+      error instanceof OperationalBridgeError ||
+      error instanceof SecretsManagerBwsAdapterError
       ? error.code
       : (typeof error?.message === 'string' && error.message.startsWith('secret_leak:')
         ? error.message

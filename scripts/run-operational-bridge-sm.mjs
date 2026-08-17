@@ -25,7 +25,12 @@ import {
   buildSecretsManagerResolverGate,
   resolveSecretsManagerSecret,
 } from '../src/secrets-manager-resolver.mjs';
-import { fetchSecretsManagerSecretValue } from '../src/secrets-manager-bws-adapter.mjs';
+import {
+  fetchSecretsManagerSecretValue,
+  SecretsManagerBwsAdapterError,
+  withBwsDiagnostic,
+} from '../src/secrets-manager-bws-adapter.mjs';
+import { checkBwsAvailable } from '../src/secrets-manager-local-lifecycle.mjs';
 
 const APPROVAL_FLAG = '--i-approve-secrets-manager-machine-resolve';
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -33,7 +38,7 @@ const bindingsPath = process.argv.find((a) => a.startsWith('samples/')) ??
   'samples/operational/bindings-sm.json';
 
 function emit(payload) {
-  process.stdout.write(`${JSON.stringify(payload)}\n`);
+  process.stdout.write(`${JSON.stringify(withBwsDiagnostic(payload))}\n`);
 }
 
 let bridge;
@@ -75,7 +80,19 @@ if (!process.argv.includes(APPROVAL_FLAG)) {
   });
   await shutdown(1);
 } else {
-  try {
+  const bws = await checkBwsAvailable();
+  if (!bws.bws_available) {
+    emit({
+      ok: false,
+      code: 'bws_missing',
+      harness_ready: false,
+      secrets_manager_mode: true,
+      authorization_ready: false,
+      helper_vault_free: true,
+    });
+    await shutdown(1);
+  } else {
+    try {
     const scope = buildSecretsManagerLiveScope();
     const bundle = await collectSecretsManagerMachineBundle(scope);
     const resolverGate = buildSecretsManagerResolverGate(scope, bundle.allow);
@@ -155,9 +172,11 @@ if (!process.argv.includes(APPROVAL_FLAG)) {
       services: bridge.services.map((s) => ({
         alias: s.alias,
         credential_class: s.credential_class,
+        runtime: s.runtime,
         baseUrl: s.baseUrl,
         ...(s.replayUrl ? { replayUrl: s.replayUrl } : {}),
       })),
+      discoveryUrl: bridge.discoveryUrl,
       smoke,
       harness_ready: bridge.harness_ready === true && allOk,
       secrets_manager_mode: true,
@@ -176,7 +195,8 @@ if (!process.argv.includes(APPROVAL_FLAG)) {
     }
   } catch (error) {
     const code = error instanceof SecretsManagerTokenCollectorError ||
-      error instanceof OperationalBridgeError
+      error instanceof OperationalBridgeError ||
+      error instanceof SecretsManagerBwsAdapterError
       ? error.code
       : 'startup_failed';
     emit({
@@ -189,5 +209,6 @@ if (!process.argv.includes(APPROVAL_FLAG)) {
       helper_vault_free: true,
     });
     await shutdown(1);
+  }
   }
 }

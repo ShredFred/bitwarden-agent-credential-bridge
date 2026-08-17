@@ -1,9 +1,13 @@
 import assert from 'node:assert/strict';
+import os from 'node:os';
+import path from 'node:path';
 import { describe, it } from 'node:test';
 import {
   fetchSecretsManagerSecretValue,
   upsertSecretsManagerSecret,
   SecretsManagerBwsAdapterError,
+  resolveBwsExecutable,
+  withBwsDiagnostic,
 } from '../src/secrets-manager-bws-adapter.mjs';
 
 const PROJECT = 'e186495e-8667-436f-9f78-b49800eba251';
@@ -105,5 +109,62 @@ describe('secrets manager bws adapter', () => {
     assert.deepEqual(updated, { ok: true, action: 'updated' });
     assert.equal(JSON.stringify(updated).includes(secretValue), false);
     assert.ok(calls.some((c) => c.startsWith('secret list')));
+  });
+
+  it('resolves the default Windows bws.exe without requiring PATH', () => {
+    const local = path.join(os.tmpdir(), 'fake-localappdata');
+    const expected = path.join(local, 'Programs', 'Bitwarden', 'bws.exe');
+    assert.equal(resolveBwsExecutable({
+      platform: 'win32',
+      env: { LOCALAPPDATA: local },
+      pathExists: (filePath) => filePath === expected,
+    }), expected);
+    assert.equal(resolveBwsExecutable({
+      platform: 'win32',
+      env: { LOCALAPPDATA: local },
+      pathExists: () => false,
+    }), 'bws');
+    assert.equal(resolveBwsExecutable({
+      bwsPath: '/custom/bws',
+      platform: 'win32',
+      env: { LOCALAPPDATA: local },
+      pathExists: () => true,
+    }), '/custom/bws');
+    assert.equal(resolveBwsExecutable({
+      platform: 'darwin',
+      env: { LOCALAPPDATA: local },
+      pathExists: () => true,
+    }), 'bws');
+  });
+
+  it('maps a missing executable to bws_missing rather than a generic failure', async () => {
+    await assert.rejects(
+      () => fetchSecretsManagerSecretValue({
+        accessToken: '0.deadbeef-token-value-not-for-logs==',
+        projectId: PROJECT,
+        secretKey: 'mivia_demo_bearer',
+        bwsPath: path.join(os.tmpdir(), 'no-such-bws-executable'),
+      }),
+      (error) => error instanceof SecretsManagerBwsAdapterError &&
+        error.code === 'bws_missing',
+    );
+  });
+
+  it('keeps bws_missing as the primary code and does not leak host paths', () => {
+    const payload = withBwsDiagnostic({
+      ok: false,
+      code: 'bws_missing',
+      authorization_ready: false,
+    });
+    assert.equal(payload.code, 'bws_missing');
+    assert.equal(payload.bws_available, false);
+    assert.equal(payload.authorization_ready, false);
+    assert.match(payload.hint, /bws/i);
+    assert.match(payload.hint, /authorization_ready/i);
+    assert.doesNotMatch(payload.hint, /C:\\Users\\/i);
+    assert.equal(
+      withBwsDiagnostic({ ok: false, code: 'startup_failed' }).hint,
+      undefined,
+    );
   });
 });

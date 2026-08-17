@@ -1553,6 +1553,9 @@ machine-account resolve path as the productive same-user default:
   `BWS_ACCESS_TOKEN` on an agent-readable process environment;
 - resolve secret values into short-lived Bridge/broker memory via a pinned
   upstream `bws` CLI or an injected test adapter; never log or return secrets;
+  on Windows, `bws.exe` may be resolved from the default LocalAppData
+  Programs\\Bitwarden location when it is not on PATH; a missing CLI is
+  `bws_missing` and must not be reported as an `authorization_ready` failure;
 - keep `helper_vault_free=true` — no vault client and no secrets on the
   LocalService helper pipe;
 - keep `authorization_ready` evidence-driven (Windows 9e/10c or platform
@@ -1631,3 +1634,93 @@ versions 7 and 8) for disposable/dev Secrets Manager secrets only:
 Phase 16 must not open non-loopback SSH/FTP without a later explicit live gate,
 implement OpenSSH/FTP wire compatibility, place credentials in agent env, or
 treat session success as production writer isolation.
+
+## Phase 17 scope
+
+Phase 17 may add a Bridge-owned browser runtime for policy version 5
+`browser_form_login` on loopback fake login sites:
+
+- the agent may snapshot value-free field candidates and select them by index
+  only (no CSS, XPath, or caller-supplied selectors);
+- `inject_login` accepts no credential values; the Bridge re-verifies origin,
+  password input type, and same-origin form action, then fills from in-memory
+  secrets;
+- cookies, CSRF values, passwords, and usernames stay off agent-readable
+  surfaces; `eval`, CDP, cookie-list, fill, and storage-state ops fail closed
+  with `session_material_forbidden` or `command_forbidden`;
+- after login, the agent may open only policy `allowed_paths`;
+- one session writer; MFA/CAPTCHA fail closed; `authorization_ready` stays
+  false; helper remains vault-free.
+
+Phase 17 must not export cookies, solve MFA, or open non-loopback hosts such as
+`traffic.mivia.ai`. Agent-owned Playwright CLI, Chrome extensions, and agent CDP
+remain forbidden. A later live gate is required for public origins.
+
+## Phase 17b scope
+
+Phase 17b may add an in-process Bridge-owned Playwright page adapter behind the
+same Phase 17 HTTP allow-list:
+
+- `startBridgeOwnedBrowser({ driver: 'playwright' })` launches Chromium, Firefox,
+  or WebKit inside the Bridge process; the agent still only sees indices and
+  `inject_login` with an empty body;
+- launch is headless unless `headless: false`; screenshots are allowed except
+  during password fill / `inject_login` (`password_entry_active`);
+- the page, context, CDP endpoint, cookies, and caller-supplied selectors never
+  appear on the session handle or agent JSON;
+- fill uses bounded field-name selectors after index authorization; submit uses
+  the authorized button label, not a free CSS/XPath string;
+- default `npm test` stays dependency-free: Playwright is not a package
+  dependency; stub tests always run and a live Playwright case skips when the
+  package or browsers are absent;
+- missing Playwright maps to `playwright_absent`; launch/goto failure maps to
+  `playwright_launch_failed`.
+
+Phase 17b must not add `playwright` to `package.json`, expose `playwright-cli`
+or agent CDP, export cookies, solve MFA, open non-loopback hosts, or set
+`authorization_ready=true`.
+
+## Phase 17c scope
+
+Phase 17c may wire the Phase 17/17b browser so a consuming agent can start it
+without improvising:
+
+- operator CLI `npm run start:browser:sm` behind
+  `--i-approve-secrets-manager-machine-resolve` and
+  `--i-approve-bridge-owned-browser`, with `--alias` and
+  `--driver fetch|playwright`; Playwright may take `--headed` (default
+  headless); emit one value-free JSON handle;
+- `GET /contract` on the browser session (allowed/forbidden ops, paths,
+  error codes) — already in 17b follow-up;
+- `GET /services` on the operational SM bridge so ports survive a lost
+  stdout line;
+- docs with a four-call transcript; optional `POST /read` only for
+  `allowed_paths`, behind the same sensitive-scan (never cookies/HTML dumps
+  of login pages).
+
+Phase 17c must not export cookies, add agent CDP/`playwright-cli`, solve MFA,
+open non-loopback hosts, put `BWS_ACCESS_TOKEN` in agent env, or set
+`authorization_ready=true`.
+
+## Phase 17d scope
+
+Phase 17d may add `GET /screenshot` on the Bridge-owned browser except during
+password entry:
+
+- allowed on an empty login form (before fill) and after `logged_in` on the
+  current page;
+- forbidden while `inject_login` is filling/submitting, and while any
+  `input[type=password]` is non-empty (`password_entry_active`);
+- session ops are one-writer serialized so a screenshot cannot interleave with
+  fill; failed inject reloads the login page before the agent can capture;
+- Playwright only; the `fetch` driver returns `screenshot_unsupported`;
+- success is raw `image/png` (never `png_base64` JSON); value-free headers
+  carry `x-bridge-logged-in` and `x-bridge-path`; PNG bytes are bounded and
+  scanned for sensitive variants; cookies, CDP, and storage-state remain
+  forbidden.
+
+Phase 17d must not export cookies, solve MFA, open non-loopback hosts, add
+`playwright` to `package.json`, or set `authorization_ready=true`. A screenshot
+of a logged-in page may still show a username in the UI; that residual is
+accepted so the agent can control layout. The password-entry phase is the
+closed window.

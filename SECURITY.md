@@ -2,10 +2,15 @@
 
 ## Scope
 
-Agent Credential Bridge is an experimental, fake-only research harness. It must
-not be used with real credentials, vaults, or production systems. A potential
-vulnerability can still affect the project's safety claims, so please report it
-privately.
+Agent Credential Bridge is experimental software. Automated tests and CI use
+generated fake values only. An operator may unlock a local Bitwarden Secrets
+Manager machine token behind an explicit approval flag; those secrets still
+must never appear in git, issues, pull requests, discussions, tests, logs, or
+agent-readable surfaces.
+
+Do not treat this project as a production password manager or as authorization
+evidence. A potential vulnerability can still affect the project's safety
+claims, so please report it privately.
 
 ## Reporting a vulnerability
 

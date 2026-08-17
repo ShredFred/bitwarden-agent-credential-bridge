@@ -55,6 +55,16 @@ describe('phase8 operational bridge', () => {
       assert.equal(bridge.operational_authorization_wired, true);
       assert.equal(bridge.authorization_ready, false);
       assert.equal(bridge.services.length, 7);
+      assert.ok(typeof bridge.discoveryUrl === 'string');
+      const discovered = await (await fetch(`${bridge.discoveryUrl}/services`)).json();
+      assert.equal(discovered.ok, true);
+      assert.equal(discovered.authorization_ready, false);
+      assert.equal(discovered.services.length, 7);
+      assert.equal(discovered.services.find((s) => s.alias === 'demo_browser').runtime, 'browser_session');
+      assert.equal(JSON.stringify(discovered).includes('set-cookie'), false);
+      const forbidden = await fetch(`${bridge.discoveryUrl}/cookie_list`);
+      assert.equal(forbidden.status, 403);
+      assert.equal((await forbidden.json()).error, 'command_forbidden');
       const smoke = await bridge.smoke();
       assert.deepEqual(smoke, {
         demo_bearer: true,

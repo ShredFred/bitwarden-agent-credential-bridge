@@ -15,3 +15,5 @@ sm-machine.token
 **/sm-machine.token
 # Installer build output
 /dist/
+# Agent Playwright CLI session artifacts (not the Bridge-owned browser).
+.playwright-cli/

@@ -5,9 +5,16 @@
 This document gives contributors a stable mental model for the project. It is
 not a deployment guide and it does not authorize a live credential experiment.
 
-After reading it, a contributor should be able to decide whether a proposed
-change belongs in the public research harness, in private planning, or outside
-the project entirely.
+**Two audiences, two doors:**
+
+- Humans installing and running the Bridge start at the
+  [README](../README.md) and [Features](features.md).
+- Coding agents start at [agent-windows-install.md](agent-windows-install.md)
+  and [AGENTS.md](../AGENTS.md).
+
+This architecture note is for people changing the code. After reading it, a
+contributor should be able to decide whether a proposed change belongs in the
+public research harness, in private planning, or outside the project entirely.
 
 ## Boundary model
 
