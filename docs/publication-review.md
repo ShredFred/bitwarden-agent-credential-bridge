@@ -47,7 +47,8 @@ are applied immediately after the visibility change.
 Completed after `main` received the review commit:
 
 - Repository visibility: **public**
-- Discussions: enabled (default categories include Announcements, Ideas, Q&A)
+- Discussions: enabled (present default categories: Announcements, Ideas,
+  Q&A, General, Polls, and Show and tell)
 - Private vulnerability reporting: **enabled**
 - Secret scanning + push protection: **enabled**
 - `main` branch protection: PRs, required CI (`Test on ubuntu-latest`,
@@ -55,6 +56,11 @@ Completed after `main` received the review commit:
   branch deletion
 - Extra labels: `security`, `research`, `windows`, `macos`, `linux`
 
-Rename the default Discussions category **Show and tell** to **Architecture**
-in the GitHub UI if you want that name exactly. GraphQL category mutations
-are not available on this token.
+Incomplete (required by [public-release-checklist.md](public-release-checklist.md)
+and [development-and-releases.md](development-and-releases.md); GraphQL
+category create/rename mutations are not available on this token):
+
+- Discussions **Architecture** category: not configured. Rename **Show and
+  tell** to **Architecture** in the GitHub UI before treating community-health
+  cutover as complete. Architecture proposals still belong in Discussions;
+  the named category does not exist yet.

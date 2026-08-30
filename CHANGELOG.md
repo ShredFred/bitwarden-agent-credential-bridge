@@ -12,7 +12,9 @@ Semantic Versioning while it remains on the experimental 0.x line.
   Agent Access SDK flow diagrams that explain the Bridge injection boundary.
 - Public-cutover review: host-specific paths and per-laptop machine ids
   removed from docs; secret scan recorded in
-  [publication-review.md](docs/publication-review.md).
+  [publication-review.md](docs/publication-review.md). The Discussions
+  **Architecture** category remains an incomplete cutover item until a
+  maintainer rename in the GitHub UI.
 
 ### Fixed
 
