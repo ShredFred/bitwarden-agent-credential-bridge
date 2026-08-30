@@ -34,7 +34,7 @@ from `npm run setup:sm -- --i-approve-sm-machine-setup`). Cloud is default.
 Do not paste the token into chat.
 
 **Machine ID** is a local label, not the Bitwarden SM secret key. Prefer a
-stable hostname, never an ISP DHCP fragment (`*.vodafone`). Rename later with:
+stable hostname, never an ISP DHCP fragment (`*.isp.example`). Rename later with:
 
 ```bash
 npm run setup:sm:rename-id -- pc-your-label

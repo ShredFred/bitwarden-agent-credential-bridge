@@ -5,6 +5,12 @@ Semantic Versioning while it remains on the experimental 0.x line.
 
 ## Unreleased
 
+### Changed
+
+- Public-cutover review: host-specific paths and per-laptop machine ids
+  removed from docs; secret scan recorded in
+  [publication-review.md](docs/publication-review.md).
+
 ### Fixed
 
 - macOS SM setup uses StandardAdditions `displayDialog` (Cmd-V works in

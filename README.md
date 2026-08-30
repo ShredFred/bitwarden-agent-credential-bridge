@@ -241,5 +241,6 @@ licensing for research references only. This repository does not ship their
 source, claim compatibility, or imply endorsement. See
 [Licensing](docs/licensing.md).
 
-Do not make this repository public until the
-[public release checklist](docs/public-release-checklist.md) passes.
+Publication review: [publication-review.md](docs/publication-review.md).
+The [public release checklist](docs/public-release-checklist.md) remains the
+gate for later releases.

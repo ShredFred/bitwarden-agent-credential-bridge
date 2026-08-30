@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Rename the local SM machine_id and re-home the macOS Keychain item.
- * Usage: node scripts/rename-sm-machine-id.mjs pc-macbookm1-andrada
+ * Usage: node scripts/rename-sm-machine-id.mjs pc-macos-example
  * Never prints the token.
  */
 import process from 'node:process';
@@ -20,7 +20,7 @@ if (typeof newId !== 'string' || newId.length < 1) {
   emit({
     ok: false,
     code: 'usage',
-    hint: 'node scripts/rename-sm-machine-id.mjs pc-macbookm1-andrada',
+    hint: 'node scripts/rename-sm-machine-id.mjs pc-macos-example',
     authorization_ready: false,
   }, 1);
 } else {

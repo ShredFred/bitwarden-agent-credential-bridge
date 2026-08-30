@@ -4,7 +4,7 @@
  * source (DPAPI / .env) by SHA-256 digest. Never prints secret values.
  *
  *   node scripts/verify-hq-sm-parity.mjs --i-approve-secrets-manager-machine-resolve \
- *     --env-root "F:\\Github Repos\\personal-hq"
+ *     --env-root "C:\\path\\to\\your-app"
  */
 import { createHash } from 'node:crypto';
 import process from 'node:process';
