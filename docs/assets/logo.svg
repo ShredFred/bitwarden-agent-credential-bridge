@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Agent Credential Bridge">
+  <rect width="512" height="512" rx="96" fill="#102A43"/>
+  <rect x="18" y="18" width="476" height="476" rx="82" fill="none" stroke="#1B3A57" stroke-width="16"/>
+  <g fill="none" stroke="#F0B429" stroke-width="22" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M56 318 H456"/>
+    <path d="M56 318 C 56 210, 256 118, 256 118 C 256 118, 456 210, 456 318"/>
+    <path d="M128 318 V 268"/>
+    <path d="M384 318 V 268"/>
+    <path d="M256 118 V 214"/>
+  </g>
+  <circle cx="256" cy="262" r="46" fill="#102A43" stroke="#F0B429" stroke-width="18"/>
+  <path d="M256 246 v28" stroke="#F0B429" stroke-width="14" stroke-linecap="round"/>
+  <circle cx="256" cy="236" r="10" fill="#F0B429"/>
+</svg>

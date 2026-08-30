@@ -1,0 +1,84 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 980 460" role="img" aria-labelledby="title desc">
+  <title id="title">How the Bridge uses a secret without giving it to the agent</title>
+  <desc id="desc">The agent sends an allowed request. The Bridge resolves a secret from Secrets Manager into its own memory, injects it on the outbound call, and returns a sanitized response. The secret never travels back to the agent.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0B1C2C"/>
+      <stop offset="1" stop-color="#102A43"/>
+    </linearGradient>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="3" result="b"/>
+      <feMerge>
+        <feMergeNode in="b"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <marker id="arrowAmber" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#F0B429"/>
+    </marker>
+    <marker id="arrowSafe" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#3DDC97"/>
+    </marker>
+  </defs>
+  <rect width="980" height="460" rx="24" fill="url(#bg)"/>
+  <text x="490" y="36" text-anchor="middle" fill="#D9E2EC" font-family="ui-sans-serif, system-ui, sans-serif" font-size="16" font-weight="700">Same-user Secrets Manager path  use, not possession</text>
+
+  <g>
+    <rect x="36" y="168" width="170" height="92" rx="16" fill="#1B3A57" stroke="#486581" stroke-width="2"/>
+    <text x="121" y="208" text-anchor="middle" fill="#F0F4F8" font-family="ui-sans-serif, system-ui, sans-serif" font-size="15" font-weight="700">Agent</text>
+    <text x="121" y="230" text-anchor="middle" fill="#9FB3C8" font-family="ui-sans-serif, system-ui, sans-serif" font-size="11">allowed request only</text>
+  </g>
+  <g>
+    <rect x="286" y="132" width="220" height="164" rx="16" fill="#243B53" stroke="#F0B429" stroke-width="2"/>
+    <text x="396" y="168" text-anchor="middle" fill="#F0B429" font-family="ui-sans-serif, system-ui, sans-serif" font-size="15" font-weight="700">Bridge / broker</text>
+    <text x="396" y="192" text-anchor="middle" fill="#D9E2EC" font-family="ui-sans-serif, system-ui, sans-serif" font-size="12">policy allow-list</text>
+    <text x="396" y="212" text-anchor="middle" fill="#D9E2EC" font-family="ui-sans-serif, system-ui, sans-serif" font-size="12">one outbound injection</text>
+    <text x="396" y="232" text-anchor="middle" fill="#D9E2EC" font-family="ui-sans-serif, system-ui, sans-serif" font-size="12">secret stays in memory</text>
+    <text x="396" y="260" text-anchor="middle" fill="#9FB3C8" font-family="ui-sans-serif, system-ui, sans-serif" font-size="11">helper stays vault-free</text>
+  </g>
+  <g>
+    <rect x="326" y="48" width="140" height="64" rx="14" fill="#1B3A57" stroke="#486581" stroke-width="2"/>
+    <text x="396" y="74" text-anchor="middle" fill="#F0F4F8" font-family="ui-sans-serif, system-ui, sans-serif" font-size="13" font-weight="700">Bitwarden SM</text>
+    <text x="396" y="94" text-anchor="middle" fill="#9FB3C8" font-family="ui-sans-serif, system-ui, sans-serif" font-size="10">bws + OS token store</text>
+  </g>
+  <g>
+    <rect x="774" y="168" width="170" height="92" rx="16" fill="#1B3A57" stroke="#486581" stroke-width="2"/>
+    <text x="859" y="208" text-anchor="middle" fill="#F0F4F8" font-family="ui-sans-serif, system-ui, sans-serif" font-size="15" font-weight="700">Upstream</text>
+    <text x="859" y="230" text-anchor="middle" fill="#9FB3C8" font-family="ui-sans-serif, system-ui, sans-serif" font-size="11">API / login / session</text>
+  </g>
+
+  <path id="req" d="M206 214 H286" fill="none" stroke="#F0B429" stroke-width="2.5" marker-end="url(#arrowAmber)"/>
+  <path id="out" d="M506 214 H774" fill="none" stroke="#F0B429" stroke-width="2.5" marker-end="url(#arrowAmber)"/>
+  <path id="back" d="M774 236 C 640 310, 340 310, 206 236" fill="none" stroke="#3DDC97" stroke-width="2.5" marker-end="url(#arrowSafe)"/>
+  <path id="sm" d="M396 112 V132" fill="none" stroke="#F0B429" stroke-width="2.5" marker-end="url(#arrowAmber)"/>
+  <path d="M121 168 V 120 H 396" fill="none" stroke="#D64545" stroke-width="2" stroke-dasharray="6 6" opacity="0.85"/>
+  <text x="210" y="112" fill="#EF4E4E" font-family="ui-sans-serif, system-ui, sans-serif" font-size="12" font-weight="700">no secret this way</text>
+
+  <text x="246" y="204" fill="#F0B429" font-family="ui-sans-serif, system-ui, sans-serif" font-size="10">request</text>
+  <text x="620" y="204" fill="#F0B429" font-family="ui-sans-serif, system-ui, sans-serif" font-size="10">inject once</text>
+  <text x="430" y="328" fill="#3DDC97" font-family="ui-sans-serif, system-ui, sans-serif" font-size="10">sanitized response</text>
+
+  <circle r="5" fill="#F0B429" filter="url(#glow)">
+    <animateMotion dur="2.4s" repeatCount="indefinite" rotate="auto">
+      <mpath href="#req"/>
+    </animateMotion>
+  </circle>
+  <circle r="5" fill="#F0B429" filter="url(#glow)">
+    <animateMotion dur="2.4s" begin="0.8s" repeatCount="indefinite" rotate="auto">
+      <mpath href="#out"/>
+    </animateMotion>
+  </circle>
+  <circle r="5" fill="#3DDC97" filter="url(#glow)">
+    <animateMotion dur="3.2s" begin="1.4s" repeatCount="indefinite" rotate="auto">
+      <mpath href="#back"/>
+    </animateMotion>
+  </circle>
+  <circle r="4" fill="#F0B429" filter="url(#glow)">
+    <animateMotion dur="1.6s" repeatCount="indefinite">
+      <mpath href="#sm"/>
+    </animateMotion>
+  </circle>
+
+  <text x="490" y="392" text-anchor="middle" fill="#9FB3C8" font-family="ui-sans-serif, system-ui, sans-serif" font-size="12">DPAPI · Keychain · Linux 0600 file  never BWS_ACCESS_TOKEN in agent env</text>
+  <text x="490" y="416" text-anchor="middle" fill="#627D98" font-family="ui-sans-serif, system-ui, sans-serif" font-size="11">Independent research harness. Not affiliated with Bitwarden.</text>
+</svg>

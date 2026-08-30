@@ -34,6 +34,7 @@ license and NOTICE files at that time.
 Do not copy product logos or use Bitwarden, OneCLI, or other upstream names in a
 way that suggests sponsorship, certification, partnership, or endorsement.
 Factual compatibility and research references should be precise and attributed.
+Public naming rules: [Trademark](trademark.md).
 
 ## Release decision
 

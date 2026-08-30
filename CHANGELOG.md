@@ -7,6 +7,9 @@ Semantic Versioning while it remains on the experimental 0.x line.
 
 ### Changed
 
+- Public README: CareerOps-style hero (logo, experimental release badges,
+  Built with, manifesto, FAQ, disclaimer, author, Let's connect), plus
+  Agent Access SDK flow diagrams that explain the Bridge injection boundary.
 - Public-cutover review: host-specific paths and per-laptop machine ids
   removed from docs; secret scan recorded in
   [publication-review.md](docs/publication-review.md).

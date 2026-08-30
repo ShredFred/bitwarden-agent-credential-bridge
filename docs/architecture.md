@@ -8,7 +8,8 @@ not a deployment guide and it does not authorize a live credential experiment.
 **Two audiences, two doors:**
 
 - Humans installing and running the Bridge start at the
-  [README](../README.md) and [Features](features.md).
+  [README](../README.md), [How it works](how-it-works.md), and
+  [Features](features.md).
 - Coding agents start at [agent-windows-install.md](agent-windows-install.md),
   [agent-macos-install.md](agent-macos-install.md),
   [agent-linux-install.md](agent-linux-install.md), and [AGENTS.md](../AGENTS.md).
