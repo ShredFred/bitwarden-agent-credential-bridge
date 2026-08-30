@@ -98,7 +98,7 @@ if (!process.argv.includes(SM_WRITE_APPROVAL_FLAG)) {
     required_flag: SM_WRITE_APPROVAL_FLAG,
     authorization_ready: false,
   }, 1);
-} else if (process.platform !== 'win32' && process.platform !== 'darwin') {
+} else if (process.platform !== 'win32' && process.platform !== 'darwin' && process.platform !== 'linux') {
   emit({ ok: false, code: 'unsupported_platform', authorization_ready: false }, 1);
 } else {
   const doPrune = process.argv.includes('--prune');

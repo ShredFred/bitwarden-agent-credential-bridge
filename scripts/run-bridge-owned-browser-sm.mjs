@@ -86,7 +86,7 @@ if (!parsed.ok) {
     agent_cdp_absent: true,
   });
   await shutdown(1);
-} else if (process.platform !== 'win32' && process.platform !== 'darwin') {
+} else if (process.platform !== 'win32' && process.platform !== 'darwin' && process.platform !== 'linux') {
   emit({
     ok: false,
     code: 'unsupported_platform',

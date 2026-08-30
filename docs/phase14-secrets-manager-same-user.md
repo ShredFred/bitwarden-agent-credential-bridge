@@ -6,7 +6,9 @@ Produktüberblick: [README](../README.md) · [Features](features.md).
 
 **Onboarding + Import (Keys, Naming, Seed):**  
 [`sm-onboarding-and-import.md`](sm-onboarding-and-import.md)  
-**Agenten:** [`agent-windows-install.md`](agent-windows-install.md)  
+**Agenten:** [`agent-windows-install.md`](agent-windows-install.md) ·
+[`agent-macos-install.md`](agent-macos-install.md) ·
+[`agent-linux-install.md`](agent-linux-install.md)  
 **Installer:** GitHub Releases → `BitwardenAgentCredentialBridge-Setup-*.exe`  
 **Key-Namen:** [`sm-operational-key-naming.md`](sm-operational-key-naming.md)
 
@@ -14,17 +16,21 @@ Produktüberblick: [README](../README.md) · [Features](features.md).
 
 Bitwarden Secrets Manager CLI. Bridge nutzt sie im Hintergrund. Windows:
 Default-Install unter `LocalAppData\Programs\Bitwarden\bws.exe` — PATH ist
-nicht nötig, wenn diese Datei existiert. Fehlt `bws`, ist der Code
-`bws_missing` (nicht `authorization_ready`).
+nicht nötig, wenn diese Datei existiert. macOS: PATH, `/opt/homebrew/bin/bws`,
+`/usr/local/bin/bws`, oder `~/.local/bin/bws`. Linux: PATH, `~/.local/bin/bws`,
+`/usr/local/bin/bws`, oder `/usr/bin/bws`. Fehlt `bws`, ist der Code `bws_missing`
+(nicht `authorization_ready`).
 
 ## Setup
 
-```powershell
+```bash
 npm run setup:sm:wizard
 # oder: npm run setup:sm -- --i-approve-sm-machine-setup
 ```
 
 Windows: Token-Fenster → Access Token einfügen.  
+macOS: Wizard-Fenster → Access Token einfügen (Keychain).  
+Linux: zenity/kdialog oder versteckte TTY-Eingabe → Access Token (0600-Datei).  
 Cloud ist Default. Self-Host nur wenn du Custom-URLs setzt (Allowlist /
 Wizard).
 

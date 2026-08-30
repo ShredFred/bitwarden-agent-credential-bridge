@@ -4,12 +4,14 @@
  *
  * Windows: opens a credential window — paste the machine access token as the
  * password. Writes allowlist (MiViA + private-hq) + DPAPI store.
- * macOS: prompts once in the terminal for the token (not echoed).
+ * macOS: prompts once in the terminal for the token (not echoed), then stores
+ * it in the same-user Keychain. Prefer `npm run setup:sm:wizard` for the GUI.
+ * Linux: same hidden TTY prompt, then owner-only XDG token file. Prefer
+ * `npm run setup:sm:wizard` (zenity/kdialog) when a display is present.
  *
  * Never prints the token. LocalService not required.
  */
 import process from 'node:process';
-import os from 'node:os';
 import readline from 'node:readline/promises';
 import { stdin as input, stdout as output } from 'node:process';
 import { spawn } from 'node:child_process';
@@ -20,6 +22,7 @@ import {
 } from '../src/secrets-manager-defaults.mjs';
 import {
   checkBwsAvailable,
+  defaultSecretsManagerMachineId,
   storeSecretsManagerAccessToken,
   writeSecretsManagerAllowConfig,
   SecretsManagerLifecycleError,
@@ -32,9 +35,7 @@ function emit(payload, code = 0) {
 }
 
 function defaultMachineId() {
-  const host = (os.hostname() || 'machine').toLowerCase().replace(/[^a-z0-9_-]+/g, '-');
-  const cleaned = host.replace(/^-+|-+$/g, '').slice(0, 48);
-  return cleaned.length > 0 ? `pc-${cleaned}` : 'pc-local';
+  return defaultSecretsManagerMachineId();
 }
 
 async function promptMachineId() {
@@ -146,14 +147,14 @@ if (!process.argv.includes(SM_SETUP_APPROVAL_FLAG)) {
     hint: `npm run setup:sm -- ${SM_SETUP_APPROVAL_FLAG}`,
     authorization_ready: false,
   }, 1);
-} else if (process.platform !== 'win32' && process.platform !== 'darwin') {
+} else if (process.platform !== 'win32' && process.platform !== 'darwin' && process.platform !== 'linux') {
   emit({ ok: false, code: 'unsupported_platform', authorization_ready: false }, 1);
 } else {
   try {
     output.write('\n=== Bitwarden Secrets Manager setup (same-user) ===\n');
     output.write('1) Machine account token from Bitwarden SM\n');
     output.write('2) Projects MiViA + private-hq are preconfigured\n');
-    output.write('3) No LocalService / no extra Windows user needed\n\n');
+    output.write('3) No LocalService / LaunchDaemon / extra OS user needed\n\n');
 
     const bws = await checkBwsAvailable();
     if (!bws.bws_available) {

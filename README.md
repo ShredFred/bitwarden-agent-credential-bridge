@@ -13,6 +13,8 @@ surface, tests fail.
 > same-user process isolation is a production writer boundary.
 
 [Install on Windows](#install-on-windows) ·
+[Install on macOS](#install-on-macos) ·
+[Install on Linux](#install-on-linux) ·
 [What you get](#what-you-get) ·
 [For agents](#for-agents) ·
 [Honest limits](#honest-limits)
@@ -39,15 +41,23 @@ local setup window. After that, agents work. Secrets do not.
 
 ## What you get
 
-### Productive same-user path (Windows)
+### Productive same-user path (Windows, macOS, and Linux)
 
-- **GitHub Release installer** with Start Menu setup, start, and Apps & Features
-  uninstall.
+- **Windows:** GitHub Release installer with Start Menu setup, start, and
+  Apps & Features uninstall. Token in DPAPI.
+- **macOS:** from-source wizard (`npm run setup:sm:wizard`). Token in the
+  same-user Keychain. Signed `.pkg` remains a later slice.
+- **Linux:** from-source wizard (`npm run setup:sm:wizard`, zenity/kdialog or
+  a hidden TTY prompt). Token in an owner-only `0600` file under XDG config.
+  Distro packages remain a later slice.
 - **Bitwarden Secrets Manager** as the default vault: machine account, project
-  allowlist, DPAPI-backed token. Cloud by default; optional self-host URLs.
-- **No extra Windows user** and **no LocalService required** for day-to-day SM
-  resolve. Distinct-writer install remains optional research.
-- Guided import of local DPAPI / `.env` material into SM (dry-run default).
+  allowlist. Cloud by default; optional self-host URLs.
+- **No extra OS user** and **no LocalService / LaunchDaemon / systemd helper
+  required** for day-to-day SM resolve. Distinct-writer install remains
+  optional research.
+- Guided import of local DPAPI / `.env` material into SM (Windows; dry-run
+  default). macOS and Linux consume the same SM projects after a machine-account
+  grant.
 
 ### Credential classes that actually run
 
@@ -101,15 +111,71 @@ Human walkthrough: [Windows laptop onboarding](docs/windows-laptop-onboarding.md
 
 Uninstall via **Apps & Features**, or `npm run uninstall:sm -- --i-approve-sm-machine-uninstall`.
 
-macOS/Linux can use the same-user SM CLI path from source today; native
-installers for those platforms are later slices.
+## Install on macOS
+
+1. Install [Node.js 20+](https://nodejs.org/) and the
+   [Bitwarden Secrets Manager CLI (`bws`)](https://bitwarden.com/help/secrets-manager-cli/)
+   (`~/.local/bin/bws`, `/opt/homebrew/bin/bws`, `/usr/local/bin/bws`, or PATH).
+2. In Bitwarden SM: create a **machine account for this Mac**, grant **MiViA**
+   and **private-hq**, create an access token. Do not paste it into chat. Do
+   not reuse the Windows machine token.
+3. From a clone of this repo:
+
+```bash
+npm run setup:sm:wizard
+npm run start:operational:sm -- --i-approve-secrets-manager-machine-resolve
+```
+
+Do **not** run `seed:sm --prune` against projects that already hold real
+HQ/MiViA keys. The Windows import already wrote those secrets; this Mac only
+needs project access.
+
+Human walkthrough: [macOS laptop onboarding](docs/macos-laptop-onboarding.md) ·
+[SM onboarding and import](docs/sm-onboarding-and-import.md)
+
+Uninstall: `npm run uninstall:sm -- --i-approve-sm-machine-uninstall` (clears
+allowlist + Keychain item). Revoke the machine token in Bitwarden SM if the
+Mac should lose access.
+
+A signed `.pkg` installer is a later slice.
+
+## Install on Linux
+
+1. Install [Node.js 20+](https://nodejs.org/) and the
+   [Bitwarden Secrets Manager CLI (`bws`)](https://bitwarden.com/help/secrets-manager-cli/)
+   (`~/.local/bin/bws`, `/usr/local/bin/bws`, `/usr/bin/bws`, or PATH).
+2. In Bitwarden SM: create a **machine account for this host**, grant **MiViA**
+   and **private-hq**, create an access token. Do not paste it into chat. Do
+   not reuse the Windows or macOS machine token.
+3. From a clone of this repo:
+
+```bash
+npm ci
+npm run install:user-path
+npm run setup:sm:wizard
+npm run start:operational:sm -- --i-approve-secrets-manager-machine-resolve
+```
+
+Do **not** run `seed:sm --prune` against projects that already hold real
+HQ/MiViA keys. This host only needs project access.
+
+Human walkthrough: [Linux laptop onboarding](docs/linux-laptop-onboarding.md) ·
+[SM onboarding and import](docs/sm-onboarding-and-import.md)
+
+Uninstall: `npm run uninstall:sm -- --i-approve-sm-machine-uninstall` (clears
+allowlist + owner-only token file). Revoke the machine token in Bitwarden SM
+if the host should lose access.
+
+A `.deb` / `.rpm` package is a later slice.
 
 ## For agents
 
 If you are an AI agent pointed at this repo, start here — not at the research
 phase list:
 
-1. [Install on Windows (agent runbook)](docs/agent-windows-install.md)
+1. [Install on Windows (agent runbook)](docs/agent-windows-install.md),
+   [Install on macOS (agent runbook)](docs/agent-macos-install.md), or
+   [Install on Linux (agent runbook)](docs/agent-linux-install.md)
 2. [SM onboarding and import](docs/sm-onboarding-and-import.md)
 3. [Experiment rules](AGENTS.md)
 4. [Bridge-owned browser contract](docs/phase17-bridge-owned-browser.md)

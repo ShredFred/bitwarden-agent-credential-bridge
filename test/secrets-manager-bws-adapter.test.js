@@ -5,6 +5,7 @@ import { describe, it } from 'node:test';
 import {
   fetchSecretsManagerSecretValue,
   upsertSecretsManagerSecret,
+  verifySecretsManagerMachineToken,
   SecretsManagerBwsAdapterError,
   resolveBwsExecutable,
   withBwsDiagnostic,
@@ -133,8 +134,28 @@ describe('secrets manager bws adapter', () => {
     assert.equal(resolveBwsExecutable({
       platform: 'darwin',
       env: { LOCALAPPDATA: local },
-      pathExists: () => true,
+      pathExists: () => false,
     }), 'bws');
+    assert.equal(resolveBwsExecutable({
+      platform: 'darwin',
+      env: {},
+      pathExists: (filePath) => filePath === '/opt/homebrew/bin/bws',
+    }), '/opt/homebrew/bin/bws');
+    assert.equal(resolveBwsExecutable({
+      platform: 'darwin',
+      env: { HOME: '/tmp/fake-home' },
+      pathExists: (filePath) => filePath === '/tmp/fake-home/.local/bin/bws',
+    }), '/tmp/fake-home/.local/bin/bws');
+    assert.equal(resolveBwsExecutable({
+      platform: 'linux',
+      env: { HOME: '/tmp/fake-linux-home' },
+      pathExists: (filePath) => filePath === '/tmp/fake-linux-home/.local/bin/bws',
+    }), '/tmp/fake-linux-home/.local/bin/bws');
+    assert.equal(resolveBwsExecutable({
+      platform: 'linux',
+      env: { HOME: '/tmp/fake-linux-home' },
+      pathExists: (filePath) => filePath === '/usr/bin/bws',
+    }), '/usr/bin/bws');
   });
 
   it('maps a missing executable to bws_missing rather than a generic failure', async () => {
@@ -148,6 +169,35 @@ describe('secrets manager bws adapter', () => {
       (error) => error instanceof SecretsManagerBwsAdapterError &&
         error.code === 'bws_missing',
     );
+  });
+
+  it('verifies a machine token by project-list counts only', async () => {
+    const token = '0.deadbeef-token-value-not-for-logs==';
+    const empty = await verifySecretsManagerMachineToken({
+      accessToken: token,
+      allowedProjectIds: [PROJECT],
+      runCommand: async (_exe, args) => {
+        assert.equal(args[0], 'project');
+        assert.equal(args[1], 'list');
+        assert.ok(args.includes(token));
+        return '[]';
+      },
+    });
+    assert.equal(empty.ok, true);
+    assert.equal(empty.projects_listed, 0);
+    assert.equal(empty.allowed_projects_visible, 0);
+    const hit = await verifySecretsManagerMachineToken({
+      accessToken: token,
+      allowedProjectIds: [PROJECT],
+      runCommand: async () => JSON.stringify([
+        { id: PROJECT, name: 'should-not-escape' },
+        { id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', name: 'other' },
+      ]),
+    });
+    assert.equal(hit.projects_listed, 2);
+    assert.equal(hit.allowed_projects_visible, 1);
+    assert.equal(JSON.stringify(hit).includes('should-not-escape'), false);
+    assert.equal(JSON.stringify(hit).includes(token), false);
   });
 
   it('keeps bws_missing as the primary code and does not leak host paths', () => {

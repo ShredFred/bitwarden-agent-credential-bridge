@@ -1,5 +1,6 @@
 import { execFile } from 'node:child_process';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import process from 'node:process';
 import { promisify } from 'node:util';
@@ -22,11 +23,51 @@ export class SecretsManagerBwsAdapterError extends Error {
 }
 
 export const BWS_MISSING_HINT =
-  'Install Bitwarden Secrets Manager CLI (bws). Windows default is LocalAppData\\Programs\\Bitwarden\\bws.exe; PATH is not required if that file exists. authorization_ready is LocalService writer evidence, not this error.';
+  'Install Bitwarden Secrets Manager CLI (bws). Windows default is LocalAppData\\Programs\\Bitwarden\\bws.exe; macOS checks Homebrew, /usr/local/bin/bws, and ~/.local/bin/bws; Linux checks ~/.local/bin/bws, /usr/local/bin/bws, and /usr/bin/bws. PATH is not required if those files exist. authorization_ready is LocalService writer evidence, not this error.';
+
+/** Homebrew Intel + Apple Silicon well-known paths (tests pin these). */
+export const MACOS_BWS_CANDIDATES = Object.freeze([
+  '/opt/homebrew/bin/bws',
+  '/usr/local/bin/bws',
+]);
 
 /**
- * Prefer an explicit path, then the well-known Windows install location, then
- * PATH lookup via the bare `bws` name. Never returns host usernames or expands
+ * @param {{ home?: string }} [options]
+ * @returns {string[]}
+ */
+export function macosBwsCandidatePaths(options = {}) {
+  const home = typeof options.home === 'string' && options.home.length > 0
+    ? options.home
+    : os.homedir();
+  return [
+    ...MACOS_BWS_CANDIDATES,
+    path.join(home, '.local', 'bin', 'bws'),
+  ];
+}
+
+/** Well-known Linux bws locations (tests pin these). */
+export const LINUX_BWS_CANDIDATES = Object.freeze([
+  '/usr/local/bin/bws',
+  '/usr/bin/bws',
+]);
+
+/**
+ * @param {{ home?: string }} [options]
+ * @returns {string[]}
+ */
+export function linuxBwsCandidatePaths(options = {}) {
+  const home = typeof options.home === 'string' && options.home.length > 0
+    ? options.home
+    : os.homedir();
+  return [
+    path.join(home, '.local', 'bin', 'bws'),
+    ...LINUX_BWS_CANDIDATES,
+  ];
+}
+
+/**
+ * Prefer an explicit path, then well-known install locations, then PATH
+ * lookup via the bare `bws` name. Never returns host usernames or expands
  * LocalAppData into agent-readable error payloads.
  *
  * @param {{
@@ -50,6 +91,26 @@ export function resolveBwsExecutable(options = {}) {
     const local = env.LOCALAPPDATA;
     if (typeof local === 'string' && local.length > 0) {
       const candidate = path.join(local, 'Programs', 'Bitwarden', 'bws.exe');
+      if (exists(candidate)) {
+        return candidate;
+      }
+    }
+  }
+  if (platform === 'darwin') {
+    const home = typeof env.HOME === 'string' && env.HOME.length > 0
+      ? env.HOME
+      : os.homedir();
+    for (const candidate of macosBwsCandidatePaths({ home })) {
+      if (exists(candidate)) {
+        return candidate;
+      }
+    }
+  }
+  if (platform === 'linux') {
+    const home = typeof env.HOME === 'string' && env.HOME.length > 0
+      ? env.HOME
+      : os.homedir();
+    for (const candidate of linuxBwsCandidatePaths({ home })) {
       if (exists(candidate)) {
         return candidate;
       }
@@ -341,6 +402,65 @@ export async function listSecretsManagerSecretKeys(options) {
     out.push({ id: entry.id.toLowerCase(), key: entry.key });
   }
   return out;
+}
+
+/**
+ * Confirm a machine token can call bws. Returns counts only (no names/values).
+ * An empty project list is a valid token with no project grants.
+ *
+ * @param {{
+ *   accessToken: string,
+ *   allowedProjectIds?: string[],
+ *   bwsPath?: string,
+ *   serverUrl?: string,
+ *   allowConfig?: object,
+ *   runCommand?: typeof defaultRunCommand,
+ * }} options
+ */
+export async function verifySecretsManagerMachineToken(options) {
+  if (typeof options.accessToken !== 'string' ||
+      options.accessToken.length < 16 ||
+      options.accessToken.length > 8192) {
+    throw new SecretsManagerBwsAdapterError('invalid_token');
+  }
+  const allowed = new Set(
+    (Array.isArray(options.allowedProjectIds) ? options.allowedProjectIds : [])
+      .filter((id) => typeof id === 'string' && UUID.test(id))
+      .map((id) => id.toLowerCase()),
+  );
+  const run = typeof options.runCommand === 'function'
+    ? options.runCommand
+    : defaultRunCommand;
+  const bwsPath = bwsExecutableFromOptions(options);
+  const serverUrl = serverUrlFromOptions(options);
+  const listed = await run(bwsPath, withServerArgs([
+    'project', 'list',
+    '--output', 'json',
+    '--access-token', options.accessToken,
+  ], serverUrl));
+  let parsed;
+  try {
+    parsed = JSON.parse(listed);
+  } catch {
+    throw new SecretsManagerBwsAdapterError('list_parse_failed');
+  }
+  if (!Array.isArray(parsed)) {
+    throw new SecretsManagerBwsAdapterError('list_parse_failed');
+  }
+  let allowedVisible = 0;
+  for (const entry of parsed) {
+    if (entry === null || typeof entry !== 'object') continue;
+    if (typeof entry.id !== 'string' || !UUID.test(entry.id)) continue;
+    const id = entry.id.toLowerCase();
+    if (allowed.size === 0 || allowed.has(id)) {
+      allowedVisible += 1;
+    }
+  }
+  return Object.freeze({
+    ok: true,
+    projects_listed: parsed.length,
+    allowed_projects_visible: allowedVisible,
+  });
 }
 
 /**

@@ -46,20 +46,44 @@ function assertHttpsUrl(value) {
   }
 }
 
-export function defaultSecretsManagerAllowPath() {
-  if (process.platform === 'darwin') {
+/**
+ * @param {{
+ *   platform?: NodeJS.Platform,
+ *   home?: string,
+ *   configHome?: string,
+ *   localAppData?: string,
+ *   userProfile?: string,
+ * }} [options]
+ */
+export function defaultSecretsManagerAllowPath(options = {}) {
+  const platform = options.platform ?? process.platform;
+  const home = typeof options.home === 'string' && options.home.length > 0
+    ? options.home
+    : os.homedir();
+  if (platform === 'darwin') {
     return path.join(
-      os.homedir(),
+      home,
       'Library',
       'Application Support',
       'BitwardenAgentCredentialBridge',
       'sm-machine.allow.json',
     );
   }
-  const base = process.env.LOCALAPPDATA ||
-    (process.env.USERPROFILE
-      ? path.join(process.env.USERPROFILE, 'AppData', 'Local')
-      : path.join(os.homedir(), 'AppData', 'Local'));
+  if (platform === 'linux') {
+    const xdg = typeof options.configHome === 'string' && options.configHome.length > 0
+      ? options.configHome
+      : (typeof process.env.XDG_CONFIG_HOME === 'string' && process.env.XDG_CONFIG_HOME.length > 0
+        ? process.env.XDG_CONFIG_HOME
+        : path.join(home, '.config'));
+    return path.join(xdg, 'BitwardenAgentCredentialBridge', 'sm-machine.allow.json');
+  }
+  const base = options.localAppData ||
+    process.env.LOCALAPPDATA ||
+    (options.userProfile
+      ? path.join(options.userProfile, 'AppData', 'Local')
+      : (process.env.USERPROFILE
+        ? path.join(process.env.USERPROFILE, 'AppData', 'Local')
+        : path.join(home, 'AppData', 'Local')));
   return path.join(base, 'BitwardenAgentCredentialBridge', 'sm-machine.allow.json');
 }
 

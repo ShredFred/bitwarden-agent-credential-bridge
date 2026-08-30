@@ -71,7 +71,7 @@ if (!process.argv.includes(APPROVAL_FLAG)) {
     secrets_manager_mode: true,
   });
   await shutdown(1);
-} else if (process.platform !== 'win32' && process.platform !== 'darwin') {
+} else if (process.platform !== 'win32' && process.platform !== 'darwin' && process.platform !== 'linux') {
   emit({
     ok: false,
     code: 'unsupported_platform',

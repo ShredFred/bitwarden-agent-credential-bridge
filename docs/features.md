@@ -2,7 +2,9 @@
 
 A human-facing map of what the Bridge can do today, what it refuses, and what
 is still research. Agent runbooks live separately:
-[agent Windows install](agent-windows-install.md), [AGENTS.md](../AGENTS.md).
+[agent Windows install](agent-windows-install.md),
+[agent macOS install](agent-macos-install.md),
+[agent Linux install](agent-linux-install.md), [AGENTS.md](../AGENTS.md).
 
 ## Available now
 
@@ -10,8 +12,12 @@ is still research. Agent runbooks live separately:
 
 - Windows Setup EXE from GitHub Releases, Start Menu **Setup** / **Start**,
   Apps & Features uninstall.
-- One local paste of a Bitwarden Secrets Manager machine token (DPAPI store).
-  Cloud SM is the default; self-host URLs are optional.
+- macOS from-source wizard (`npm run setup:sm:wizard`); signed `.pkg` later.
+- Linux from-source wizard (`npm run setup:sm:wizard`, zenity/kdialog or TTY);
+  distro packages later.
+- One local paste of a Bitwarden Secrets Manager machine token (Windows DPAPI,
+  macOS Keychain, or Linux owner-only `0600` file). Cloud SM is the default;
+  self-host URLs are optional.
 - Machine-local project allowlist. Tokens never belong in git, chat, or
   `process.env`.
 - Guided local DPAPI / `.env` → SM import (dry-run default; apply behind an
@@ -75,12 +81,14 @@ See [Research status](research-status.md) for the phase index.
 | Platform | Productive SM | Native installer | Distinct-writer research |
 | --- | --- | --- | --- |
 | Windows | Yes (DPAPI + `bws`) | Yes (Inno Setup) | LocalService ladder |
-| macOS | Yes (from source) | Not in this slice | LaunchDaemon ladder |
-| Linux | Yes (from source) | Not in this slice | systemd system-instance ladder |
+| macOS | Yes (Keychain + `bws`, from source) | Not in this slice | LaunchDaemon ladder |
+| Linux | Yes (`0600` XDG file + `bws`, from source) | Not in this slice | systemd system-instance ladder |
 
 ## Related docs
 
 - [Windows laptop onboarding](windows-laptop-onboarding.md)
+- [macOS laptop onboarding](macos-laptop-onboarding.md)
+- [Linux laptop onboarding](linux-laptop-onboarding.md)
 - [SM onboarding and import](sm-onboarding-and-import.md)
 - [Windows installer](phase15-windows-installer.md)
 - [Bridge-owned browser](phase17-bridge-owned-browser.md)

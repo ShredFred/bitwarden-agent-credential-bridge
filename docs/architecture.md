@@ -9,8 +9,9 @@ not a deployment guide and it does not authorize a live credential experiment.
 
 - Humans installing and running the Bridge start at the
   [README](../README.md) and [Features](features.md).
-- Coding agents start at [agent-windows-install.md](agent-windows-install.md)
-  and [AGENTS.md](../AGENTS.md).
+- Coding agents start at [agent-windows-install.md](agent-windows-install.md),
+  [agent-macos-install.md](agent-macos-install.md),
+  [agent-linux-install.md](agent-linux-install.md), and [AGENTS.md](../AGENTS.md).
 
 This architecture note is for people changing the code. After reading it, a
 contributor should be able to decide whether a proposed change belongs in the

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Apply wizard inputs: machine id (+ optional server_url) from env, token on stdin.
- * Never prints the token. Used by the Windows WinForms first-run wizard.
+ * Never prints the token. Used by the Windows WinForms and macOS AppKit wizards.
  */
 import process from 'node:process';
 import {

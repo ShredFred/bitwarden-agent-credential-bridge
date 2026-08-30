@@ -166,4 +166,21 @@ describe('sm secret entry form', () => {
     assert.match(src, /Secrets Manager/);
     assert.match(src, /Measure-UiText/);
   });
+
+  it('keeps the macOS secret-entry JXA ASCII-only and form-path driven', () => {
+    const jxaPath = path.join(
+      path.dirname(fileURLToPath(import.meta.url)),
+      '..',
+      'scripts',
+      'macos-sm-secret-entry-dialog.jxa',
+    );
+    const bytes = fs.readFileSync(jxaPath);
+    for (let i = 0; i < bytes.length; i += 1) {
+      assert.ok(bytes[i] < 0x80, `non-ASCII byte at offset ${i}`);
+    }
+    const src = bytes.toString('utf8');
+    assert.match(src, /NSAlert/);
+    assert.match(src, /--form-path/);
+    assert.equal(src.includes('console.log'), false);
+  });
 });

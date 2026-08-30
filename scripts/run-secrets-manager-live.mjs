@@ -24,6 +24,7 @@ import {
 } from '../src/secrets-manager-resolver.mjs';
 import { fetchSecretsManagerSecretValue, SecretsManagerBwsAdapterError, withBwsDiagnostic } from '../src/secrets-manager-bws-adapter.mjs';
 import { loadOperationalBindingsFile } from '../src/operational-bridge.mjs';
+import { isSecretsManagerSameUserPlatform } from '../src/secrets-manager-platforms.mjs';
 
 const APPROVAL_FLAG = '--i-approve-secrets-manager-machine-resolve';
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -54,7 +55,7 @@ if (!process.argv.includes(APPROVAL_FLAG)) {
     env_inject_forbidden: true,
     secrets_manager_allowed: true,
   }, 1);
-} else if (process.platform !== 'win32' && process.platform !== 'darwin') {
+} else if (!isSecretsManagerSameUserPlatform()) {
   emit({
     ok: false,
     code: 'unsupported_platform',
@@ -88,7 +89,7 @@ if (!process.argv.includes(APPROVAL_FLAG)) {
     const wantedAlias = aliasFlagIdx >= 0 ? process.argv[aliasFlagIdx + 1] : null;
     const binding = wantedAlias
       ? table.bindings.find((b) => b.alias === wantedAlias)
-      : table.bindings.find((b) => b.alias === 'privatehq_demo_bearer')
+      : table.bindings.find((b) => b.alias === 'phq_api')
         || table.bindings[0];
     if (!binding) {
       emit({

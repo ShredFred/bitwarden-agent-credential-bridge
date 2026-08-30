@@ -35,4 +35,13 @@ See [`agent-windows-install.md`](agent-windows-install.md).
 
 ## macOS
 
-Not in this slice — use from-source `setup:sm` / Phase 14 docs until a pkg handoff.
+From-source wizard: `npm run setup:sm:wizard` (Keychain token,
+`~/.local/bin/bws` / Homebrew paths). Signed `.pkg` remains a later slice. See
+[`macos-laptop-onboarding.md`](macos-laptop-onboarding.md).
+
+## Linux
+
+From-source wizard: `npm run setup:sm:wizard` (owner-only XDG token file,
+zenity/kdialog or TTY). Distro packages remain a later slice. See
+[`linux-laptop-onboarding.md`](linux-laptop-onboarding.md) and
+[`agent-linux-install.md`](agent-linux-install.md).
