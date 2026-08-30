@@ -7,6 +7,13 @@ Semantic Versioning while it remains on the experimental 0.x line.
 
 ### Fixed
 
+- macOS SM setup uses StandardAdditions `displayDialog` (Cmd-V works in
+  the hidden-answer token prompt) instead of NSAlert accessory fields that
+  crashed on Save. Empty `defaultAnswer` is padded to 8192 characters so
+  AppleScript does not cap paste at a few glyphs. `--self-test` applies a
+  fake token to a temp allowlist and Keychain account `pc-selftest-wizard`,
+  then uninstalls. Stuck wizard processes are replaced before a new dialog
+  opens. Setup verifies the token with `bws project list` (counts only).
 - Laptop-ready CLI reports `approval_flag_required` before
   `unsupported_platform`, so Linux CI matches the operator-flag contract.
   Phase 9e operational-bridge tests pin `platform: 'win32'` when feeding
@@ -20,6 +27,19 @@ Semantic Versioning while it remains on the experimental 0.x line.
 
 ### Added
 
+- Linux same-user SM parity with Windows/macOS: owner-only `0600` token file
+  under XDG config, allowlist next to it (not `AppData`), `bws` lookup in
+  `~/.local/bin` / `/usr/local/bin` / `/usr/bin`, first-run wizard
+  (zenity/kdialog or `--self-test`), `bw-sm ask`, PATH wrappers
+  (`npm run install:user-path`), and from-source onboarding docs.
+  Distro packages remain a later slice. `authorization_ready` stays false.
+- macOS same-user SM product parity with Windows: Keychain token store
+  (`security -i`, same-user `-A`), AppKit first-run wizard and
+  `bw-sm ask` secret-entry dialog, Homebrew/`~/.local/bin` `bws` lookup,
+  PATH wrappers (`npm run install:macos-path`), and from-source onboarding
+  docs. Signed `.pkg` remains a later slice. `authorization_ready` stays
+  false. Wizard `machine_id` prefers ComputerName over ISP DHCP hostnames;
+  `npm run setup:sm:rename-id` re-homes an existing Keychain item.
 - Bridge-owned Playwright accepts both headless (default) and `--headed`.
   `--headed` with the `fetch` driver is `invalid_request`. Unknown flags
   such as `--devtools` fail closed. Launch pins

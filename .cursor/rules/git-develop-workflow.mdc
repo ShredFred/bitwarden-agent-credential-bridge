@@ -1,0 +1,18 @@
+---
+description: Always work on develop; never commit on main or leftover Codex branches
+alwaysApply: true
+---
+
+# Git: land on develop
+
+This repo's integration branch is `develop`. `main` is release-only.
+
+At the start of any session that will edit files:
+
+1. If `HEAD` is `main`, detached, or a leftover `codex/*` branch, check out `develop` immediately (`git checkout develop` or `git checkout -B develop origin/develop`).
+2. Fast-forward `develop` from `origin/develop` when behind. Do not rebase onto `main` as a working branch.
+3. Call `SetActiveBranch` with `develop`.
+
+Never commit, amend, or push to `main`. Never recreate `codex/windows-integration` or other Codex integration branches. Open PRs from `develop` to `main` only when a slice is ready to publish.
+
+If you find yourself on `main` with a dirty tree, move to `develop` before more edits. Preserve unrelated changes.

@@ -12,6 +12,16 @@ This repository is a sample-only security experiment.
 - Run tests before claiming completion. Report limitations explicitly.
 - Do not create a remote or push this repository until a separate secret scan and publication review pass succeeds.
 
+## Git workflow
+
+Default integration branch is `develop`. `main` is release-only.
+
+- On any session that will edit files: if `HEAD` is `main` or a leftover `codex/*` branch, check out `develop` first (`git checkout develop` or `git checkout -B develop origin/develop`). Fast-forward `develop` from `origin/develop` when it is behind. Call `SetActiveBranch` to `develop`.
+- Never commit, amend, or push to `main`. Never create or revive `codex/*` integration branches.
+- Land work on `develop`. Open PRs `develop` → `main` only when a slice is ready to publish.
+- Do not work on `main` even if the working tree is already dirty there; move the work onto `develop` before further edits.
+- Stale fully-merged Codex branches may be deleted from origin; do not merge them back.
+
 ## Phase 1 scope
 
 Implement only:
@@ -1548,13 +1558,15 @@ machine-account resolve path as the productive same-user default:
   `--i-approve-secrets-manager-machine-resolve` (never a library capability);
 - pin allowed project UUIDs in a machine-local schema-fixed allowlist
   (not free runtime org strings);
-- store the machine access token only in a local secure store (Windows DPAPI
-  or macOS owner-only file / Keychain path); never commit tokens; never place
-  `BWS_ACCESS_TOKEN` on an agent-readable process environment;
+- store the machine access token only in a local secure store (Windows DPAPI,
+  macOS Keychain, or Linux owner-only `0600` file under XDG config); never
+  commit tokens; never place `BWS_ACCESS_TOKEN` on an agent-readable process
+  environment;
 - resolve secret values into short-lived Bridge/broker memory via a pinned
   upstream `bws` CLI or an injected test adapter; never log or return secrets;
   on Windows, `bws.exe` may be resolved from the default LocalAppData
-  Programs\\Bitwarden location when it is not on PATH; a missing CLI is
+  Programs\\Bitwarden location when it is not on PATH; on macOS/Linux, well-known
+  `bws` paths include `~/.local/bin/bws`; a missing CLI is
   `bws_missing` and must not be reported as an `authorization_ready` failure;
 - keep `helper_vault_free=true` — no vault client and no secrets on the
   LocalService helper pipe;
@@ -1598,7 +1610,9 @@ Manager path:
   token/allowlist state;
 - keep `helper_vault_free=true`, no LocalService vault client, and never set
   `authorization_ready=true` from installer or SM unlock;
-- provide [`docs/agent-windows-install.md`](docs/agent-windows-install.md) so
+- provide [`docs/agent-windows-install.md`](docs/agent-windows-install.md),
+  [`docs/agent-macos-install.md`](docs/agent-macos-install.md), and
+  [`docs/agent-linux-install.md`](docs/agent-linux-install.md) so
   agents pointed at this repo can run a guided install without requiring the
   user to be a terminal expert;
 - keep onboarding/import docs current:
@@ -1606,9 +1620,9 @@ Manager path:
   [`docs/sm-operational-key-naming.md`](docs/sm-operational-key-naming.md)
   (bindings in `samples/operational/bindings-sm.json`, seed via `npm run seed:sm`).
 
-Phase 15 must not create macOS installers in this slice, auto-create Bitwarden
-machine accounts, place secrets on agent-readable surfaces, or treat the
-installer as LocalService authorization evidence.
+Phase 15 must not create macOS or Linux installers in this slice, auto-create
+Bitwarden machine accounts, place secrets on agent-readable surfaces, or treat
+the installer as LocalService authorization evidence.
 
 ## Phase 16 scope
 

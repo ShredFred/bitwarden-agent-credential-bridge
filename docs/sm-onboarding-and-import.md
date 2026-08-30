@@ -1,21 +1,25 @@
 # Secrets Manager onboarding and import
 
 This is the canonical operator/agent guide for making **MiViA** and
-**private-hq** usable on a Windows (or macOS) machine without putting tokens or
-secret values in chat, logs, or agent `process.env`.
+**private-hq** usable on a Windows, macOS, or Linux machine without putting
+tokens or secret values in chat, logs, or agent `process.env`.
 
 Related:
 
-- Install / token paste: [`agent-windows-install.md`](agent-windows-install.md)
-- Laptop quickstart: [`windows-laptop-onboarding.md`](windows-laptop-onboarding.md)
+- Install / token paste: [`agent-windows-install.md`](agent-windows-install.md) ·
+  [`agent-macos-install.md`](agent-macos-install.md) ·
+  [`agent-linux-install.md`](agent-linux-install.md)
+- Laptop quickstart: [`windows-laptop-onboarding.md`](windows-laptop-onboarding.md) ·
+  [`macos-laptop-onboarding.md`](macos-laptop-onboarding.md) ·
+  [`linux-laptop-onboarding.md`](linux-laptop-onboarding.md)
 - Key naming rules: [`sm-operational-key-naming.md`](sm-operational-key-naming.md)
 - Bindings source of truth: [`samples/operational/bindings-sm.json`](../samples/operational/bindings-sm.json)
 
 ## Model (read this once)
 
 ```text
-Machine account (Freddy Desktop, …)
-  └─ access token  →  DPAPI / local secure store (once)
+Machine account (Freddy Desktop, MacBook, Linux box, …)
+  └─ access token  →  DPAPI / Keychain / owner-only file (once)
         └─ allowlisted SM projects
               ├─ MiViA
               └─ private-hq
@@ -39,15 +43,19 @@ Machine account (Freddy Desktop, …)
 2. Assign projects **MiViA** and **private-hq**.
 3. Create an **access token** (Zugriffstoken). Do not paste it into chat.
 
-### B. Local bridge setup (DPAPI / secure store)
+### B. Local bridge setup (DPAPI / Keychain / owner-only file)
 
-Preferred: Release Setup EXE → Start Menu **Bitwarden Agent Bridge Setup**.
+Preferred on Windows: Release Setup EXE → Start Menu **Bitwarden Agent Bridge Setup**.  
+Preferred on macOS: `npm run setup:sm:wizard` (dialog; Keychain store).  
+Preferred on Linux: `npm run setup:sm:wizard` (zenity/kdialog; `0600` XDG file).
 
 From source:
 
-```powershell
+```bash
 npm ci
-# bws: PATH or default %LOCALAPPDATA%\Programs\Bitwarden\bws.exe
+# Windows bws: PATH or %LOCALAPPDATA%\Programs\Bitwarden\bws.exe
+# macOS bws: PATH, ~/.local/bin/bws, /opt/homebrew/bin/bws, or /usr/local/bin/bws
+# Linux bws: PATH, ~/.local/bin/bws, /usr/local/bin/bws, or /usr/bin/bws
 npm run setup:sm:wizard
 # or: npm run setup:sm -- --i-approve-sm-machine-setup
 ```

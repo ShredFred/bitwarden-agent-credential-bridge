@@ -1,4 +1,4 @@
-import { execFile, spawn } from 'node:child_process';
+import { execFile, execFileSync, spawn } from 'node:child_process';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -7,14 +7,30 @@ import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import {
   defaultSecretsManagerAllowPath,
+  loadSecretsManagerAllowConfig,
+  SecretsManagerAllowConfigError,
 } from './secrets-manager-allow-config.mjs';
 import {
   SM_MACHINE_TOKEN_PURPOSE,
   SM_MACHINE_TOKEN_STORE_BASENAME,
   defaultMacSecretsManagerTokenPath,
 } from './secrets-manager-token-collector.mjs';
+import {
+  MacosSmKeychainError,
+  deleteMacosKeychainToken,
+  macosKeychainTokenPresent,
+  readMacosKeychainToken,
+  storeMacosKeychainToken,
+} from './macos-sm-keychain.mjs';
+import {
+  LinuxSmTokenFileError,
+  defaultLinuxSecretsManagerTokenPath,
+  deleteLinuxOwnerOnlyToken,
+  linuxOwnerOnlyTokenPresent,
+  storeLinuxOwnerOnlyToken,
+} from './linux-sm-token-file.mjs';
 import { SM_DEFAULT_ALLOWED_PROJECT_IDS } from './secrets-manager-defaults.mjs';
-import { resolveBwsExecutable } from './secrets-manager-bws-adapter.mjs';
+import { linuxBwsCandidatePaths, macosBwsCandidatePaths, resolveBwsExecutable } from './secrets-manager-bws-adapter.mjs';
 
 const execFileAsync = promisify(execFile);
 
@@ -28,9 +44,95 @@ export class SecretsManagerLifecycleError extends Error {
 
 const MACHINE_ID = /^[a-z][a-z0-9_-]{0,63}$/;
 
+/** DHCP/ISP labels that must not become a machine id. */
+const ISP_MACHINE_LABELS = new Set([
+  'vodafone', 'telekom', 'unitymedia', 'kabelbw', 'o2', '1und1', 'easybox',
+  'fritz', 'fritzbox', 'dhcp', 'gateway', 'router',
+  'local', 'lan', 'home', 'corp', 'internal',
+]);
+
+/**
+ * Build a local machine_id from a user-facing name, never from ISP DNS.
+ * @param {string} raw
+ * @returns {string} slug without `pc-` prefix, possibly empty
+ */
+export function slugSecretsManagerMachineLabel(raw) {
+  if (typeof raw !== 'string' || raw.length < 1) return '';
+  const parts = raw
+    .toLowerCase()
+    .replace(/[''`]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .split('-')
+    .filter((part) => part.length > 0 && !ISP_MACHINE_LABELS.has(part));
+  return parts.join('-').replace(/^-+|-+$/g, '').slice(0, 48);
+}
+
+function readMacosScutilName(key) {
+  try {
+    const out = execFileSync('/usr/sbin/scutil', ['--get', key], {
+      encoding: 'utf8',
+      timeout: 2000,
+      stdio: ['ignore', 'pipe', 'ignore'],
+    });
+    return typeof out === 'string' ? out.trim() : '';
+  } catch {
+    return '';
+  }
+}
+
+/**
+ * Suggested same-user machine_id. Prefers the Mac ComputerName over DHCP
+ * hostnames such as `*.home.vodafone`.
+ *
+ * @param {{
+ *   platform?: NodeJS.Platform,
+ *   computerName?: string,
+ *   localHostName?: string,
+ *   hostname?: string,
+ * }} [options]
+ */
+export function defaultSecretsManagerMachineId(options = {}) {
+  const platform = options.platform ?? process.platform;
+  const hints = [];
+  if (typeof options.computerName === 'string') hints.push(options.computerName);
+  if (typeof options.localHostName === 'string') hints.push(options.localHostName);
+  if (typeof options.hostname === 'string') hints.push(options.hostname);
+  if (hints.length === 0) {
+    if (platform === 'darwin') {
+      hints.push(readMacosScutilName('ComputerName'));
+      hints.push(readMacosScutilName('LocalHostName'));
+    }
+    if (platform === 'win32' && typeof process.env.COMPUTERNAME === 'string') {
+      hints.push(process.env.COMPUTERNAME);
+    }
+    if (platform === 'linux' && typeof process.env.HOSTNAME === 'string') {
+      hints.push(process.env.HOSTNAME);
+    }
+    hints.push(os.hostname() || '');
+  }
+  for (const hint of hints) {
+    const slug = slugSecretsManagerMachineLabel(hint);
+    if (slug.length > 0) {
+      const id = `pc-${slug}`.slice(0, 64);
+      if (MACHINE_ID.test(id)) return id;
+    }
+  }
+  return 'pc-local';
+}
+
 export function defaultWindowsTokenStorePath() {
   const home = process.env.USERPROFILE || os.homedir();
   return path.join(home, '.codex', 'secrets', SM_MACHINE_TOKEN_STORE_BASENAME);
+}
+
+function defaultTokenStorePath() {
+  if (process.platform === 'darwin') {
+    return defaultMacSecretsManagerTokenPath();
+  }
+  if (process.platform === 'linux') {
+    return defaultLinuxSecretsManagerTokenPath();
+  }
+  return defaultWindowsTokenStorePath();
 }
 
 /**
@@ -91,12 +193,15 @@ export async function writeSecretsManagerAllowConfig(input, options = {}) {
 
 /**
  * Store access token locally. Never logs the token.
- * Windows: DPAPI Clixml via repo probe. macOS: owner-only token file.
+ * Windows: DPAPI Clixml via repo probe. macOS: same-user Keychain item.
+ * Linux: owner-only 0600 file under XDG config.
  *
  * @param {{
  *   accessToken: string,
  *   machine_id: string,
  *   storeToken?: (token: string, machineId: string) => Promise<void>,
+ *   runSecurity?: Function,
+ *   tokenPath?: string,
  * }} options
  */
 export async function storeSecretsManagerAccessToken(options) {
@@ -118,10 +223,131 @@ export async function storeSecretsManagerAccessToken(options) {
     return { stored: true, platform: 'win32' };
   }
   if (process.platform === 'darwin') {
-    await storeMacTokenFile(options.accessToken);
+    try {
+      await storeMacosKeychainToken(options.accessToken, options.machine_id, {
+        runSecurity: options.runSecurity,
+      });
+    } catch (error) {
+      if (error instanceof MacosSmKeychainError) {
+        throw new SecretsManagerLifecycleError(error.code);
+      }
+      throw new SecretsManagerLifecycleError('token_store_failed');
+    }
     return { stored: true, platform: 'darwin' };
   }
+  if (process.platform === 'linux') {
+    try {
+      await storeLinuxOwnerOnlyToken(options.accessToken, {
+        tokenPath: options.tokenPath,
+      });
+    } catch (error) {
+      if (error instanceof LinuxSmTokenFileError) {
+        throw new SecretsManagerLifecycleError(error.code);
+      }
+      throw new SecretsManagerLifecycleError('token_store_failed');
+    }
+    return { stored: true, platform: 'linux' };
+  }
   throw new SecretsManagerLifecycleError('unsupported_platform');
+}
+
+/**
+ * Rename the local machine_id. macOS re-homes the Keychain item. Linux keeps
+ * the owner-only token file and rewrites the allowlist id. Never prints the token.
+ *
+ * @param {string} newMachineId
+ * @param {{
+ *   allowPath?: string,
+ *   runSecurity?: Function,
+ *   platform?: NodeJS.Platform,
+ *   tokenPath?: string,
+ * }} [options]
+ */
+export async function renameSecretsManagerMachineId(newMachineId, options = {}) {
+  if (typeof newMachineId !== 'string' || !MACHINE_ID.test(newMachineId)) {
+    throw new SecretsManagerLifecycleError('invalid_machine_id');
+  }
+  const platform = options.platform ?? process.platform;
+  if (platform !== 'darwin' && platform !== 'linux') {
+    throw new SecretsManagerLifecycleError('unsupported_platform');
+  }
+  const allowPath = options.allowPath ?? defaultSecretsManagerAllowPath();
+  let allow;
+  try {
+    allow = await loadSecretsManagerAllowConfig(allowPath);
+  } catch (error) {
+    if (error instanceof SecretsManagerAllowConfigError) {
+      throw new SecretsManagerLifecycleError(error.code);
+    }
+    throw new SecretsManagerLifecycleError('allow_config_absent');
+  }
+  const previous = allow.machine_id;
+  if (previous === newMachineId) {
+    return Object.freeze({
+      ok: true,
+      renamed: false,
+      machine_id: previous,
+      authorization_ready: false,
+    });
+  }
+  /** @type {Record<string, unknown>} */
+  const next = {
+    machine_id: newMachineId,
+    allowed_project_ids: [...allow.allowed_project_ids],
+  };
+  if (typeof allow.server_url === 'string') next.server_url = allow.server_url;
+  if (typeof allow.api_url === 'string' && typeof allow.identity_url === 'string') {
+    next.api_url = allow.api_url;
+    next.identity_url = allow.identity_url;
+  }
+
+  if (platform === 'linux') {
+    const tokenPath = options.tokenPath ?? defaultLinuxSecretsManagerTokenPath();
+    const present = await linuxOwnerOnlyTokenPresent({ tokenPath });
+    if (!present) {
+      throw new SecretsManagerLifecycleError('token_store_absent');
+    }
+    await writeSecretsManagerAllowConfig(next, { allowPath });
+    return Object.freeze({
+      ok: true,
+      renamed: true,
+      machine_id: newMachineId,
+      previous_machine_id: previous,
+      authorization_ready: false,
+      helper_vault_free: true,
+    });
+  }
+
+  let token;
+  try {
+    token = await readMacosKeychainToken(previous, { runSecurity: options.runSecurity });
+  } catch (error) {
+    if (error instanceof MacosSmKeychainError) {
+      throw new SecretsManagerLifecycleError(error.code);
+    }
+    throw new SecretsManagerLifecycleError('token_probe_failed');
+  }
+  await writeSecretsManagerAllowConfig(next, { allowPath });
+  try {
+    await storeMacosKeychainToken(token, newMachineId, { runSecurity: options.runSecurity });
+  } catch (error) {
+    await writeSecretsManagerAllowConfig({
+      ...next,
+      machine_id: previous,
+    }, { allowPath }).catch(() => {});
+    throw error instanceof MacosSmKeychainError
+      ? new SecretsManagerLifecycleError(error.code)
+      : new SecretsManagerLifecycleError('token_store_failed');
+  }
+  await deleteMacosKeychainToken(previous, { runSecurity: options.runSecurity }).catch(() => {});
+  return Object.freeze({
+    ok: true,
+    renamed: true,
+    machine_id: newMachineId,
+    previous_machine_id: previous,
+    authorization_ready: false,
+    helper_vault_free: true,
+  });
 }
 
 async function storeWindowsDpapiToken(accessToken, machineId) {
@@ -177,41 +403,89 @@ async function storeWindowsDpapiToken(accessToken, machineId) {
   }
 }
 
-async function storeMacTokenFile(accessToken) {
-  const tokenPath = defaultMacSecretsManagerTokenPath();
-  await fs.mkdir(path.dirname(tokenPath), { recursive: true, mode: 0o700 });
-  await fs.writeFile(tokenPath, `${accessToken}\n`, { encoding: 'utf8', mode: 0o600 });
-}
-
 /**
  * Remove local SM allowlist + token artifacts. Continues after individual misses.
+ * macOS deletes the Keychain item and any leftover 0600 token file.
+ * Linux deletes the owner-only XDG token file.
  */
 export async function uninstallSecretsManagerLocalState(options = {}) {
   const allowPath = options.allowPath ?? defaultSecretsManagerAllowPath();
-  const tokenPath = options.tokenPath ?? (
-    process.platform === 'darwin'
-      ? defaultMacSecretsManagerTokenPath()
-      : defaultWindowsTokenStorePath()
-  );
+  const leftoverPath = options.tokenPath ?? defaultTokenStorePath();
+  const useKeychain = process.platform === 'darwin' && options.tokenPath === undefined;
+  const useLinuxFile = process.platform === 'linux' && options.tokenPath === undefined;
+
+  let machineId = typeof options.machine_id === 'string' ? options.machine_id : null;
+  if (!machineId) {
+    try {
+      const allow = await loadSecretsManagerAllowConfig(allowPath);
+      machineId = allow.machine_id;
+    } catch {
+      machineId = null;
+    }
+  }
+
   const removed = {
     allow_config_removed: false,
     token_store_removed: false,
   };
+
+  let skipAllowUnlink = false;
+  if (typeof options.machine_id === 'string') {
+    try {
+      const existing = await loadSecretsManagerAllowConfig(allowPath);
+      if (existing.machine_id !== options.machine_id) {
+        skipAllowUnlink = true;
+      }
+    } catch {
+      // absent or invalid allowlist: safe to unlink
+    }
+  }
+
+  if (useKeychain && typeof machineId === 'string') {
+    try {
+      await deleteMacosKeychainToken(machineId, { runSecurity: options.runSecurity });
+      removed.token_store_removed = true;
+    } catch {
+      // continue; leftover file and allowlist still removed
+    }
+  }
+  if (useLinuxFile) {
+    try {
+      await deleteLinuxOwnerOnlyToken();
+      removed.token_store_removed = true;
+    } catch {
+      // continue
+    }
+  }
+
   try {
-    await fs.unlink(allowPath);
-    removed.allow_config_removed = true;
+    if (!skipAllowUnlink) {
+      await fs.unlink(allowPath);
+      removed.allow_config_removed = true;
+    }
   } catch {
     // absent is success for uninstall
   }
   try {
-    await fs.unlink(tokenPath);
-    removed.token_store_removed = true;
+    await fs.unlink(leftoverPath);
+    if (!useKeychain && !useLinuxFile) {
+      removed.token_store_removed = true;
+    }
   } catch {
     // absent is success
   }
-  // Prove absence
+
   const allowAbsent = !(await pathExists(allowPath));
-  const tokenAbsent = !(await pathExists(tokenPath));
+  let tokenAbsent = !(await pathExists(leftoverPath));
+  if (useKeychain && typeof machineId === 'string') {
+    const keychainPresent = await macosKeychainTokenPresent(machineId, {
+      runSecurity: options.runSecurity,
+    });
+    tokenAbsent = tokenAbsent && !keychainPresent;
+  }
+  if (useLinuxFile) {
+    tokenAbsent = tokenAbsent && !(await linuxOwnerOnlyTokenPresent());
+  }
   return Object.freeze({
     ...removed,
     allow_config_absent: allowAbsent,
@@ -224,14 +498,34 @@ export async function uninstallSecretsManagerLocalState(options = {}) {
 
 export async function inspectSecretsManagerLocalState(options = {}) {
   const allowPath = options.allowPath ?? defaultSecretsManagerAllowPath();
-  const tokenPath = options.tokenPath ?? (
-    process.platform === 'darwin'
-      ? defaultMacSecretsManagerTokenPath()
-      : defaultWindowsTokenStorePath()
-  );
+  const leftoverPath = options.tokenPath ?? defaultTokenStorePath();
+  const useKeychain = process.platform === 'darwin' && options.tokenPath === undefined;
+  const useLinuxFile = process.platform === 'linux' && options.tokenPath === undefined;
+  let tokenStorePresent = await pathExists(leftoverPath);
+  if (useKeychain) {
+    let machineId = typeof options.machine_id === 'string' ? options.machine_id : null;
+    if (!machineId) {
+      try {
+        const allow = await loadSecretsManagerAllowConfig(allowPath);
+        machineId = allow.machine_id;
+      } catch {
+        machineId = null;
+      }
+    }
+    if (typeof machineId === 'string') {
+      tokenStorePresent = await macosKeychainTokenPresent(machineId, {
+        runSecurity: options.runSecurity,
+      });
+    } else {
+      tokenStorePresent = false;
+    }
+  }
+  if (useLinuxFile) {
+    tokenStorePresent = await linuxOwnerOnlyTokenPresent();
+  }
   return Object.freeze({
     allow_config_present: await pathExists(allowPath),
-    token_store_present: await pathExists(tokenPath),
+    token_store_present: tokenStorePresent,
     platform: process.platform,
     authorization_ready: false,
     helper_vault_free: true,
@@ -262,7 +556,12 @@ export async function checkBwsAvailable(options = {}) {
         encoding: 'utf8',
         env: {
           Path: process.env.Path || process.env.PATH,
-          PATH: process.env.PATH || process.env.Path,
+          PATH: process.platform === 'darwin' || process.platform === 'linux'
+            ? `${[...macosBwsCandidatePaths(), ...linuxBwsCandidatePaths()]
+              .map((filePath) => path.dirname(filePath))
+              .join(':')}:${process.env.PATH || ''}`
+            : (process.env.PATH || process.env.Path),
+          HOME: process.env.HOME,
           SystemRoot: process.env.SystemRoot,
         },
       });

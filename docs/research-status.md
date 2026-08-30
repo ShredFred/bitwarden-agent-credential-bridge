@@ -41,7 +41,7 @@ in [Architecture](architecture.md) over adding another README section.
 | Slice | One-line | Doc |
 | --- | --- | --- |
 | 13 | Flagged personal Bitwarden PM resolve (Windows) | [phase13](phase13-personal-bitwarden.md) |
-| 14 | Same-user SM machine resolve (productive default) | [phase14](phase14-secrets-manager-same-user.md) |
+| 14 | Same-user SM machine resolve (Windows / macOS / Linux) | [phase14](phase14-secrets-manager-same-user.md) |
 | 15 | Windows product installer | [phase15](phase15-windows-installer.md) |
 
 ## Windows writer ladder (optional)

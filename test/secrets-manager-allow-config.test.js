@@ -6,6 +6,7 @@ import { describe, it } from 'node:test';
 import {
   loadSecretsManagerAllowConfig,
   isProjectAllowed,
+  defaultSecretsManagerAllowPath,
   SecretsManagerAllowConfigError,
 } from '../src/secrets-manager-allow-config.mjs';
 
@@ -26,6 +27,19 @@ describe('secrets manager allow config', () => {
     assert.equal(isProjectAllowed(loaded, projectA), true);
     assert.equal(isProjectAllowed(loaded, '00000000-0000-4000-8000-000000000099'), false);
     await fs.rm(dir, { recursive: true, force: true });
+  });
+
+  it('places the Linux allowlist under XDG config, not AppData', () => {
+    const linuxPath = defaultSecretsManagerAllowPath({
+      platform: 'linux',
+      home: '/tmp/fake-linux-home',
+      configHome: '/tmp/fake-xdg-config',
+    });
+    assert.equal(
+      linuxPath,
+      '/tmp/fake-xdg-config/BitwardenAgentCredentialBridge/sm-machine.allow.json',
+    );
+    assert.equal(linuxPath.includes('AppData'), false);
   });
 
   it('rejects malformed allow configs', async () => {

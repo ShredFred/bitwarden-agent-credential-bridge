@@ -59,7 +59,7 @@ if (!process.argv.includes(SM_RESOLVE_APPROVAL_FLAG)) {
     helper_vault_free: true,
     agent_secret_visible: false,
   }, 1);
-} else if (process.platform !== 'win32' && process.platform !== 'darwin') {
+} else if (process.platform !== 'win32' && process.platform !== 'darwin' && process.platform !== 'linux') {
   emit({ ok: false, code: 'unsupported_platform', authorization_ready: false }, 1);
 } else {
   const projectArg = argValue('--project');

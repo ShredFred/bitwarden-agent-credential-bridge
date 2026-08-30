@@ -1,0 +1,119 @@
+#!/usr/bin/osascript
+/**
+ * macOS first-run SM setup dialog using StandardAdditions displayDialog.
+ * Cmd-V works in that system prompt. Prints one JSON line to stdout.
+ * The Node wrapper must never re-emit the token.
+ *
+ * --self-test writes a fake token JSON with no GUI (never a real secret).
+ */
+ObjC.import('Foundation')
+
+const SELF_TEST_TOKEN = '0.fake-macos-wizard-self-test=='
+
+function parseArgs() {
+  const args = ObjC.deepUnwrap($.NSProcessInfo.processInfo.arguments)
+  const out = { machineId: 'pc-local', bwsOk: false, selfTest: false }
+  for (let i = 0; i < args.length; i += 1) {
+    if (args[i] === '--machine-id' && i + 1 < args.length) {
+      out.machineId = String(args[i + 1])
+    }
+    if (args[i] === '--bws-ok' && i + 1 < args.length) {
+      out.bwsOk = args[i + 1] === '1'
+    }
+    if (args[i] === '--self-test') {
+      out.selfTest = true
+    }
+  }
+  return out
+}
+
+function writeJson(obj) {
+  const json = JSON.stringify(obj) + '\n'
+  const ns = $.NSString.stringWithString(json)
+  const data = ns.dataUsingEncoding($.NSUTF8StringEncoding)
+  $.NSFileHandle.fileHandleWithStandardOutput.writeData(data)
+}
+
+function fieldPad(width) {
+  var pad = ''
+  var i
+  for (i = 0; i < width; i += 1) {
+    pad += ' '
+  }
+  return pad
+}
+
+function paddedDefault(text, minWidth) {
+  var base = String(text || '')
+  if (base.length >= minWidth) return base
+  return base + fieldPad(minWidth - base.length)
+}
+
+function isCancelError(error) {
+  const text = String(error)
+  return text.indexOf('-128') >= 0 || text.toLowerCase().indexOf('cancel') >= 0
+}
+
+const opts = parseArgs()
+
+try {
+  if (opts.selfTest) {
+    writeJson({
+      ok: true,
+      machine_id: opts.machineId,
+      token: SELF_TEST_TOKEN,
+      server_url: '',
+      self_test: true,
+    })
+  } else if (!opts.bwsOk) {
+    writeJson({ ok: false, code: 'bws_missing' })
+  } else {
+    const app = Application.currentApplication()
+    app.includeStandardAdditions = true
+    app.activate()
+
+    const idDlg = app.displayDialog(
+      'Confirm the local machine id, then Continue. This is not a Bitwarden secret key.',
+      {
+        defaultAnswer: paddedDefault(opts.machineId, 64),
+        hiddenAnswer: false,
+        buttons: ['Cancel', 'Continue'],
+        defaultButton: 'Continue',
+        cancelButton: 'Cancel',
+        withTitle: 'Bitwarden Agent Bridge Setup',
+      },
+    )
+    if (idDlg.gaveUp) {
+      writeJson({ ok: false, code: 'cancelled' })
+    } else {
+      const machineId = String(idDlg.textReturned || '').trim().toLowerCase()
+      const tokenDlg = app.displayDialog(
+        'Paste the Secrets Manager machine access token (Cmd-V). Then Save. Do not paste it into chat.',
+        {
+          defaultAnswer: fieldPad(8192),
+          hiddenAnswer: true,
+          buttons: ['Cancel', 'Save'],
+          defaultButton: 'Save',
+          cancelButton: 'Cancel',
+          withTitle: 'Bitwarden Agent Bridge Setup',
+        },
+      )
+      if (tokenDlg.gaveUp) {
+        writeJson({ ok: false, code: 'cancelled' })
+      } else {
+        writeJson({
+          ok: true,
+          machine_id: machineId,
+          token: String(tokenDlg.textReturned || '').trim(),
+          server_url: '',
+        })
+      }
+    }
+  }
+} catch (error) {
+  if (isCancelError(error)) {
+    writeJson({ ok: false, code: 'cancelled' })
+  } else {
+    writeJson({ ok: false, code: 'wizard_failed' })
+  }
+}

@@ -15,10 +15,12 @@ This document is the maintainer workflow.
 
 1. Start with a discussion if the idea changes a security boundary, scope, or
    public contract. Use an issue for an already agreed, bounded task.
-2. Create a short-lived branch for the issue. Do not work directly on main.
+2. Check out `develop` (never `main`, never leftover `codex/*` branches). For a
+   bounded issue you may still use a short-lived branch off `develop`.
 3. Make the smallest change that proves the behavior. Add or adjust tests at the
    same time.
-4. Open a pull request early, as a draft if the design is still being tested.
+4. Land the work on `develop`. Open a pull request `develop` → `main` when the
+   slice is ready to publish (draft if the design is still being tested).
 5. Review the exact threat-boundary impact, test results, documentation, and
    release-note need before merging.
 6. Merge only after required checks pass and every unresolved conversation is
@@ -58,6 +60,11 @@ Only mark something `good first issue` after its acceptance criteria are clear
 and it cannot accidentally expand a security boundary.
 
 ## Branch and merge policy
+
+`develop` is the default integration branch. Agents and maintainers work there.
+`main` receives reviewed merges from `develop` only. Do not revive
+`codex/windows-integration` or other Codex leftover branches; they are fully
+merged history.
 
 Before public visibility, protect main with a GitHub ruleset or branch-protection
 rule:

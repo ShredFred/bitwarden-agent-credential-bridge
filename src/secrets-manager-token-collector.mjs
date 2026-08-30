@@ -1,6 +1,5 @@
 import { execFile } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import process from 'node:process';
@@ -15,6 +14,14 @@ import {
   loadSecretsManagerAllowConfig,
   SecretsManagerAllowConfigError,
 } from './secrets-manager-allow-config.mjs';
+import {
+  MacosSmKeychainError,
+  readMacosKeychainToken,
+} from './macos-sm-keychain.mjs';
+import {
+  LinuxSmTokenFileError,
+  readLinuxOwnerOnlyToken,
+} from './linux-sm-token-file.mjs';
 
 const execFileAsync = promisify(execFile);
 
@@ -116,24 +123,6 @@ async function readWindowsDpapiToken() {
   return stdout;
 }
 
-async function readMacTokenFile(tokenPath = defaultMacSecretsManagerTokenPath()) {
-  let raw;
-  try {
-    raw = await fs.readFile(tokenPath, { encoding: 'utf8' });
-  } catch {
-    throw new SecretsManagerTokenCollectorError('token_absent');
-  }
-  const token = raw.replace(/^\uFEFF/, '').trim();
-  if (token.length < 16 || token.length > 8192) {
-    throw new SecretsManagerTokenCollectorError('invalid_token');
-  }
-  // Reject obvious multiline leaks / accidental JSON dumps.
-  if (token.includes('\n') || token.includes('\r')) {
-    throw new SecretsManagerTokenCollectorError('invalid_token');
-  }
-  return token;
-}
-
 /**
  * Collect machine allowlist + short-lived access token under a branded scope.
  * Never logs the token.
@@ -142,7 +131,7 @@ async function readMacTokenFile(tokenPath = defaultMacSecretsManagerTokenPath())
  * @param {{
  *   allowConfigPath?: string,
  *   readToken?: () => Promise<string>,
- *   macTokenPath?: string,
+ *   runSecurity?: (script: string) => Promise<{ code: number, stdout: string, stderr: string }>,
  * }} [options]
  */
 export async function collectSecretsManagerMachineBundle(scope, options = {}) {
@@ -172,7 +161,26 @@ export async function collectSecretsManagerMachineBundle(scope, options = {}) {
         return readWindowsDpapiToken();
       }
       if (process.platform === 'darwin') {
-        return readMacTokenFile(options.macTokenPath);
+        try {
+          return await readMacosKeychainToken(allow.machine_id, {
+            runSecurity: options.runSecurity,
+          });
+        } catch (error) {
+          if (error instanceof MacosSmKeychainError) {
+            throw new SecretsManagerTokenCollectorError(error.code);
+          }
+          throw new SecretsManagerTokenCollectorError('token_probe_failed');
+        }
+      }
+      if (process.platform === 'linux') {
+        try {
+          return await readLinuxOwnerOnlyToken();
+        } catch (error) {
+          if (error instanceof LinuxSmTokenFileError) {
+            throw new SecretsManagerTokenCollectorError(error.code);
+          }
+          throw new SecretsManagerTokenCollectorError('token_probe_failed');
+        }
       }
       throw new SecretsManagerTokenCollectorError('unsupported_platform');
     };

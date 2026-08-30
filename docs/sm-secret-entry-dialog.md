@@ -18,9 +18,7 @@ returned. `agent_secret_visible` stays `false`.
 
 ## Fast CLI (`bw-sm`) — preferred
 
-```powershell
-cd "F:\Github Repos\bitwarden-agent-credential-bridge"
-
+```bash
 npm run bw-sm -- presets
 npm run bw-sm -- exists mivia prefix:mivia_klicktipp_ --approve
 npm run bw-sm -- ask klicktipp --approve
@@ -63,6 +61,6 @@ npm run bw-sm -- exists mivia prefix:mivia_klicktipp_ --approve
 
 ## Limitations
 
-- Windows dialog only (this slice).
+- Native dialog: Windows WinForms or macOS NSAlert (this slice).
 - Max 8 fields; public values capped at 256 chars.
 - Personal/company password vault remains out of scope.
