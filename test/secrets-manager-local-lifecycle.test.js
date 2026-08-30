@@ -160,7 +160,9 @@ describe('secrets manager local lifecycle', () => {
     }
   });
 
-  it('renames machine_id on Linux without touching a mocked token file', async () => {
+  it('renames machine_id on Linux without touching a mocked token file', {
+    skip: process.platform === 'win32',
+  }, async () => {
     const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'bw-sm-linux-rename-'));
     const allowPath = path.join(dir, 'sm-machine.allow.json');
     const tokenPath = path.join(dir, 'sm-machine.token');
