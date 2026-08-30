@@ -14,8 +14,12 @@ channel, or production support commitment.
 ## Before asking
 
 - Humans: [README](README.md), [Features](docs/features.md),
-  [Windows onboarding](docs/windows-laptop-onboarding.md).
-- Agents: [agent Windows install](docs/agent-windows-install.md).
+  [Windows onboarding](docs/windows-laptop-onboarding.md),
+  [macOS onboarding](docs/macos-laptop-onboarding.md),
+  [Linux onboarding](docs/linux-laptop-onboarding.md).
+- Agents: [agent Windows install](docs/agent-windows-install.md),
+  [agent macOS install](docs/agent-macos-install.md),
+  [agent Linux install](docs/agent-linux-install.md).
 - Contributors: [Architecture](docs/architecture.md).
 
 Never include real credentials, vault references, raw host output, or private

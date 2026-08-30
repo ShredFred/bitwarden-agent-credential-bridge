@@ -1,6 +1,6 @@
 # macOS laptop onboarding
 
-Human quickstart for this Mac. Product overview:
+Human quickstart for macOS. Product overview:
 [README](../README.md) · [Features](features.md).
 
 **Default:** from-source `setup:sm:wizard` → Secrets Manager same-user
@@ -36,11 +36,11 @@ click **Save**. Cloud is default. Do not paste the token into chat.
 
 **Machine ID** is a local label (Keychain account), not the Bitwarden SM
 secret key. Use the Mac ComputerName, never the DHCP/ISP hostname
-(`*.vodafone`). Example for this laptop: `pc-macbookm1-andrada`. If a
-wizard already saved an ISP id:
+(`*.isp.example`). Example: `pc-macos-example`. If a wizard already saved
+an ISP id:
 
 ```bash
-npm run setup:sm:rename-id -- pc-macbookm1-andrada
+npm run setup:sm:rename-id -- pc-macos-example
 ```
 
 Do **not** run `seed:sm --prune` if those SM projects already hold real keys

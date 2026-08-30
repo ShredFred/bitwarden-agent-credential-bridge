@@ -70,13 +70,14 @@ private repository.
 
 Use this sequence:
 
-1. **Now:** keep the current repository private and continue all source, test,
-   documentation, and release-preparation work here. There is no second
-   repository and no local credential configuration to create.
+1. **Now:** continue all source, test, documentation, and release work in this
+   repository. There is no second source repository and no local credential
+   configuration to commit.
 2. **At public release:** run the publication review, make this same repository
    public, then immediately enable GitHub private vulnerability reporting and
    verify the reporting button. The public repository remains the canonical
-   source for issues, pull requests, discussions, and releases.
+   source for issues, pull requests, discussions, and releases. Cutover notes:
+   [publication-review.md](publication-review.md).
 3. **Only if needed later:** create one separate private planning repository for
    sanitized maintainer material that must not be public, such as roadmap drafts,
    non-sensitive decision records, and release planning. Do not mirror source

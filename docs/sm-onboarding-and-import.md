@@ -71,8 +71,8 @@ write, no local delete):
 
 ```powershell
 npm run import:local-to-sm
-# when dry-run is all green (add --env-root for personal-hq .env paths):
-npm run import:local-to-sm -- --apply --i-approve-secrets-manager-machine-write --env-root "F:\Github Repos\personal-hq"
+# when dry-run is all green (add --env-root for a local app repo with .env files):
+npm run import:local-to-sm -- --apply --i-approve-secrets-manager-machine-write --env-root "C:\path\to\your-app"
 ```
 
 Manifest: `samples/operational/local-to-sm-import-manifest.json`  

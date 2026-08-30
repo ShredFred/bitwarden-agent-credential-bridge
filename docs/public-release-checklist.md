@@ -6,6 +6,9 @@ This checklist is the gate for changing repository visibility or publishing a
 release. It is deliberately stricter than "the tests are green." Do not make
 the repository public until every required item has an accountable answer.
 
+The 2026-08-31 cutover answers live in
+[publication-review.md](publication-review.md).
+
 ## Repository content
 
 - [ ] The working tree is clean and every intended change has a reviewed pull
