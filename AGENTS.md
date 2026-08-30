@@ -12,6 +12,16 @@ This repository is a sample-only security experiment.
 - Run tests before claiming completion. Report limitations explicitly.
 - Do not create a remote or push this repository until a separate secret scan and publication review pass succeeds.
 
+## Git workflow
+
+Default integration branch is `develop`. `main` is release-only.
+
+- On any session that will edit files: if `HEAD` is `main` or a leftover `codex/*` branch, check out `develop` first (`git checkout develop` or `git checkout -B develop origin/develop`). Fast-forward `develop` from `origin/develop` when it is behind. Call `SetActiveBranch` to `develop`.
+- Never commit, amend, or push to `main`. Never create or revive `codex/*` integration branches.
+- Land work on `develop`. Open PRs `develop` → `main` only when a slice is ready to publish.
+- Do not work on `main` even if the working tree is already dirty there; move the work onto `develop` before further edits.
+- Stale fully-merged Codex branches may be deleted from origin; do not merge them back.
+
 ## Phase 1 scope
 
 Implement only:
