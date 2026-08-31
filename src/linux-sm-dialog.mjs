@@ -79,10 +79,26 @@ export function spawnLinuxDialog(command, args, timeoutMs) {
     let stderr = '';
     let overflow = false;
     let settled = false;
+    let killTimer;
+    const requestStop = () => {
+      child.kill('SIGTERM');
+      if (!killTimer) {
+        killTimer = setTimeout(() => {
+          child.kill('SIGKILL');
+        }, 250);
+      }
+    };
+    const dropCapture = () => {
+      stdout = '';
+      stderr = '';
+      child.stdout.pause();
+      child.stderr.pause();
+    };
     const finish = (code, err) => {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
+      if (overflow) dropCapture();
       resolve({
         code,
         stdout: overflow ? '' : stdout,
@@ -90,27 +106,33 @@ export function spawnLinuxDialog(command, args, timeoutMs) {
       });
     };
     const timer = setTimeout(() => {
-      child.kill('SIGTERM');
+      requestStop();
       finish(1, 'timeout');
     }, timeoutMs);
     child.stdout.on('data', (chunk) => {
+      if (overflow || settled) return;
       stdout += chunk;
       if (stdout.length > LINUX_DIALOG_MAX_OUTPUT) {
         overflow = true;
-        child.kill('SIGTERM');
+        dropCapture();
+        requestStop();
       }
     });
     child.stderr.on('data', (chunk) => {
+      if (overflow || settled) return;
       stderr += chunk;
       if (stderr.length > LINUX_DIALOG_MAX_OUTPUT) {
         overflow = true;
-        child.kill('SIGTERM');
+        dropCapture();
+        requestStop();
       }
     });
     child.on('close', (code) => {
+      clearTimeout(killTimer);
       finish(overflow ? 1 : (code ?? 1), overflow ? 'output_overflow' : stderr);
     });
     child.on('error', () => {
+      requestStop();
       finish(1, 'spawn_failed');
     });
   });

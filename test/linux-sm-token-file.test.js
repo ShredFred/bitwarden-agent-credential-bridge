@@ -58,7 +58,9 @@ describe('linux SM owner-only token file', () => {
     }
   });
 
-  it('rejects group/other-readable tokens and newlines', async () => {
+  it('rejects group/other-readable tokens and newlines', {
+    skip: process.platform === 'win32',
+  }, async () => {
     const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'bw-sm-linux-bad-'));
     const tokenPath = path.join(dir, 'sm-machine.token');
     try {
@@ -85,6 +87,10 @@ describe('linux SM owner-only token file', () => {
     try {
       await assert.rejects(
         () => storeLinuxOwnerOnlyToken(token, { tokenPath: 'sm-machine.token' }),
+        (error) => error instanceof LinuxSmTokenFileError && error.code === 'invalid_path',
+      );
+      await assert.rejects(
+        () => storeLinuxOwnerOnlyToken(token, { tokenPath: 'C:\\fake\\sm-machine.token' }),
         (error) => error instanceof LinuxSmTokenFileError && error.code === 'invalid_path',
       );
       const filePath = path.join(dir, 'sm-machine.token');

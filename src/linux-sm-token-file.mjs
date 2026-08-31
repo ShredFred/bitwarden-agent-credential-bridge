@@ -59,7 +59,7 @@ function noFollowFlag() {
 }
 
 function isAbsolutePath(filePath) {
-  return path.posix.isAbsolute(filePath) || path.win32.isAbsolute(filePath);
+  return path.posix.isAbsolute(filePath);
 }
 
 function assertSafeTokenPath(filePath) {
@@ -135,6 +135,19 @@ export async function storeLinuxOwnerOnlyToken(token, options = {}) {
   }
   const dir = path.dirname(filePath);
   await fs.mkdir(dir, { recursive: true, mode: 0o700 });
+  let preChmod;
+  try {
+    preChmod = await fs.lstat(dir);
+  } catch {
+    throw new LinuxSmTokenFileError('token_store_invalid');
+  }
+  if (preChmod.isSymbolicLink() || !preChmod.isDirectory()) {
+    throw new LinuxSmTokenFileError('token_store_invalid');
+  }
+  const uid = currentUid();
+  if (uid !== null && typeof preChmod.uid === 'number' && preChmod.uid !== uid) {
+    throw new LinuxSmTokenFileError('token_store_insecure');
+  }
   await fs.chmod(dir, 0o700);
   await assertOwnerOnlyDirectory(dir);
   const tmp = `${filePath}.${process.pid}.tmp`;
