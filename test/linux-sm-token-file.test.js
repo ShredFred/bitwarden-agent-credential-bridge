@@ -58,7 +58,9 @@ describe('linux SM owner-only token file', () => {
     }
   });
 
-  it('rejects group/other-readable tokens and newlines', async () => {
+  it('rejects group/other-readable tokens and newlines', {
+    skip: process.platform === 'win32',
+  }, async () => {
     const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'bw-sm-linux-bad-'));
     const tokenPath = path.join(dir, 'sm-machine.token');
     try {
@@ -71,6 +73,47 @@ describe('linux SM owner-only token file', () => {
       await assert.rejects(
         () => readLinuxOwnerOnlyToken({ tokenPath }),
         (error) => error instanceof LinuxSmTokenFileError && error.code === 'token_store_insecure',
+      );
+    } finally {
+      await fs.rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('rejects relative paths, symlinks, and symlink parents', {
+    skip: process.platform === 'win32',
+  }, async () => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'bw-sm-linux-hard-'));
+    const token = '0.fake-linux-token-value==';
+    try {
+      await assert.rejects(
+        () => storeLinuxOwnerOnlyToken(token, { tokenPath: 'sm-machine.token' }),
+        (error) => error instanceof LinuxSmTokenFileError && error.code === 'invalid_path',
+      );
+      await assert.rejects(
+        () => storeLinuxOwnerOnlyToken(token, { tokenPath: 'C:\\fake\\sm-machine.token' }),
+        (error) => error instanceof LinuxSmTokenFileError && error.code === 'invalid_path',
+      );
+      const filePath = path.join(dir, 'sm-machine.token');
+      await fs.writeFile(filePath, token, { mode: 0o600 });
+      const linkPath = path.join(dir, 'link.token');
+      await fs.symlink(filePath, linkPath);
+      await assert.rejects(
+        () => readLinuxOwnerOnlyToken({ tokenPath: linkPath }),
+        (error) => error instanceof LinuxSmTokenFileError &&
+          (error.code === 'token_store_invalid' || error.code === 'token_store_absent'),
+      );
+      await assert.rejects(
+        () => storeLinuxOwnerOnlyToken(token, { tokenPath: linkPath }),
+        (error) => error instanceof LinuxSmTokenFileError && error.code === 'token_store_invalid',
+      );
+      const realParent = path.join(dir, 'real-parent');
+      await fs.mkdir(realParent, { mode: 0o700 });
+      const linkParent = path.join(dir, 'link-parent');
+      await fs.symlink(realParent, linkParent);
+      await assert.rejects(
+        () => storeLinuxOwnerOnlyToken(token, { tokenPath: path.join(linkParent, 'sm-machine.token') }),
+        (error) => error instanceof LinuxSmTokenFileError &&
+          (error.code === 'token_store_invalid' || error.code === 'token_store_insecure'),
       );
     } finally {
       await fs.rm(dir, { recursive: true, force: true });

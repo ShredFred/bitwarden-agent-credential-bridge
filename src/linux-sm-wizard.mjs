@@ -1,62 +1,18 @@
 /**
  * Linux same-user SM first-run wizard. Token never logged.
- * Prefers zenity/kdialog when DISPLAY is set; otherwise a TTY hidden prompt.
+ * Prefers zenity/kdialog when a display is set. Headless hosts use
+ * `npm run setup:sm` (hidden TTY), not this GUI path.
  */
-import { spawn } from 'node:child_process';
-import fs from 'node:fs';
-import process from 'node:process';
 import { interpretMacosWizardDialog } from './macos-sm-wizard.mjs';
+import { resolveLinuxGuiTool, spawnLinuxDialog } from './linux-sm-dialog.mjs';
 
 export const LINUX_WIZARD_SELF_TEST_TOKEN = '0.fake-linux-wizard-self-test==';
 export const LINUX_WIZARD_SELF_TEST_MACHINE_ID = 'pc-selftest-wizard';
 
 const MACHINE_ID = /^[a-z][a-z0-9_-]{0,63}$/;
 
-function spawnCaptured(command, args, timeoutMs) {
-  return new Promise((resolve) => {
-    const child = spawn(command, args, {
-      stdio: ['ignore', 'pipe', 'pipe'],
-      env: process.env,
-    });
-    let stdout = '';
-    let stderr = '';
-    const timer = setTimeout(() => {
-      child.kill('SIGTERM');
-      resolve({ code: 1, stdout, stderr: 'timeout' });
-    }, timeoutMs);
-    child.stdout.on('data', (chunk) => {
-      stdout += chunk;
-    });
-    child.stderr.on('data', (chunk) => {
-      stderr += chunk;
-    });
-    child.on('close', (code) => {
-      clearTimeout(timer);
-      resolve({ code: code ?? 1, stdout, stderr });
-    });
-    child.on('error', () => {
-      clearTimeout(timer);
-      resolve({ code: 1, stdout, stderr: 'spawn_failed' });
-    });
-  });
-}
-
-function whichGui() {
-  if (typeof process.env.DISPLAY !== 'string' || process.env.DISPLAY.length < 1) {
-    if (typeof process.env.WAYLAND_DISPLAY !== 'string' ||
-        process.env.WAYLAND_DISPLAY.length < 1) {
-      return null;
-    }
-  }
-  const zenity = '/usr/bin/zenity';
-  const kdialog = '/usr/bin/kdialog';
-  if (fs.existsSync(zenity)) return { kind: 'zenity', bin: zenity };
-  if (fs.existsSync(kdialog)) return { kind: 'kdialog', bin: kdialog };
-  return null;
-}
-
-async function promptZenity(gui, { machineId, bwsOk, timeoutMs }) {
-  const idDialog = await spawnCaptured(gui.bin, [
+async function promptGui(gui, { machineId, bwsOk, timeoutMs }) {
+  const idDialog = await spawnLinuxDialog(gui.bin, [
     '--entry',
     '--title', 'Bitwarden Agent Bridge',
     '--text', bwsOk
@@ -72,12 +28,12 @@ async function promptZenity(gui, { machineId, bwsOk, timeoutMs }) {
     return { ok: false, code: 'invalid_machine_id' };
   }
   const tokenDialog = gui.kind === 'zenity'
-    ? await spawnCaptured(gui.bin, [
+    ? await spawnLinuxDialog(gui.bin, [
       '--password',
       '--title', 'Bitwarden Agent Bridge',
       '--text', 'Paste the Secrets Manager machine access token. Do not paste it into chat.',
     ], timeoutMs)
-    : await spawnCaptured(gui.bin, [
+    : await spawnLinuxDialog(gui.bin, [
       '--password',
       'Paste the Secrets Manager machine access token. Do not paste it into chat.',
     ], timeoutMs);
@@ -124,9 +80,9 @@ export async function collectLinuxWizardAnswers(options) {
     });
   }
   const timeoutMs = Number.isInteger(options.timeoutMs) ? options.timeoutMs : 3600000;
-  const gui = whichGui();
+  const gui = resolveLinuxGuiTool();
   if (gui) {
-    return promptZenity(gui, {
+    return promptGui(gui, {
       machineId: options.machineId,
       bwsOk: options.bwsOk === true,
       timeoutMs,
