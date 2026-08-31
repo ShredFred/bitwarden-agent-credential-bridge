@@ -7,12 +7,21 @@ Semantic Versioning while it remains on the experimental 0.x line.
 
 ### Changed
 
+- Public README: CareerOps-style hero (logo, experimental release badges,
+  Built with, manifesto, FAQ, disclaimer, author, Let's connect), plus
+  Agent Access SDK flow diagrams that explain the Bridge injection boundary.
 - Public-cutover review: host-specific paths and per-laptop machine ids
   removed from docs; secret scan recorded in
-  [publication-review.md](docs/publication-review.md).
+  [publication-review.md](docs/publication-review.md). The Discussions
+  **Architecture** category remains an incomplete cutover item until a
+  maintainer rename in the GitHub UI.
 
 ### Fixed
 
+- Windows CI: Linux/macOS SM path helpers use `path.posix` so simulated
+  XDG/`~/.local/bin` locations stay slash-stable, and POSIX `0600` token-file
+  tests skip on NTFS (owner-only bits are not preserved there). An injected
+  Linux `home` no longer inherits the runner `XDG_CONFIG_HOME`.
 - macOS SM setup uses StandardAdditions `displayDialog` (Cmd-V works in
   the hidden-answer token prompt) instead of NSAlert accessory fields that
   crashed on Save. Empty `defaultAnswer` is padded to 8192 characters so

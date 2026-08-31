@@ -14,19 +14,15 @@ claims, so please report it privately.
 
 ## Reporting a vulnerability
 
-GitHub private vulnerability reporting is available only after a repository is
-public. This repository is currently private, so the public reporting button is
-not active yet. At the public-release cutover, the maintainer will enable it
-immediately and verify that the **Report a vulnerability** button appears on the
-repository's Security Advisories page.
+Use GitHub private vulnerability reporting:
+
+https://github.com/ShredFred/bitwarden-agent-credential-bridge/security/advisories/new
 
 Do not create a public issue, pull request, or discussion for a suspected
 vulnerability. Do not include a real credential, token, vault reference, account
 identifier, private endpoint, or raw host output in any report.
 
-Until then, do not disclose exploit details publicly. Contact the repository
-maintainer through a verified private channel and share only the minimum
-information needed to establish secure contact.
+Do not disclose exploit details publicly.
 
 ## What to include
 

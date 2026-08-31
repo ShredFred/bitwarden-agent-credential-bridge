@@ -41,7 +41,7 @@ export function macosBwsCandidatePaths(options = {}) {
     : os.homedir();
   return [
     ...MACOS_BWS_CANDIDATES,
-    path.join(home, '.local', 'bin', 'bws'),
+    path.posix.join(home, '.local', 'bin', 'bws'),
   ];
 }
 
@@ -60,7 +60,7 @@ export function linuxBwsCandidatePaths(options = {}) {
     ? options.home
     : os.homedir();
   return [
-    path.join(home, '.local', 'bin', 'bws'),
+    path.posix.join(home, '.local', 'bin', 'bws'),
     ...LINUX_BWS_CANDIDATES,
   ];
 }

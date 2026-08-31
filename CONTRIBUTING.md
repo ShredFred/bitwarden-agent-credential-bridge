@@ -6,8 +6,9 @@ more than feature count.
 
 ## Before you start
 
-- Read the [README](README.md), [Features](docs/features.md),
-  [Architecture](docs/architecture.md), security policy, and code of conduct.
+- Read the [README](README.md), [How it works](docs/how-it-works.md),
+  [Features](docs/features.md), [Architecture](docs/architecture.md),
+  security policy, and code of conduct.
   Agent-facing rules live in [AGENTS.md](AGENTS.md).
 - Never include a real credential, vault export, token, cookie, recovery code,
   private service inventory, or raw machine output in a commit, issue, pull

@@ -25,12 +25,15 @@ export function defaultLinuxSecretsManagerConfigDir(options = {}) {
   const home = typeof options.home === 'string' && options.home.length > 0
     ? options.home
     : os.homedir();
+  const homeInjected = typeof options.home === 'string' && options.home.length > 0;
   const xdg = typeof options.configHome === 'string' && options.configHome.length > 0
     ? options.configHome
-    : (typeof process.env.XDG_CONFIG_HOME === 'string' && process.env.XDG_CONFIG_HOME.length > 0
+    : (!homeInjected
+      && typeof process.env.XDG_CONFIG_HOME === 'string'
+      && process.env.XDG_CONFIG_HOME.length > 0
       ? process.env.XDG_CONFIG_HOME
-      : path.join(home, '.config'));
-  return path.join(xdg, 'BitwardenAgentCredentialBridge');
+      : path.posix.join(home, '.config'));
+  return path.posix.join(xdg, 'BitwardenAgentCredentialBridge');
 }
 
 /**
@@ -44,7 +47,7 @@ export function defaultLinuxSecretsManagerTokenPath(options = {}) {
   if (typeof options.tokenPath === 'string' && options.tokenPath.length > 0) {
     return options.tokenPath;
   }
-  return path.join(defaultLinuxSecretsManagerConfigDir(options), 'sm-machine.token');
+  return path.posix.join(defaultLinuxSecretsManagerConfigDir(options), 'sm-machine.token');
 }
 
 function assertTokenShape(token) {

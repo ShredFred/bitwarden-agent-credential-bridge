@@ -5,6 +5,7 @@ import path from 'node:path';
 import { describe, it } from 'node:test';
 import {
   LinuxSmTokenFileError,
+  defaultLinuxSecretsManagerTokenPath,
   deleteLinuxOwnerOnlyToken,
   linuxOwnerOnlyTokenPresent,
   readLinuxOwnerOnlyToken,
@@ -19,7 +20,26 @@ describe('linux SM owner-only token file', () => {
     assert.equal(isSecretsManagerSameUserPlatform('win32'), true);
     assert.equal(isSecretsManagerSameUserPlatform('freebsd'), false);
   });
-  it('stores, reads, and deletes a fake token without echoing it', async () => {
+
+  it('places the token file under XDG config with POSIX separators', () => {
+    assert.equal(
+      defaultLinuxSecretsManagerTokenPath({
+        home: '/tmp/fake-linux-home',
+        configHome: '/tmp/fake-xdg-config',
+      }),
+      '/tmp/fake-xdg-config/BitwardenAgentCredentialBridge/sm-machine.token',
+    );
+    assert.equal(
+      defaultLinuxSecretsManagerTokenPath({
+        home: '/tmp/fake-linux-home',
+      }),
+      '/tmp/fake-linux-home/.config/BitwardenAgentCredentialBridge/sm-machine.token',
+    );
+  });
+
+  it('stores, reads, and deletes a fake token without echoing it', {
+    skip: process.platform === 'win32',
+  }, async () => {
     const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'bw-sm-linux-tok-'));
     const tokenPath = path.join(dir, 'sm-machine.token');
     const token = '0.fake-linux-token-value==';

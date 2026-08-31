@@ -42,8 +42,25 @@ Git history is not rewritten. Scan found no live credential values. Do not treat
 GitHub branch rulesets are unavailable on a free-plan **private** repo; they
 are applied immediately after the visibility change.
 
-## First public release
+## Cutover status (2026-08-31)
 
-- Version remains experimental `0.1.0`
-- No production isolation claim
-- Questions → Discussions; vulnerabilities → private advisory reporting
+Completed after `main` received the review commit:
+
+- Repository visibility: **public**
+- Discussions: enabled (present default categories: Announcements, Ideas,
+  Q&A, General, Polls, and Show and tell)
+- Private vulnerability reporting: **enabled**
+- Secret scanning + push protection: **enabled**
+- `main` branch protection: PRs, required CI (`Test on ubuntu-latest`,
+  `Test on windows-latest`), conversation resolution, no force-push, no
+  branch deletion
+- Extra labels: `security`, `research`, `windows`, `macos`, `linux`
+
+Incomplete (required by [public-release-checklist.md](public-release-checklist.md)
+and [development-and-releases.md](development-and-releases.md); GraphQL
+category create/rename mutations are not available on this token):
+
+- Discussions **Architecture** category: not configured. Rename **Show and
+  tell** to **Architecture** in the GitHub UI before treating community-health
+  cutover as complete. Architecture proposals still belong in Discussions;
+  the named category does not exist yet.
