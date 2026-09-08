@@ -46,6 +46,21 @@ maintainer approval before merge.
 
 ## Development principles
 
+`npm test` runs the full suite; `npm run test:ci` runs the bounded CI selection.
+Tests use fake values and temporary fixtures. The two tests that read existing
+Windows disposable DPAPI stores are skipped unless the operator explicitly sets
+`BW_BRIDGE_APPROVE_DISPOSABLE_DPAPI_TESTS=1` for that invocation. Never set this
+variable in CI or a normal development shell. Opt in only after approving the
+fixed disposable development stores; personal and company stores are out of
+scope. A skipped live probe is not proof of live credential integration.
+
+Native Windows build tests require SDK `8.0.423` and the digest-pinned cached
+ILLink `8.0.29` package. When either is absent, the default suite explicitly skips
+the native build; it never installs or downloads prerequisites. Set
+`BW_BRIDGE_REQUIRE_WINDOWS_NATIVE_TESTS=1` when running `npm run test:phase5h10`
+for mandatory native validation. Present but invalid artifacts still fail. A
+skip is not reproducibility, pipe, service, or authorization evidence.
+
 - Prefer standard-library code and pinned, auditable tools.
 - Reject unsupported input; never silently broaden access or fall back to general
   process-environment injection.

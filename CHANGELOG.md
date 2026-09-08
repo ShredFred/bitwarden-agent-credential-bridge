@@ -18,6 +18,22 @@ Semantic Versioning while it remains on the experimental 0.x line.
 
 ### Fixed
 
+- Allowlist updates validate and normalize before touching disk, then publish a
+  fully written, synced temporary file. Invalid input no longer deletes an
+  existing configuration; malformed endpoint types and empty project lists fail
+  closed instead of selecting defaults.
+- Bridge-owned browsers reserve their single-session slot before asynchronous
+  startup. Failed startup or adapter cleanup releases the slot, and cleanup
+  failures cannot leave the agent HTTP listener running or expose raw errors.
+- HTTP sentinel filtering recognizes independently mixed-case percent escapes while preserving
+  literal letter case, including form-encoded query values in responses and logs.
+- Existing-store DPAPI tests require explicit disposable-store opt-in; normal
+  test runs skip them. The native helper inventory test includes the already
+  package-pinned process-query ACL source. Missing pinned native build tools are
+  explicit skips in the default suite, with a strict native-validation opt-in.
+- Windows token-store startup and stdin failures return fixed errors instead of
+  crashing the caller. Unexpected child output terminates the operation without
+  retaining output buffers.
 - Windows CI: Linux/macOS SM path helpers use `path.posix` so simulated
   XDG/`~/.local/bin` locations stay slash-stable, and POSIX `0600` token-file
   tests skip on NTFS (owner-only bits are not preserved there). An injected

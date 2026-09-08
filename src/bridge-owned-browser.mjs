@@ -26,6 +26,21 @@ export class BridgeOwnedBrowserError extends Error {
 }
 
 export const MAX_BRIDGE_OWNED_BROWSERS = 1;
+const ADAPTER_CLOSE_TIMEOUT_MS = 5000;
+
+async function closeAdapter(adapter) {
+  let timer;
+  try {
+    await Promise.race([
+      Promise.resolve().then(() => adapter.close()),
+      new Promise((_, reject) => {
+        timer = setTimeout(() => reject(new BridgeOwnedBrowserError('adapter_failed')), ADAPTER_CLOSE_TIMEOUT_MS);
+      }),
+    ]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 /** @type {number} */
 let activeSessions = 0;
@@ -81,10 +96,13 @@ export async function startBridgeOwnedBrowser(options) {
   }
   const headless = driver === 'fetch' ? true : options.headless !== false;
 
+  // Reserve before the first await: concurrent launches must not both pass
+  // the admission check while Playwright is starting.
+  activeSessions += 1;
   let adapter = options.adapter;
-  if (!adapter) {
-    if (driver === 'playwright') {
-      try {
+  try {
+    if (!adapter) {
+      if (driver === 'playwright') {
         const { createPlaywrightPageAdapter } = await import('./bridge-browser-playwright-adapter.mjs');
         adapter = await createPlaywrightPageAdapter({
           origin: policy.login_origin,
@@ -93,18 +111,19 @@ export async function startBridgeOwnedBrowser(options) {
           headless,
           browser: options.browser,
         });
-      } catch (error) {
-        if (error instanceof BridgeBrowserTargetingError) {
-          throw new BridgeOwnedBrowserError(error.code);
-        }
-        throw new BridgeOwnedBrowserError('playwright_launch_failed');
+      } else {
+        adapter = createFetchPageAdapter({
+          origin: policy.login_origin,
+          loginPath: policy.login_path,
+        });
       }
-    } else {
-      adapter = createFetchPageAdapter({
-        origin: policy.login_origin,
-        loginPath: policy.login_path,
-      });
     }
+  } catch (error) {
+    activeSessions = Math.max(0, activeSessions - 1);
+    if (error instanceof BridgeBrowserTargetingError) {
+      throw new BridgeOwnedBrowserError(error.code);
+    }
+    throw new BridgeOwnedBrowserError('playwright_launch_failed');
   }
 
   /** @type {Set<string>} */
@@ -119,11 +138,11 @@ export async function startBridgeOwnedBrowser(options) {
     });
   };
 
-  activeSessions += 1;
   const sessionId = randomBytes(32).toString('hex');
   const createdAt = Date.now();
   let lastUsedAt = createdAt;
   let closed = false;
+  let closing;
   let loggedIn = false;
   let passwordEntryActive = false;
   let generation = 0;
@@ -175,7 +194,7 @@ export async function startBridgeOwnedBrowser(options) {
   } catch {
     closed = true;
     activeSessions = Math.max(0, activeSessions - 1);
-    await adapter.close();
+    try { await closeAdapter(adapter); } catch { /* Keep the bind error value-free. */ }
     throw new BridgeOwnedBrowserError('bind_failed');
   }
 
@@ -183,7 +202,7 @@ export async function startBridgeOwnedBrowser(options) {
   if (address === null || typeof address === 'string') {
     closed = true;
     activeSessions = Math.max(0, activeSessions - 1);
-    await adapter.close();
+    try { await closeAdapter(adapter); } catch { /* Keep the bind error value-free. */ }
     await closeHttp(server);
     throw new BridgeOwnedBrowserError('bind_failed');
   }
@@ -208,12 +227,20 @@ export async function startBridgeOwnedBrowser(options) {
     baseUrl,
     logs,
     async close() {
-      if (closed) return;
+      if (closing) return closing;
       closed = true;
-      await adapter.close();
-      sensitive.clear();
-      activeSessions = Math.max(0, activeSessions - 1);
-      await closeHttp(server);
+      closing = (async () => {
+        try {
+          await closeAdapter(adapter);
+        } catch {
+          throw new BridgeOwnedBrowserError('adapter_failed');
+        } finally {
+          await closeHttp(server);
+          sensitive.clear();
+          activeSessions = Math.max(0, activeSessions - 1);
+        }
+      })();
+      return closing;
     },
   };
 }

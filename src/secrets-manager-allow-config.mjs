@@ -114,13 +114,20 @@ export async function loadSecretsManagerAllowConfig(
   } catch {
     throw new SecretsManagerAllowConfigError('allow_config_invalid');
   }
-  const config = exactObjectAllowingOptional(parsed);
+  return Object.freeze({ ...validateSecretsManagerAllowConfig(parsed), path: filePath });
+}
+
+/** Validate and normalize a secret-free allowlist before any filesystem mutation. */
+export function validateSecretsManagerAllowConfig(input) {
+  const config = exactObjectAllowingOptional(input);
   if (config.schema_version !== 1 ||
       typeof config.machine_id !== 'string' ||
       !MACHINE_ID.test(config.machine_id)) {
     throw new SecretsManagerAllowConfigError('allow_config_invalid');
   }
-  if (!Array.isArray(config.allowed_project_ids) ||
+  if (utilTypes.isProxy(config.allowed_project_ids) ||
+      !Array.isArray(config.allowed_project_ids) ||
+      Object.getPrototypeOf(config.allowed_project_ids) !== Array.prototype ||
       config.allowed_project_ids.length < 1 ||
       config.allowed_project_ids.length > 16) {
     throw new SecretsManagerAllowConfigError('allow_config_invalid');
@@ -128,7 +135,16 @@ export async function loadSecretsManagerAllowConfig(
   /** @type {string[]} */
   const projectIds = [];
   const seen = new Set();
-  for (const id of config.allowed_project_ids) {
+  const ids = config.allowed_project_ids;
+  if (Reflect.ownKeys(ids).length !== ids.length + 1) {
+    throw new SecretsManagerAllowConfigError('allow_config_invalid');
+  }
+  for (let i = 0; i < ids.length; i += 1) {
+    const descriptor = Object.getOwnPropertyDescriptor(ids, String(i));
+    if (!descriptor || !('value' in descriptor)) {
+      throw new SecretsManagerAllowConfigError('allow_config_invalid');
+    }
+    const id = descriptor.value;
     if (typeof id !== 'string' || !UUID.test(id)) {
       throw new SecretsManagerAllowConfigError('allow_config_invalid');
     }
@@ -146,7 +162,6 @@ export async function loadSecretsManagerAllowConfig(
     machine_id: config.machine_id,
     allowed_project_ids: Object.freeze(projectIds),
     ...endpoints,
-    path: filePath,
   });
 }
 
@@ -185,6 +200,11 @@ export function resolveBwsServerOptions(allow) {
 }
 
 function normalizeEndpoints(config) {
+  for (const key of OPTIONAL_FIELDS) {
+    if (Object.hasOwn(config, key) && typeof config[key] !== 'string') {
+      throw new SecretsManagerAllowConfigError('allow_config_invalid');
+    }
+  }
   const hasServer = typeof config.server_url === 'string';
   const hasApi = typeof config.api_url === 'string';
   const hasIdentity = typeof config.identity_url === 'string';

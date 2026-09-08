@@ -94,10 +94,37 @@ function buildSentinelSensitiveVariants(sentinel) {
       sentinel,
       encodeURIComponent(sentinel),
       encodeURIComponent(sentinel).toLowerCase(),
+      lowerPercentEscapes(encodeURIComponent(sentinel)),
       Buffer.from(sentinel, 'utf8').toString('base64'),
       Buffer.from(sentinel, 'utf8').toString('base64url'),
     ].filter((variant) => variant.length > 0),
   );
+}
+
+// Escape hex digits are case-insensitive; literal credential letters are not.
+function lowerPercentEscapes(value) {
+  return value.replace(/%[0-9a-fA-F]{2}/g, (triplet) => triplet.toLowerCase());
+}
+
+function redactPercentVariant(text, variant) {
+  const canonical = lowerPercentEscapes(text);
+  const needle = lowerPercentEscapes(variant);
+  let cursor = 0;
+  let result = '';
+  for (let at = canonical.indexOf(needle); at !== -1; at = canonical.indexOf(needle, cursor)) {
+    // Canonicalization preserves length, so offsets still refer to original text.
+    result += text.slice(cursor, at) + REDACTED;
+    cursor = at + needle.length;
+  }
+  return result + text.slice(cursor);
+}
+
+function textContainsSensitiveVariant(text, sensitiveVariants) {
+  const canonical = lowerPercentEscapes(text);
+  for (const variant of sensitiveVariants) {
+    if (canonical.includes(lowerPercentEscapes(variant))) return true;
+  }
+  return false;
 }
 
 /**
@@ -111,12 +138,16 @@ function buildQuerySensitiveVariants(queryName, sentinel) {
   const params = new URLSearchParams();
   params.set(queryName, sentinel);
   const serialized = params.toString();
+  const formValue = serialized.slice(serialized.indexOf('=') + 1);
   const encodedValue = encodeURIComponent(sentinel);
   for (const value of [
     `${queryName}=${sentinel}`,
     `${queryName}=${encodedValue}`,
     `${queryName}=${encodedValue.toLowerCase()}`,
     serialized,
+    lowerPercentEscapes(serialized),
+    formValue,
+    lowerPercentEscapes(formValue),
   ]) {
     if (value.length > 0) variants.add(value);
   }
@@ -176,7 +207,7 @@ function redactSensitiveVariants(value, sensitiveVariants) {
     for (const variant of [...sensitiveVariants].sort(
       (left, right) => right.length - left.length,
     )) {
-      safe = safe.split(variant).join(REDACTED);
+      safe = redactPercentVariant(safe, variant);
     }
     return safe;
   }
@@ -694,7 +725,7 @@ function bufferContainsSensitiveVariant(body, sensitiveVariants) {
   for (const variant of sensitiveVariants) {
     if (body.includes(variant)) return true;
   }
-  return false;
+  return textContainsSensitiveVariant(body.toString('utf8'), sensitiveVariants);
 }
 
 /**
@@ -704,9 +735,8 @@ function bufferContainsSensitiveVariant(body, sensitiveVariants) {
  */
 function headersContainSensitiveVariant(headers, sensitiveVariants) {
   for (const [name, value] of headers.entries()) {
-    for (const variant of sensitiveVariants) {
-      if (name.includes(variant) || value.includes(variant)) return true;
-    }
+    if (textContainsSensitiveVariant(name, sensitiveVariants) ||
+        textContainsSensitiveVariant(value, sensitiveVariants)) return true;
   }
   return false;
 }

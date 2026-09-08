@@ -9,9 +9,7 @@ import {
   buildDisposableBitwardenLiveScope,
 } from '../src/disposable-bitwarden-live-gate.mjs';
 
-describe('disposable Bitwarden DPAPI collector', {
-  skip: process.platform !== 'win32',
-}, () => {
+describe('disposable Bitwarden DPAPI collector', () => {
   it('rejects forged scopes', async () => {
     await assert.rejects(
       () => collectDisposableBitwardenDpapiBundle({
@@ -24,7 +22,10 @@ describe('disposable Bitwarden DPAPI collector', {
     );
   });
 
-  it('collects the pinned disposable account under a branded scope without leaking secrets into assertions', async () => {
+  it('collects the pinned disposable account under a branded scope without leaking secrets into assertions', {
+    skip: process.platform !== 'win32' ||
+      process.env.BW_BRIDGE_APPROVE_DISPOSABLE_DPAPI_TESTS !== '1',
+  }, async () => {
     const scope = buildDisposableBitwardenLiveScope();
     let bundle;
     try {

@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import http from 'node:http';
 import { describe, it } from 'node:test';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -126,6 +127,90 @@ async function policyFor(origin) {
 }
 
 describe('bridge-owned playwright driver', () => {
+  it('bounds hung adapter cleanup after bind failure and releases session admission', { timeout: 10000 }, async () => {
+    const occupied = http.createServer();
+    await new Promise((resolve) => occupied.listen(0, '127.0.0.1', resolve));
+    const policy = await policyFor('http://127.0.0.1:9');
+    const credentials = { username: 'user_abcdefgh', password: generateFakeSentinel() };
+    try {
+      await assert.rejects(() => startBridgeOwnedBrowser({
+        policy: withBind(policy, `http://127.0.0.1:${occupied.address().port}`),
+        credentials,
+        adapter: { close: () => new Promise(() => {}) },
+      }), (error) => error instanceof BridgeOwnedBrowserError && error.code === 'bind_failed');
+      const next = await startBridgeOwnedBrowser({ policy, credentials });
+      await next.close();
+    } finally {
+      await new Promise((resolve) => occupied.close(resolve));
+    }
+  });
+
+  it('reserves the single session while browser launch is still pending', async () => {
+    const origin = 'http://127.0.0.1:9';
+    const policy = await policyFor(origin);
+    const credentials = { username: 'user_abcdefgh', password: generateFakeSentinel() };
+    const stub = makeStubPlaywright(origin);
+    const originalLaunch = stub.chromium.launch;
+    let releaseLaunch;
+    let notifyLaunch;
+    const pending = new Promise((resolve) => { releaseLaunch = resolve; });
+    const launched = new Promise((resolve) => { notifyLaunch = resolve; });
+    stub.chromium.launch = async (options) => {
+      notifyLaunch();
+      await pending;
+      return originalLaunch(options);
+    };
+    const first = startBridgeOwnedBrowser({ policy, credentials, driver: 'playwright', playwright: stub });
+    await launched;
+    let unexpected;
+    try {
+      await assert.rejects(async () => {
+        unexpected = await startBridgeOwnedBrowser({
+          policy, credentials, driver: 'playwright', playwright: makeStubPlaywright(origin),
+        });
+      }, (error) => error instanceof BridgeOwnedBrowserError &&
+        error.code === 'concurrent_session_forbidden');
+    } finally {
+      releaseLaunch();
+      await (await first).close();
+      if (unexpected) await unexpected.close();
+    }
+  });
+
+  it('releases the session reservation when browser launch fails', async () => {
+    const origin = 'http://127.0.0.1:9';
+    const policy = await policyFor(origin);
+    const credentials = { username: 'user_abcdefgh', password: generateFakeSentinel() };
+    const stub = makeStubPlaywright(origin);
+    stub.chromium.launch = async () => { throw new Error('fake-launch-failure'); };
+    await assert.rejects(() => startBridgeOwnedBrowser({
+      policy, credentials, driver: 'playwright', playwright: stub,
+    }), (error) => error.code === 'playwright_launch_failed');
+    const next = await startBridgeOwnedBrowser({ policy, credentials });
+    await next.close();
+  });
+
+  it('closes the listener and releases admission even when adapter cleanup fails', async () => {
+    const origin = 'http://127.0.0.1:9';
+    const policy = await policyFor(origin);
+    const credentials = { username: 'user_abcdefgh', password: generateFakeSentinel() };
+    let closes = 0;
+    const session = await startBridgeOwnedBrowser({
+      policy, credentials,
+      adapter: { close: async () => { closes += 1; throw new Error(credentials.password); } },
+    });
+    const results = await Promise.allSettled([session.close(), session.close()]);
+    assert.equal(closes, 1);
+    for (const result of results) {
+      assert.equal(result.status, 'rejected');
+      assert.equal(result.reason.code, 'adapter_failed');
+      assert.equal(String(result.reason).includes(credentials.password), false);
+    }
+    await assert.rejects(() => fetch(`${session.baseUrl}/contract`));
+    const next = await startBridgeOwnedBrowser({ policy, credentials });
+    await next.close();
+  });
+
   it('injects through a Bridge-owned stub browser without exposing cookies or the page', async () => {
     const origin = 'http://127.0.0.1:9';
     const credentials = { username: 'user_abcdefgh', password: generateFakeSentinel() };
