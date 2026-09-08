@@ -178,17 +178,17 @@ export async function startBridgeOwnedBrowser(options) {
     await listenHttp(server, bindUrl);
   } catch {
     closed = true;
-    try { await adapter.close(); } catch { /* Keep the bind error value-free. */ }
     activeSessions = Math.max(0, activeSessions - 1);
+    try { await adapter.close(); } catch { /* Keep the bind error value-free. */ }
     throw new BridgeOwnedBrowserError('bind_failed');
   }
 
   const address = server.address();
   if (address === null || typeof address === 'string') {
     closed = true;
+    activeSessions = Math.max(0, activeSessions - 1);
     try { await adapter.close(); } catch { /* Keep the bind error value-free. */ }
     await closeHttp(server);
-    activeSessions = Math.max(0, activeSessions - 1);
     throw new BridgeOwnedBrowserError('bind_failed');
   }
 
