@@ -25,7 +25,7 @@ Semantic Versioning while it remains on the experimental 0.x line.
 - Bridge-owned browsers reserve their single-session slot before asynchronous
   startup. Failed startup or adapter cleanup releases the slot, and cleanup
   failures cannot leave the agent HTTP listener running or expose raw errors.
-- HTTP sentinel filtering recognizes lowercase percent escapes while preserving
+- HTTP sentinel filtering recognizes independently mixed-case percent escapes while preserving
   literal letter case, including form-encoded query values in responses and logs.
 - Existing-store DPAPI tests require explicit disposable-store opt-in; normal
   test runs skip them. The native helper inventory test includes the already

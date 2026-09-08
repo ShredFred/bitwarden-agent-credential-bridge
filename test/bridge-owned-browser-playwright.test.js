@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import http from 'node:http';
 import { describe, it } from 'node:test';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -126,6 +127,24 @@ async function policyFor(origin) {
 }
 
 describe('bridge-owned playwright driver', () => {
+  it('bounds hung adapter cleanup after bind failure and releases session admission', { timeout: 10000 }, async () => {
+    const occupied = http.createServer();
+    await new Promise((resolve) => occupied.listen(0, '127.0.0.1', resolve));
+    const policy = await policyFor('http://127.0.0.1:9');
+    const credentials = { username: 'user_abcdefgh', password: generateFakeSentinel() };
+    try {
+      await assert.rejects(() => startBridgeOwnedBrowser({
+        policy: withBind(policy, `http://127.0.0.1:${occupied.address().port}`),
+        credentials,
+        adapter: { close: () => new Promise(() => {}) },
+      }), (error) => error instanceof BridgeOwnedBrowserError && error.code === 'bind_failed');
+      const next = await startBridgeOwnedBrowser({ policy, credentials });
+      await next.close();
+    } finally {
+      await new Promise((resolve) => occupied.close(resolve));
+    }
+  });
+
   it('reserves the single session while browser launch is still pending', async () => {
     const origin = 'http://127.0.0.1:9';
     const policy = await policyFor(origin);

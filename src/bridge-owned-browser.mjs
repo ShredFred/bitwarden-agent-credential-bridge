@@ -26,6 +26,21 @@ export class BridgeOwnedBrowserError extends Error {
 }
 
 export const MAX_BRIDGE_OWNED_BROWSERS = 1;
+const ADAPTER_CLOSE_TIMEOUT_MS = 5000;
+
+async function closeAdapter(adapter) {
+  let timer;
+  try {
+    await Promise.race([
+      Promise.resolve().then(() => adapter.close()),
+      new Promise((_, reject) => {
+        timer = setTimeout(() => reject(new BridgeOwnedBrowserError('adapter_failed')), ADAPTER_CLOSE_TIMEOUT_MS);
+      }),
+    ]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 /** @type {number} */
 let activeSessions = 0;
@@ -179,7 +194,7 @@ export async function startBridgeOwnedBrowser(options) {
   } catch {
     closed = true;
     activeSessions = Math.max(0, activeSessions - 1);
-    try { await adapter.close(); } catch { /* Keep the bind error value-free. */ }
+    try { await closeAdapter(adapter); } catch { /* Keep the bind error value-free. */ }
     throw new BridgeOwnedBrowserError('bind_failed');
   }
 
@@ -187,7 +202,7 @@ export async function startBridgeOwnedBrowser(options) {
   if (address === null || typeof address === 'string') {
     closed = true;
     activeSessions = Math.max(0, activeSessions - 1);
-    try { await adapter.close(); } catch { /* Keep the bind error value-free. */ }
+    try { await closeAdapter(adapter); } catch { /* Keep the bind error value-free. */ }
     await closeHttp(server);
     throw new BridgeOwnedBrowserError('bind_failed');
   }
@@ -216,7 +231,7 @@ export async function startBridgeOwnedBrowser(options) {
       closed = true;
       closing = (async () => {
         try {
-          await adapter.close();
+          await closeAdapter(adapter);
         } catch {
           throw new BridgeOwnedBrowserError('adapter_failed');
         } finally {
