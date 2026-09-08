@@ -42,7 +42,10 @@ function assertNoSecret(label, value, secret) {
   }
 }
 
-describe('dev Bitwarden DPAPI live path', { skip: process.platform !== 'win32' }, () => {
+describe('dev Bitwarden DPAPI live path', {
+  skip: process.platform !== 'win32' ||
+    process.env.BW_BRIDGE_APPROVE_DISPOSABLE_DPAPI_TESTS !== '1',
+}, () => {
   it('resolves the fixed DPAPI store under a branded gate without logging secrets', async () => {
     const gate = buildDevBitwardenLiveGate();
     const adapter = createDevBitwardenDpapiAdapter();

@@ -133,10 +133,10 @@ async function publishOnce(root, mutateSource = null) {
 }
 
 describe('native Windows helper service host scaffold', () => {
-  it('contains no network, vault, process-launch, or manifest-executor surface', async () => {
+  it('pins the helper inventory and excludes network, vault, and process-launch surfaces', async () => {
     assert.deepEqual(
       (await fs.readdir(SOURCE)).sort(),
-      [PROJECT, 'AuthorizeSchemaProbe.cs', 'DenialPipeProbe.cs', 'DisposableFirstInstallApply.cs', 'NativeDenialPipeClient.cs', 'NativeServerIdentityVerifier.cs', 'PipeSecurity.cs', 'Program.cs', 'global.json', 'NuGet.Config'].sort(),
+      [PROJECT, 'AuthorizeSchemaProbe.cs', 'DenialPipeProbe.cs', 'DisposableFirstInstallApply.cs', 'NativeDenialPipeClient.cs', 'NativeServerIdentityVerifier.cs', 'PipeSecurity.cs', 'ProcessQueryAcl.cs', 'Program.cs', 'global.json', 'NuGet.Config'].sort(),
     );
     const project = await fs.readFile(path.join(SOURCE, PROJECT), 'utf8');
     assert.equal(project.includes('PackageReference'), false);
@@ -174,7 +174,7 @@ describe('native Windows helper service host scaffold', () => {
     for (const forbiddenTrustee of [';;;WD)', ';;;AN)', ';;;NU)', ';;;BA)', ';;;OW)']) {
       assert.equal(pipeSecurity.includes(forbiddenTrustee), false, forbiddenTrustee);
     }
-    const source = `${program}\n${denialProbe}\n${await fs.readFile(path.join(SOURCE, 'NativeDenialPipeClient.cs'), 'utf8')}\n${serverVerifier}\n${await fs.readFile(path.join(SOURCE, 'PipeSecurity.cs'), 'utf8')}`;
+    const source = `${program}\n${denialProbe}\n${await fs.readFile(path.join(SOURCE, 'NativeDenialPipeClient.cs'), 'utf8')}\n${serverVerifier}\n${await fs.readFile(path.join(SOURCE, 'PipeSecurity.cs'), 'utf8')}\n${await fs.readFile(path.join(SOURCE, 'ProcessQueryAcl.cs'), 'utf8')}`;
     assert.equal(source.match(/CreateFile\(/g)?.length, 3);
     assert.ok(source.includes('GenericRead | FileWriteData | FileWriteAttributes'));
     for (const forbidden of [
@@ -190,7 +190,23 @@ describe('native Windows helper service host scaffold', () => {
   it('publishes deterministically and exercises only the value-free console contract', {
     skip: process.platform !== 'win32',
     timeout: 180000,
-  }, async () => {
+  }, async (t) => {
+    // The default suite also runs on Node-only workstations. Missing offline
+    // prerequisites are an explicit skip, never successful native-build evidence.
+    // Dedicated native validation can require them and fail instead of skipping.
+    try {
+      await fs.access(path.join(
+        os.homedir(), '.nuget', 'packages', 'microsoft.net.illink.tasks', ILLINK_VERSION,
+        `microsoft.net.illink.tasks.${ILLINK_VERSION}.nupkg`,
+      ));
+      await fs.access(path.join(process.env.ProgramFiles, 'dotnet', 'sdk', '8.0.423', 'dotnet.dll'));
+    } catch (error) {
+      if (error.code !== 'ENOENT' || process.env.BW_BRIDGE_REQUIRE_WINDOWS_NATIVE_TESTS === '1') {
+        throw error;
+      }
+      t.skip('offline native build requires SDK 8.0.423 and cached ILLink 8.0.29; native contract not exercised');
+      return;
+    }
     const root = await fs.mkdtemp(path.join(os.tmpdir(), 'bridge-service-build-'));
     try {
       const first = await publishOnce(path.join(root, 'one'));

@@ -1,8 +1,13 @@
 import assert from 'node:assert/strict';
+import childProcess, { execFile } from 'node:child_process';
+import { EventEmitter } from 'node:events';
+import { syncBuiltinESMExports } from 'node:module';
+import { PassThrough } from 'node:stream';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { describe, it } from 'node:test';
+import { promisify } from 'node:util';
 import {
   writeSecretsManagerAllowConfig,
   storeSecretsManagerAccessToken,
@@ -17,6 +22,140 @@ import {
 import { SM_DEFAULT_ALLOWED_PROJECT_IDS } from '../src/secrets-manager-defaults.mjs';
 
 describe('secrets manager local lifecycle', () => {
+  it('reports a missing Windows token-store process without crashing or leaking raw errors', {
+    skip: process.platform !== 'win32',
+  }, async () => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'bw-sm-missing-process-'));
+    const moduleUrl = new URL('../src/secrets-manager-local-lifecycle.mjs', import.meta.url).href;
+    const script = `
+      import { storeSecretsManagerAccessToken } from ${JSON.stringify(moduleUrl)};
+      process.env.SystemRoot = process.argv[1];
+      try {
+        await storeSecretsManagerAccessToken({
+          accessToken: 'FAKE-token-for-missing-process-only', machine_id: 'pc-test',
+        });
+        process.exitCode = 2;
+      } catch (error) {
+        process.stdout.write(JSON.stringify({ name: error.name, code: error.code }));
+      }
+    `;
+    try {
+      const { stdout, stderr } = await promisify(execFile)(process.execPath, ['--input-type=module', '-e', script, dir], {
+        env: { SystemRoot: process.env.SystemRoot, USERPROFILE: dir, LOCALAPPDATA: dir },
+        windowsHide: true, timeout: 5000, maxBuffer: 8192, encoding: 'utf8',
+      });
+      assert.equal(stderr, '');
+      assert.deepEqual(JSON.parse(stdout), {
+        name: 'SecretsManagerLifecycleError', code: 'token_store_failed',
+      });
+      assert.deepEqual(await fs.readdir(dir), []);
+    } finally {
+      await fs.rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('accepts only silent successful Windows token-store children and contains pipe failures', {
+    skip: process.platform !== 'win32',
+  }, async (t) => {
+    const token = 'FAKE-only-for-injected-token-store';
+    const originalSpawn = childProcess.spawn;
+    t.after(() => { childProcess.spawn = originalSpawn; syncBuiltinESMExports(); });
+    for (const mode of ['silent', 'stdout', 'stderr', 'stdin_error', 'nonzero']) {
+      const child = new EventEmitter();
+      child.stdin = new PassThrough();
+      child.stdout = new PassThrough();
+      child.stderr = new PassThrough();
+      let killed = false;
+      child.kill = () => { killed = true; setImmediate(() => child.emit('close', 1)); return true; };
+      child.stdin.once('finish', () => {
+        if (mode === 'stdout' || mode === 'stderr') child[mode].emit('data', Buffer.from(token));
+        if (mode === 'stdin_error') child.stdin.emit('error', new Error(token));
+        setImmediate(() => child.emit('close', mode === 'nonzero' ? 1 : 0));
+      });
+      childProcess.spawn = (_exe, args, options) => {
+        assert.equal(JSON.stringify({ args, env: options.env }).includes(token), false);
+        assert.equal(options.windowsHide, true);
+        return child;
+      };
+      syncBuiltinESMExports();
+      const result = storeSecretsManagerAccessToken({ accessToken: token, machine_id: 'pc-test' });
+      if (mode === 'silent') {
+        assert.equal((await result).stored, true);
+        assert.equal(killed, false);
+      } else {
+        await assert.rejects(() => result, (error) => error.code === 'token_store_failed' &&
+          !String(error).includes(token));
+        assert.equal(killed, mode !== 'nonzero');
+      }
+    }
+  });
+
+  it('preserves the existing allowlist when replacement input is invalid', async () => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'bw-sm-preserve-'));
+    const allowPath = path.join(dir, 'allow.json');
+    try {
+      await writeSecretsManagerAllowConfig({ machine_id: 'pc-original' }, { allowPath });
+      const original = await fs.readFile(allowPath, 'utf8');
+      for (const invalid of [
+        { server_url: 'http://invalid.example.test' },
+        { allowed_project_ids: ['not-a-uuid'] },
+        { allowed_project_ids: [] },
+        { allowed_project_ids: [null] },
+        { server_url: false },
+        { api_url: 'https://api.example.test' },
+      ]) {
+        await assert.rejects(
+          () => writeSecretsManagerAllowConfig({ machine_id: 'pc-new', ...invalid }, { allowPath }),
+          (error) => error instanceof SecretsManagerLifecycleError,
+        );
+        assert.equal(await fs.readFile(allowPath, 'utf8'), original);
+      }
+    } finally {
+      await fs.rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('validates before creating directories and atomically replaces a valid config', async () => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'bw-sm-atomic-'));
+    const allowPath = path.join(dir, 'new', 'allow.json');
+    try {
+      await assert.rejects(() => writeSecretsManagerAllowConfig({
+        machine_id: 'pc-test', server_url: 'http://invalid.example.test',
+      }, { allowPath }));
+      assert.deepEqual(await fs.readdir(dir), []);
+      await writeSecretsManagerAllowConfig({ machine_id: 'pc-old' }, { allowPath });
+      await writeSecretsManagerAllowConfig({
+        machine_id: 'pc-new', server_url: 'https://vault.example.test/',
+      }, { allowPath });
+      const result = JSON.parse(await fs.readFile(allowPath, 'utf8'));
+      assert.equal(result.machine_id, 'pc-new');
+      assert.equal(result.server_url, 'https://vault.example.test');
+      assert.deepEqual(await fs.readdir(path.dirname(allowPath)), ['allow.json']);
+      if (process.platform !== 'win32') {
+        assert.equal((await fs.stat(allowPath)).mode & 0o777, 0o600);
+      }
+    } finally {
+      await fs.rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('preserves a colliding directory and cleans only its own staging file', async () => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'bw-sm-collision-'));
+    const allowPath = path.join(dir, 'allow.json');
+    try {
+      await fs.mkdir(allowPath);
+      await fs.writeFile(path.join(allowPath, 'keep.txt'), 'synthetic unrelated data');
+      await assert.rejects(() => writeSecretsManagerAllowConfig({
+        machine_id: 'pc-test',
+      }, { allowPath }), (error) => error instanceof SecretsManagerLifecycleError &&
+        error.code === 'allow_config_write_failed' && !String(error).includes(dir));
+      assert.deepEqual(await fs.readdir(dir), ['allow.json']);
+      assert.equal(await fs.readFile(path.join(allowPath, 'keep.txt'), 'utf8'), 'synthetic unrelated data');
+    } finally {
+      await fs.rm(dir, { recursive: true, force: true });
+    }
+  });
+
   it('writes allowlist defaults, stores token via inject, and uninstalls cleanly', async () => {
     const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'bw-sm-life-'));
     const allowPath = path.join(dir, 'sm-machine.allow.json');

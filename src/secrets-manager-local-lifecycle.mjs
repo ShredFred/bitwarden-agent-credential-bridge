@@ -1,4 +1,5 @@
 import { execFile, execFileSync, spawn } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -8,6 +9,7 @@ import { promisify } from 'node:util';
 import {
   defaultSecretsManagerAllowPath,
   loadSecretsManagerAllowConfig,
+  validateSecretsManagerAllowConfig,
   SecretsManagerAllowConfigError,
 } from './secrets-manager-allow-config.mjs';
 import {
@@ -149,20 +151,19 @@ export async function writeSecretsManagerAllowConfig(input, options = {}) {
   if (typeof input.machine_id !== 'string' || !MACHINE_ID.test(input.machine_id)) {
     throw new SecretsManagerLifecycleError('invalid_machine_id');
   }
-  const projectIds = Array.isArray(input.allowed_project_ids) &&
-    input.allowed_project_ids.length > 0
-    ? input.allowed_project_ids
-    : [...SM_DEFAULT_ALLOWED_PROJECT_IDS];
-  if (projectIds.length < 1 || projectIds.length > 16) {
+  const projectIds = input.allowed_project_ids === undefined
+    ? [...SM_DEFAULT_ALLOWED_PROJECT_IDS]
+    : input.allowed_project_ids;
+  if (!Array.isArray(projectIds) || projectIds.length < 1 || projectIds.length > 16) {
     throw new SecretsManagerLifecycleError('invalid_project_ids');
   }
   /** @type {Record<string, unknown>} */
   const payload = {
     schema_version: 1,
     machine_id: input.machine_id,
-    allowed_project_ids: projectIds.map((id) => id.toLowerCase()),
+    allowed_project_ids: projectIds,
   };
-  if (typeof input.server_url === 'string' && input.server_url.length > 0) {
+  if (input.server_url !== undefined) {
     payload.server_url = input.server_url;
   }
   if (typeof input.api_url === 'string' && typeof input.identity_url === 'string') {
@@ -171,23 +172,39 @@ export async function writeSecretsManagerAllowConfig(input, options = {}) {
   } else if (input.api_url !== undefined || input.identity_url !== undefined) {
     throw new SecretsManagerLifecycleError('invalid_endpoints');
   }
-  // Validate by round-tripping through loader rules via JSON write + parse path.
-  const allowPath = options.allowPath ?? defaultSecretsManagerAllowPath();
-  await fs.mkdir(path.dirname(allowPath), { recursive: true });
-  const body = `${JSON.stringify(payload, null, 2)}\n`;
-  await fs.writeFile(allowPath, body, { encoding: 'utf8', mode: 0o600 });
+  let validated;
   try {
-    const { loadSecretsManagerAllowConfig } = await import('./secrets-manager-allow-config.mjs');
-    await loadSecretsManagerAllowConfig(allowPath);
+    validated = validateSecretsManagerAllowConfig(payload);
   } catch {
-    await fs.unlink(allowPath).catch(() => {});
-    throw new SecretsManagerLifecycleError('invalid_endpoints');
+    throw new SecretsManagerLifecycleError('invalid_allow_config');
+  }
+  const allowPath = options.allowPath ?? defaultSecretsManagerAllowPath();
+  const body = `${JSON.stringify(validated, null, 2)}\n`;
+  let temporaryPath;
+  let handle;
+  try {
+    await fs.mkdir(path.dirname(allowPath), { recursive: true });
+    // Never truncate an existing config. Publish only a complete, synced file.
+    const candidate = `${allowPath}.${randomUUID()}.tmp`;
+    handle = await fs.open(candidate, 'wx', 0o600);
+    temporaryPath = candidate;
+    await handle.writeFile(body, 'utf8');
+    await handle.sync();
+    await handle.close();
+    handle = undefined;
+    await fs.rename(temporaryPath, allowPath);
+    temporaryPath = undefined;
+  } catch {
+    throw new SecretsManagerLifecycleError('allow_config_write_failed');
+  } finally {
+    if (handle) await handle.close().catch(() => {});
+    if (temporaryPath) await fs.unlink(temporaryPath).catch(() => {});
   }
   return {
     path: allowPath,
-    machine_id: input.machine_id,
-    project_count: projectIds.length,
-    cloud_default: payload.server_url === undefined && payload.api_url === undefined,
+    machine_id: validated.machine_id,
+    project_count: validated.allowed_project_ids.length,
+    cloud_default: validated.server_url === undefined && validated.api_url === undefined,
   };
 }
 
@@ -381,24 +398,28 @@ async function storeWindowsDpapiToken(accessToken, machineId) {
       },
       stdio: ['pipe', 'pipe', 'pipe'],
     });
-    let stdout = '';
-    let stderr = '';
-    const timer = setTimeout(() => {
+    let failed = false;
+    const fail = () => {
+      failed = true;
       child.kill();
-      resolve({ code: 1, stdout, stderr: 'timeout' });
-    }, 20000);
-    child.stdout.on('data', (chunk) => { stdout += chunk; });
-    child.stderr.on('data', (chunk) => { stderr += chunk; });
+    };
+    const timer = setTimeout(fail, 20000);
+    // The store protocol is silent. Never buffer output that could contain a token.
+    child.stdout.on('data', fail);
+    child.stderr.on('data', fail);
+    child.stdin.on('error', fail);
+    child.on('error', () => {
+      failed = true;
+      clearTimeout(timer);
+      resolve(false);
+    });
     child.on('close', (code) => {
       clearTimeout(timer);
-      resolve({ code: code ?? 1, stdout, stderr });
+      resolve(!failed && code === 0);
     });
-    child.stdin.write(`${accessToken}\n`);
-    child.stdin.end();
-  });
-  if (result.code !== 0 ||
-      (typeof result.stderr === 'string' && result.stderr.trim().length > 0) ||
-      (typeof result.stdout === 'string' && result.stdout.trim().length > 0)) {
+    child.stdin.end(`${accessToken}\n`);
+  }).catch(() => false);
+  if (!result) {
     throw new SecretsManagerLifecycleError('token_store_failed');
   }
 }

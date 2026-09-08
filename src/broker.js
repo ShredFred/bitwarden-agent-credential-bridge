@@ -94,10 +94,16 @@ function buildSentinelSensitiveVariants(sentinel) {
       sentinel,
       encodeURIComponent(sentinel),
       encodeURIComponent(sentinel).toLowerCase(),
+      lowerPercentEscapes(encodeURIComponent(sentinel)),
       Buffer.from(sentinel, 'utf8').toString('base64'),
       Buffer.from(sentinel, 'utf8').toString('base64url'),
     ].filter((variant) => variant.length > 0),
   );
+}
+
+// Escape hex digits are case-insensitive; literal credential letters are not.
+function lowerPercentEscapes(value) {
+  return value.replace(/%[0-9A-F]{2}/g, (triplet) => triplet.toLowerCase());
 }
 
 /**
@@ -111,12 +117,16 @@ function buildQuerySensitiveVariants(queryName, sentinel) {
   const params = new URLSearchParams();
   params.set(queryName, sentinel);
   const serialized = params.toString();
+  const formValue = serialized.slice(serialized.indexOf('=') + 1);
   const encodedValue = encodeURIComponent(sentinel);
   for (const value of [
     `${queryName}=${sentinel}`,
     `${queryName}=${encodedValue}`,
     `${queryName}=${encodedValue.toLowerCase()}`,
     serialized,
+    lowerPercentEscapes(serialized),
+    formValue,
+    lowerPercentEscapes(formValue),
   ]) {
     if (value.length > 0) variants.add(value);
   }
