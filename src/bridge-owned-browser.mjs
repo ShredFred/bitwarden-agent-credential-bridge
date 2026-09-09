@@ -30,9 +30,11 @@ const ADAPTER_CLOSE_TIMEOUT_MS = 5000;
 
 async function closeAdapter(adapter) {
   let timer;
+  const closing = Promise.resolve().then(() => adapter.close());
+  closing.catch(() => {}); // Late close rejections after timeout stay value-free.
   try {
     await Promise.race([
-      Promise.resolve().then(() => adapter.close()),
+      closing,
       new Promise((_, reject) => {
         timer = setTimeout(() => reject(new BridgeOwnedBrowserError('adapter_failed')), ADAPTER_CLOSE_TIMEOUT_MS);
       }),
