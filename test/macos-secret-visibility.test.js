@@ -24,12 +24,13 @@ const shown = row.revealed && !plain.hidden && secure.hidden && unwrap(plain.str
 plain.stringValue = 'generated-fake-edited-only'
 visibilityTarget.toggleSecret(button)
 const hidden = !row.revealed && plain.hidden && !secure.hidden && unwrap(secure.stringValue) === 'generated-fake-edited-only' && unwrap(plain.stringValue) === ''
-writeJson({ shown: shown, hidden: hidden })
+const icon = makeDialogIcon()
+writeJson({ shown: shown, hidden: hidden, iconAvailable: Boolean(icon) })
 `);
     const result = spawnSync('/usr/bin/osascript', ['-l', 'JavaScript', script], { encoding: 'utf8', timeout: 10000 });
     assert.equal(result.status, 0, result.stderr);
     assert.equal(result.stdout.includes('generated-fake'), false);
-    assert.deepEqual(JSON.parse(result.stdout), { shown: true, hidden: true });
+    assert.deepEqual(JSON.parse(result.stdout), { shown: true, hidden: true, iconAvailable: true });
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
