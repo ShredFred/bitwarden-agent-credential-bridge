@@ -155,6 +155,10 @@ const UUID =
 
 function withServerArgs(args, serverUrl) {
   if (typeof serverUrl === 'string' && serverUrl.length > 0) {
+    const end = args.indexOf('--');
+    if (end >= 0) {
+      return [...args.slice(0, end), '--server-url', serverUrl, ...args.slice(end)];
+    }
     return [...args, '--server-url', serverUrl];
   }
   return args;
@@ -330,7 +334,8 @@ export async function upsertSecretsManagerSecret(options) {
     const editArgs = [
       'secret', 'edit', matches[0].id,
       '--key', options.secretKey,
-      '--value', options.secretValue,
+      // `=` form: a value starting with '-' would otherwise parse as a flag.
+      `--value=${options.secretValue}`,
       '--output', 'json',
       '--access-token', options.accessToken,
     ];
@@ -343,11 +348,13 @@ export async function upsertSecretsManagerSecret(options) {
 
   await run(bwsPath, withServerArgs([
     'secret', 'create',
+    '--output', 'json',
+    '--access-token', options.accessToken,
+    // Positionals after `--`: a value starting with '-' would otherwise parse as a flag.
+    '--',
     options.secretKey,
     options.secretValue,
     projectId,
-    '--output', 'json',
-    '--access-token', options.accessToken,
   ], serverUrl));
   return Object.freeze({ ok: true, action: 'created' });
 }
