@@ -38,11 +38,45 @@ const WINDOWS_SCRIPT = path.join(
 );
 
 export class SecretsManagerTokenCollectorError extends Error {
-  constructor(code) {
-    super(`Secrets Manager token collector rejected: ${code}`);
+  /**
+   * @param {string} code
+   * @param {string} [reason] non-secret classification (timeout, exit_<n>,
+   *   stderr, spawn_<code>) -- never stdout or stderr content.
+   */
+  constructor(code, reason) {
+    super(reason
+      ? `Secrets Manager token collector rejected: ${code} reason=${reason}`
+      : `Secrets Manager token collector rejected: ${code}`);
     this.name = 'SecretsManagerTokenCollectorError';
     this.code = code;
+    if (reason) this.reason = reason;
   }
+}
+
+/**
+ * Default child timeout for the DPAPI token probe. 15 s was too short under
+ * memory pressure (2026-11-06: Windows PowerShell cold start took longer while
+ * free RAM was below 1 GB, every abort surfaced as an opaque
+ * token_probe_failed). Override with BWS_BRIDGE_SM_TOKEN_PROBE_TIMEOUT_MS.
+ */
+export const DEFAULT_TOKEN_PROBE_TIMEOUT_MS = 60000;
+
+export function resolveTokenProbeTimeoutMs(env = process.env) {
+  const raw = Number(env?.BWS_BRIDGE_SM_TOKEN_PROBE_TIMEOUT_MS);
+  if (Number.isInteger(raw) && raw >= 1000 && raw <= 600000) return raw;
+  return DEFAULT_TOKEN_PROBE_TIMEOUT_MS;
+}
+
+/** Classify an execFile failure without touching its output. */
+export function classifyExecFailure(error) {
+  if (error?.killed === true || error?.signal === 'SIGTERM' || error?.code === 'ETIMEDOUT') {
+    return 'timeout';
+  }
+  if (typeof error?.code === 'number') return `exit_${error.code}`;
+  if (typeof error?.code === 'string' && /^[A-Z0-9_]{1,32}$/.test(error.code)) {
+    return `spawn_${error.code}`;
+  }
+  return 'unknown';
 }
 
 export function defaultMacSecretsManagerTokenPath() {
@@ -55,8 +89,11 @@ export function defaultMacSecretsManagerTokenPath() {
   );
 }
 
-async function readWindowsDpapiToken() {
-  if (process.platform !== 'win32') {
+export async function readWindowsDpapiToken(options = {}) {
+  const platform = options.platform ?? process.platform;
+  const run = typeof options.execFile === 'function' ? options.execFile : execFileAsync;
+  const timeoutMs = options.timeoutMs ?? resolveTokenProbeTimeoutMs();
+  if (platform !== 'win32') {
     throw new SecretsManagerTokenCollectorError('unsupported_platform');
   }
   const systemRoot = process.env.SystemRoot;
@@ -74,8 +111,9 @@ async function readWindowsDpapiToken() {
   let stdout = '';
   let stderr = '';
   let code = 1;
+  let reason = null;
   try {
-    const result = await execFileAsync(powershell, [
+    const result = await run(powershell, [
       '-NoLogo',
       '-NoProfile',
       '-NonInteractive',
@@ -87,7 +125,7 @@ async function readWindowsDpapiToken() {
       SM_MACHINE_TOKEN_PURPOSE_SHA256,
     ], {
       windowsHide: true,
-      timeout: 15000,
+      timeout: timeoutMs,
       maxBuffer: 64 * 1024,
       encoding: 'utf8',
       env: {
@@ -105,10 +143,14 @@ async function readWindowsDpapiToken() {
     code = typeof error?.code === 'number' ? error.code : 1;
     stdout = typeof error?.stdout === 'string' ? error.stdout : '';
     stderr = typeof error?.stderr === 'string' ? error.stderr : '';
+    reason = classifyExecFailure(error);
   }
 
-  if (code !== 0 || (typeof stderr === 'string' && stderr.length > 0)) {
-    throw new SecretsManagerTokenCollectorError('token_probe_failed');
+  if (code !== 0) {
+    throw new SecretsManagerTokenCollectorError('token_probe_failed', reason ?? `exit_${code}`);
+  }
+  if (typeof stderr === 'string' && stderr.length > 0) {
+    throw new SecretsManagerTokenCollectorError('token_probe_failed', 'stderr');
   }
   if (typeof stdout !== 'string' || stdout.length < 16 || stdout.length > 8192) {
     throw new SecretsManagerTokenCollectorError('invalid_token');
