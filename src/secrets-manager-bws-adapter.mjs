@@ -15,10 +15,13 @@ const execFileAsync = promisify(execFile);
  */
 
 export class SecretsManagerBwsAdapterError extends Error {
-  constructor(code) {
-    super(`Secrets Manager bws adapter rejected: ${code}`);
+  constructor(code, reason) {
+    super(reason
+      ? `Secrets Manager bws adapter rejected: ${code} reason=${reason}`
+      : `Secrets Manager bws adapter rejected: ${code}`);
     this.name = 'SecretsManagerBwsAdapterError';
     this.code = code;
+    if (reason) this.reason = reason;
   }
 }
 
@@ -155,6 +158,10 @@ const UUID =
 
 function withServerArgs(args, serverUrl) {
   if (typeof serverUrl === 'string' && serverUrl.length > 0) {
+    const end = args.indexOf('--');
+    if (end >= 0) {
+      return [...args.slice(0, end), '--server-url', serverUrl, ...args.slice(end)];
+    }
     return [...args, '--server-url', serverUrl];
   }
   return args;
@@ -330,7 +337,8 @@ export async function upsertSecretsManagerSecret(options) {
     const editArgs = [
       'secret', 'edit', matches[0].id,
       '--key', options.secretKey,
-      '--value', options.secretValue,
+      // `=` form: a value starting with '-' would otherwise parse as a flag.
+      `--value=${options.secretValue}`,
       '--output', 'json',
       '--access-token', options.accessToken,
     ];
@@ -343,11 +351,13 @@ export async function upsertSecretsManagerSecret(options) {
 
   await run(bwsPath, withServerArgs([
     'secret', 'create',
+    '--output', 'json',
+    '--access-token', options.accessToken,
+    // Positionals after `--`: a value starting with '-' would otherwise parse as a flag.
+    '--',
     options.secretKey,
     options.secretValue,
     projectId,
-    '--output', 'json',
-    '--access-token', options.accessToken,
   ], serverUrl));
   return Object.freeze({ ok: true, action: 'created' });
 }
@@ -497,14 +507,24 @@ export async function deleteSecretsManagerSecret(options) {
   return Object.freeze({ ok: true, action: 'deleted' });
 }
 
+/** bws child timeout; 30 s aborted under memory pressure. Env override. */
+export const DEFAULT_BWS_TIMEOUT_MS = 90000;
+
+export function resolveBwsTimeoutMs(env = process.env) {
+  const raw = Number(env?.BWS_BRIDGE_BWS_TIMEOUT_MS);
+  if (Number.isInteger(raw) && raw >= 1000 && raw <= 600000) return raw;
+  return DEFAULT_BWS_TIMEOUT_MS;
+}
+
 async function defaultRunCommand(executable, args, runOptions = {}) {
   let stdout = '';
   let stderr = '';
   let code = 1;
+  let reason = null;
   try {
     const result = await execFileAsync(executable, args, {
       windowsHide: true,
-      timeout: 30000,
+      timeout: resolveBwsTimeoutMs(),
       maxBuffer: 1024 * 1024,
       encoding: 'utf8',
       env: {
@@ -530,9 +550,12 @@ async function defaultRunCommand(executable, args, runOptions = {}) {
     code = typeof error?.code === 'number' ? error.code : 1;
     stdout = typeof error?.stdout === 'string' ? error.stdout : '';
     stderr = typeof error?.stderr === 'string' ? error.stderr : '';
+    reason = (error?.killed === true || error?.signal === 'SIGTERM')
+      ? 'timeout'
+      : (typeof error?.code === 'number' ? `exit_${error.code}` : 'unknown');
   }
   if (code !== 0) {
-    throw new SecretsManagerBwsAdapterError('bws_failed');
+    throw new SecretsManagerBwsAdapterError('bws_failed', reason ?? `exit_${code}`);
   }
   if (typeof stderr === 'string' && stderr.trim().length > 0) {
     throw new SecretsManagerBwsAdapterError('bws_stderr');

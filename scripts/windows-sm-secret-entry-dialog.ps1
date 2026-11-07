@@ -665,7 +665,11 @@ $btnOk.Add_Click({
       $proc = New-Object System.Diagnostics.Process
       $proc.StartInfo = $psi
       [void]$proc.Start()
-      $proc.StandardInput.Write($values[$key])
+      # Raw UTF-8 bytes without BOM: StandardInput.Write would encode with the
+      # console input encoding and prepend a BOM that ends up inside the secret.
+      $valueBytes = [System.Text.UTF8Encoding]::new($false).GetBytes([string]$values[$key])
+      $proc.StandardInput.BaseStream.Write($valueBytes, 0, $valueBytes.Length)
+      $proc.StandardInput.BaseStream.Flush()
       $proc.StandardInput.Close()
       $stdout = $proc.StandardOutput.ReadToEnd()
       $null = $proc.StandardError.ReadToEnd()

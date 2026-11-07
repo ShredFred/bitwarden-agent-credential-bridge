@@ -47,7 +47,10 @@ function readStdinLine() {
     process.stdin.on('data', (chunk) => { data += chunk; });
     process.stdin.on('end', () => {
       clearTimeout(timer);
-      resolve(data.replace(/\r?\n$/, ''));
+      // Windows PowerShell 5.1 writers prepend a UTF-8 BOM to redirected stdin;
+      // depending on the console code page it arrives as U+FEFF or as the
+      // mis-decoded "ï»¿". Either way it is not part of the value.
+      resolve(data.replace(/^(?:﻿|ï»¿)/, '').replace(/\r?\n$/, ''));
     });
     process.stdin.on('error', (error) => {
       clearTimeout(timer);
