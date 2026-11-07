@@ -60,3 +60,44 @@ describe('secrets manager token collector', () => {
     }
   });
 });
+
+describe('secrets manager token probe under load', async () => {
+  const mod = await import('../src/secrets-manager-token-collector.mjs');
+
+  it('defaults to a 60 s timeout and honours a bounded env override', () => {
+    assert.equal(mod.resolveTokenProbeTimeoutMs({}), 60000);
+    assert.equal(mod.resolveTokenProbeTimeoutMs({ BWS_BRIDGE_SM_TOKEN_PROBE_TIMEOUT_MS: '90000' }), 90000);
+    assert.equal(mod.resolveTokenProbeTimeoutMs({ BWS_BRIDGE_SM_TOKEN_PROBE_TIMEOUT_MS: '5' }), 60000);
+  });
+
+  it('passes the timeout to the child and reports reason=timeout without output', async () => {
+    let seen;
+    const leaked = 'stderr-could-hold-anything';
+    await assert.rejects(
+      () => mod.readWindowsDpapiToken({
+        platform: 'win32',
+        timeoutMs: 42000,
+        execFile: async (_exe, _args, opts) => {
+          seen = opts.timeout;
+          const e = new Error('killed');
+          e.killed = true; e.signal = 'SIGTERM'; e.code = null; e.stderr = leaked;
+          throw e;
+        },
+      }),
+      (error) => error.code === 'token_probe_failed' && error.reason === 'timeout' &&
+        /token_probe_failed reason=timeout/.test(error.message) && !error.message.includes(leaked),
+    );
+    assert.equal(seen, 42000);
+  });
+
+  it('reports exit code and stderr presence as reasons', async () => {
+    await assert.rejects(
+      () => mod.readWindowsDpapiToken({ platform: 'win32', execFile: async () => { const e = new Error('x'); e.code = 15; throw e; } }),
+      (error) => error.reason === 'exit_15',
+    );
+    await assert.rejects(
+      () => mod.readWindowsDpapiToken({ platform: 'win32', execFile: async () => ({ stdout: 'x'.repeat(20), stderr: 'warn' }) }),
+      (error) => error.reason === 'stderr' && !error.message.includes('warn'),
+    );
+  });
+});
