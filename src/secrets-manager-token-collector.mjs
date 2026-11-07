@@ -99,11 +99,12 @@ export function defaultMacSecretsManagerTokenPath() {
 export async function readWindowsDpapiToken(options = {}) {
   const platform = options.platform ?? process.platform;
   const run = typeof options.execFile === 'function' ? options.execFile : execFileAsync;
+  const env = options.env ?? process.env;
   const timeoutMs = options.timeoutMs ?? resolveTokenProbeTimeoutMs();
   if (platform !== 'win32') {
     throw new SecretsManagerTokenCollectorError('unsupported_platform');
   }
-  const systemRoot = process.env.SystemRoot;
+  const systemRoot = env.SystemRoot;
   if (typeof systemRoot !== 'string' || systemRoot.length < 1) {
     throw new SecretsManagerTokenCollectorError('system_root_absent');
   }
@@ -137,10 +138,10 @@ export async function readWindowsDpapiToken(options = {}) {
       encoding: 'utf8',
       env: {
         SystemRoot: systemRoot,
-        USERPROFILE: process.env.USERPROFILE,
-        LOCALAPPDATA: process.env.LOCALAPPDATA,
-        windir: process.env.windir,
-        PATH: process.env.PATH,
+        USERPROFILE: env.USERPROFILE,
+        LOCALAPPDATA: env.LOCALAPPDATA,
+        windir: env.windir,
+        PATH: env.PATH,
       },
     });
     stdout = result.stdout;

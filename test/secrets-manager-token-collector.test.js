@@ -63,6 +63,8 @@ describe('secrets manager token collector', () => {
 
 describe('secrets manager token probe under load', async () => {
   const mod = await import('../src/secrets-manager-token-collector.mjs');
+  // The probe is Windows-only; inject a fake SystemRoot so the injected execFile runs on every CI platform.
+  const fakeWinEnv = { SystemRoot: 'C:/Windows' };
 
   it('defaults to a 60 s timeout and honours a bounded env override', () => {
     assert.equal(mod.resolveTokenProbeTimeoutMs({}), 60000);
@@ -76,6 +78,7 @@ describe('secrets manager token probe under load', async () => {
     await assert.rejects(
       () => mod.readWindowsDpapiToken({
         platform: 'win32',
+        env: fakeWinEnv,
         timeoutMs: 42000,
         execFile: async (_exe, _args, opts) => {
           seen = opts.timeout;
@@ -92,11 +95,11 @@ describe('secrets manager token probe under load', async () => {
 
   it('reports exit code and stderr presence as reasons', async () => {
     await assert.rejects(
-      () => mod.readWindowsDpapiToken({ platform: 'win32', execFile: async () => { const e = new Error('x'); e.code = 15; throw e; } }),
+      () => mod.readWindowsDpapiToken({ platform: 'win32', env: fakeWinEnv, execFile: async () => { const e = new Error('x'); e.code = 15; throw e; } }),
       (error) => error.reason === 'exit_15',
     );
     await assert.rejects(
-      () => mod.readWindowsDpapiToken({ platform: 'win32', execFile: async () => ({ stdout: 'x'.repeat(20), stderr: 'warn' }) }),
+      () => mod.readWindowsDpapiToken({ platform: 'win32', env: fakeWinEnv, execFile: async () => ({ stdout: 'x'.repeat(20), stderr: 'warn' }) }),
       (error) => error.reason === 'stderr' && !error.message.includes('warn'),
     );
   });
